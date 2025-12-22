@@ -112,7 +112,7 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
                 <CardTitle className="text-purple-600">Facial Screening</CardTitle>
                 <CardDescription className="flex items-center gap-2 mt-1">
                   <Baby className="w-4 h-4" />
-                  {child?.name}
+                  {child?.firstName} {child?.lastName}
                 </CardDescription>
               </div>
             </div>

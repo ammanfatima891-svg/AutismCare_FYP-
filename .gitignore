@@ -114,3 +114,6 @@ Desktop.ini
 # Vite
 dist-ssr
 *.local
+TODO.md
+test_document.txt
+server/.env

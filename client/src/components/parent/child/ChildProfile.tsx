@@ -1,43 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
-import { 
-  Edit, 
-  Calendar, 
-  Activity, 
-  FileText, 
+import {
+  Edit,
+  FileText,
   TrendingUp,
   ClipboardCheck,
   Pill,
   AlertCircle,
-  Phone
+  Phone,
+  Activity
 } from 'lucide-react';
 import { Progress } from '../../ui/progress';
+import { childAPI } from '../../../api';
 
 interface ChildProfileProps {
-  childId: number;
+  childId: string;
 }
 
 export function ChildProfile({ childId }: ChildProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [child, setChild] = useState<any>(null);
+  const [screeningStatus, setScreeningStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data
-  const child = {
-    id: childId,
-    firstName: 'Emma',
-    lastName: 'Johnson',
-    fullName: 'Emma Johnson',
-    age: 4,
-    dateOfBirth: '2020-03-15',
-    gender: 'Female',
-    medicalHistory: 'No significant medical history',
-    allergies: 'None',
-    currentMedications: 'None',
-    emergencyContact: 'John Johnson',
-    emergencyPhone: '+1 (555) 123-4567',
-  };
+  useEffect(() => {
+    const fetchChildData = async () => {
+      try {
+        const [childResponse, screeningResponse] = await Promise.all([
+          childAPI.getChildById(childId),
+          childAPI.getChildScreeningStatus(childId)
+        ]);
+
+        setChild(childResponse.data.data);
+        setScreeningStatus(screeningResponse.data.data);
+      } catch (err) {
+        setError('Failed to load child data');
+        console.error('Error fetching child:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChildData();
+  }, [childId]);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64">Loading...</div>;
+  }
+
+  if (error || !child) {
+    return <div className="flex justify-center items-center h-64 text-red-500">{error || 'Child not found'}</div>;
+  }
+
+  const fullName = `${child.firstName} ${child.lastName}`;
+  const age = Math.floor((new Date().getTime() - new Date(child.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 
   const screeningHistory = [
     {
@@ -58,38 +78,7 @@ export function ChildProfile({ childId }: ChildProfileProps) {
     },
   ];
 
-  const appointments = [
-    {
-      id: 1,
-      type: 'Speech Therapy',
-      provider: 'Dr. Sarah Johnson',
-      date: '2024-11-05',
-      time: '10:00 AM',
-      status: 'upcoming',
-    },
-    {
-      id: 2,
-      type: 'Occupational Therapy',
-      provider: 'Alex Martinez',
-      date: '2024-11-07',
-      time: '2:00 PM',
-      status: 'upcoming',
-    },
-    {
-      id: 3,
-      type: 'Follow-up Assessment',
-      provider: 'Dr. Emily Chen',
-      date: '2024-10-01',
-      time: '3:00 PM',
-      status: 'completed',
-    },
-  ];
 
-  const activities = [
-    { id: 1, name: 'Daily Routine Practice', completed: 12, total: 15, category: 'Life Skills' },
-    { id: 2, name: 'Color Recognition', completed: 8, total: 10, category: 'Cognitive' },
-    { id: 3, name: 'Social Skills', completed: 5, total: 8, category: 'Social' },
-  ];
 
   return (
     <div className="space-y-6">
@@ -102,8 +91,8 @@ export function ChildProfile({ childId }: ChildProfileProps) {
                 {child.firstName[0]}
               </div>
               <div>
-                <h2 className="text-pink-600 mb-1">{child.fullName}</h2>
-                <p className="text-gray-600">{child.age} years old • {child.gender}</p>
+                <h2 className="text-pink-600 mb-1">{fullName}</h2>
+                <p className="text-gray-600">{age} years old • {child.gender}</p>
                 <p className="text-sm text-gray-500 mt-1">
                   Born: {new Date(child.dateOfBirth).toLocaleDateString()}
                 </p>
@@ -123,11 +112,9 @@ export function ChildProfile({ childId }: ChildProfileProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-2 lg:w-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="screening">Screening</TabsTrigger>
-          <TabsTrigger value="appointments">Appointments</TabsTrigger>
-          <TabsTrigger value="activities">Activities</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -144,11 +131,11 @@ export function ChildProfile({ childId }: ChildProfileProps) {
               <CardContent className="space-y-3">
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-gray-600">Full Name</span>
-                  <span className="text-gray-900">{child.fullName}</span>
+                  <span className="text-gray-900">{fullName}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-gray-600">Age</span>
-                  <span className="text-gray-900">{child.age} years</span>
+                  <span className="text-gray-900">{age} years</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-gray-600">Gender</span>
@@ -221,23 +208,35 @@ export function ChildProfile({ childId }: ChildProfileProps) {
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">Screenings Completed</span>
-                    <span className="text-gray-900">{screeningHistory.length}</span>
+                    <span className="text-gray-900">{screeningStatus?.totalScreenings || 0}</span>
                   </div>
-                  <Progress value={100} className="h-2" />
+                  <Progress value={screeningStatus?.totalScreenings > 0 ? 100 : 0} className="h-2" />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Appointments Attended</span>
-                    <span className="text-gray-900">1 of 3</span>
+                    <span className="text-gray-600">Current Status</span>
+                    <span className="text-gray-900">{screeningStatus?.overallStatus || 'Not Screened'}</span>
                   </div>
-                  <Progress value={33} className="h-2" />
+                  <Progress
+                    value={
+                      screeningStatus?.latestRiskLevel === 'low' ? 25 :
+                      screeningStatus?.latestRiskLevel === 'medium' ? 50 :
+                      screeningStatus?.latestRiskLevel === 'high' ? 100 : 0
+                    }
+                    className="h-2"
+                  />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Activities Progress</span>
-                    <span className="text-gray-900">25 of 33</span>
+                    <span className="text-gray-600">Last Screening</span>
+                    <span className="text-gray-900">
+                      {screeningStatus?.latestScreeningDate ?
+                        new Date(screeningStatus.latestScreeningDate).toLocaleDateString() :
+                        'None'
+                      }
+                    </span>
                   </div>
-                  <Progress value={75} className="h-2" />
+                  <Progress value={screeningStatus?.latestScreeningDate ? 100 : 0} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -253,87 +252,50 @@ export function ChildProfile({ childId }: ChildProfileProps) {
               New Screening
             </Button>
           </div>
-          {screeningHistory.map((screening) => (
-            <Card key={screening.id}>
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="text-purple-600">{screening.type}</h4>
-                      <Badge className="bg-green-500">{screening.score}</Badge>
+          {screeningStatus?.screeningHistory && screeningStatus.screeningHistory.length > 0 ? (
+            screeningStatus.screeningHistory.map((screening: any, index: number) => (
+              <Card key={index}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="text-purple-600">{screening.type}</h4>
+                        <Badge className={
+                          screening.riskLevel === 'low' ? 'bg-green-500' :
+                          screening.riskLevel === 'medium' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }>
+                          {screening.riskLevel === 'low' ? 'Low Risk' :
+                           screening.riskLevel === 'medium' ? 'Medium Risk' :
+                           'High Risk'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Score: {screening.totalScore || 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(screening.completedAt).toLocaleDateString()}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{screening.details}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(screening.date).toLocaleDateString()}
-                    </p>
+                    <Button variant="outline" size="sm">View Report</Button>
                   </div>
-                  <Button variant="outline" size="sm">View Report</Button>
-                </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <ClipboardCheck className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Screenings Yet</h3>
+                <p className="text-gray-500 text-center">
+                  No screening history available for this child.
+                </p>
               </CardContent>
             </Card>
-          ))}
+          )}
         </TabsContent>
 
-        {/* Appointments Tab */}
-        <TabsContent value="appointments" className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-orange-600">Appointments</h3>
-            <Button className="bg-orange-600 hover:bg-orange-700">
-              <Calendar className="w-4 h-4 mr-2" />
-              Book Appointment
-            </Button>
-          </div>
-          {appointments.map((appointment) => (
-            <Card key={appointment.id}>
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-lg bg-orange-100 flex flex-col items-center justify-center text-orange-600">
-                    <span className="text-xs">
-                      {new Date(appointment.date).toLocaleDateString('en-US', { month: 'short' })}
-                    </span>
-                    <span className="text-xl">
-                      {new Date(appointment.date).getDate()}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="text-orange-600">{appointment.type}</h4>
-                      <Badge
-                        variant={appointment.status === 'upcoming' ? 'default' : 'secondary'}
-                        className={appointment.status === 'upcoming' ? 'bg-blue-500' : 'bg-gray-500'}
-                      >
-                        {appointment.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">{appointment.provider}</p>
-                    <p className="text-xs text-gray-500 mt-1">{appointment.time}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
 
-        {/* Activities Tab */}
-        <TabsContent value="activities" className="space-y-4">
-          <h3 className="text-green-600 mb-4">Learning Activities</h3>
-          {activities.map((activity) => (
-            <Card key={activity.id}>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="text-green-600">{activity.name}</h4>
-                    <p className="text-sm text-gray-600">{activity.category}</p>
-                  </div>
-                  <span className="text-sm text-gray-900">
-                    {activity.completed}/{activity.total}
-                  </span>
-                </div>
-                <Progress value={(activity.completed / activity.total) * 100} className="h-2" />
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
       </Tabs>
     </div>
   );

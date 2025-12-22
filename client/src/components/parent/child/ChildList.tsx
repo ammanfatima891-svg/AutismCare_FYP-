@@ -3,44 +3,43 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Progress } from '../../ui/progress';
+import { useEffect, useState } from 'react';
+import { childAPI } from '../../../api';
+import { getAgeDisplayString } from '../../../utils/ageUtils';
 
 interface ChildListProps {
   onViewChild: (childId: number) => void;
 }
 
-const mockChildren = [
-  {
-    id: 1,
-    name: 'Emma Johnson',
-    age: 4,
-    dateOfBirth: '2020-03-15',
-    gender: 'Female',
-    lastScreening: '2 weeks ago',
-    screeningStatus: 'completed',
-    screeningScore: 'Low Risk',
-    nextAppointment: '2024-11-05',
-    activitiesCompleted: 12,
-    totalActivities: 15,
-  },
-  {
-    id: 2,
-    name: 'Noah Johnson',
-    age: 3,
-    dateOfBirth: '2021-07-22',
-    gender: 'Male',
-    lastScreening: 'Not started',
-    screeningStatus: 'pending',
-    screeningScore: null,
-    nextAppointment: null,
-    activitiesCompleted: 0,
-    totalActivities: 0,
-  },
-];
+
 
 export function ChildList({ onViewChild }: ChildListProps) {
+  const [children, setChildren] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchChildren = async () => {
+      try {
+        const response = await childAPI.getChildren();
+        setChildren(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching children:', error);
+        setChildren([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChildren();
+  }, []);
+
+  if (loading) {
+    return <div className="text-center py-8">Loading children...</div>;
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {mockChildren.map((child) => (
+      {children.map((child) => (
         <Card
           key={child.id}
           className="hover:shadow-xl transition-all cursor-pointer border-2 hover:border-pink-300"
@@ -50,12 +49,12 @@ export function ChildList({ onViewChild }: ChildListProps) {
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-purple-400 flex items-center justify-center text-white text-2xl">
-                  {child.name[0]}
+                  {child.firstName[0]}
                 </div>
                 <div>
-                  <CardTitle className="text-pink-600">{child.name}</CardTitle>
+                  <CardTitle className="text-pink-600">{child.firstName} {child.lastName}</CardTitle>
                   <p className="text-sm text-gray-600 mt-1">
-                    {child.age} years old • {child.gender}
+                    {getAgeDisplayString(child.dateOfBirth)} • {child.gender}
                   </p>
                 </div>
               </div>
@@ -77,55 +76,16 @@ export function ChildList({ onViewChild }: ChildListProps) {
             <div className="flex items-center gap-3 text-sm">
               <ClipboardCheck className="w-4 h-4 text-gray-400" />
               <span className="text-gray-600">Screening:</span>
-              <Badge
-                variant={child.screeningStatus === 'completed' ? 'default' : 'secondary'}
-                className={child.screeningStatus === 'completed' ? 'bg-green-500' : 'bg-yellow-500'}
-              >
-                {child.screeningStatus === 'completed' ? 'Completed' : 'Pending'}
+              <Badge variant="secondary" className="bg-yellow-500">
+                Pending
               </Badge>
-              {child.screeningScore && (
-                <span className="text-gray-900 ml-auto">{child.screeningScore}</span>
-              )}
             </div>
-
-            {/* Activities Progress */}
-            {child.totalActivities > 0 && (
-              <div>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-green-600" />
-                    <span className="text-gray-600">Activities Progress</span>
-                  </div>
-                  <span className="text-gray-900">
-                    {child.activitiesCompleted}/{child.totalActivities}
-                  </span>
-                </div>
-                <Progress
-                  value={(child.activitiesCompleted / child.totalActivities) * 100}
-                  className="h-2"
-                />
-              </div>
-            )}
-
-            {/* Next Appointment */}
-            {child.nextAppointment && (
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs text-gray-600">Next Appointment</p>
-                <p className="text-sm text-gray-900 mt-1">
-                  {new Date(child.nextAppointment).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
       ))}
 
       {/* Empty State */}
-      {mockChildren.length === 0 && (
+      {children.length === 0 && (
         <div className="col-span-2 text-center py-12">
           <Baby className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-gray-600 mb-2">No children added yet</h3>

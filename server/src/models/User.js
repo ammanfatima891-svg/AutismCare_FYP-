@@ -1,129 +1,101 @@
-// models/User.js
 const mongoose = require('mongoose');
-const { Schema, model } = mongoose;
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { Schema } = mongoose;
 
-const userSchema = new Schema({
-  // Common
-  fullName: { type: String, required: [true, 'Full name is required'], trim: true },
+const ROLES = {
+  ADMIN: 'admin',
+  CLINICIAN: 'clinician',
+  THERAPIST: 'therapist',
+  LAB: 'lab',
+  PARENT: 'parent'
+};
+
+const APPROVAL_STATUS = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  REJECTED: 'rejected'
+};
+
+const DocumentSchema = new Schema({
+  name: { type: String, required: true },
+  url: { type: String, required: true },
+  type: { type: String, required: true },
+  uploadedAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+const UserSchema = new Schema({
   email: {
     type: String,
     required: [true, 'Email is required'],
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, 'Please provide a valid email address']
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Invalid email'],
+    index: true
   },
-  phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    match: [/^\+?[0-9]{7,15}$/, 'Please provide a valid phone number']
-  },
-  password: { type: String, required: [true, 'Password is required'], minlength: [8, 'Password must be at least 8 characters'] },
-
-  // Roles
-  roles: [{
-    type: String,
-    enum: ['parent', 'doctor', 'therapist', 'laboratory', 'admin']
-  }],
-  primaryRole: {
-    type: String,
-    enum: ['parent', 'doctor', 'therapist', 'laboratory', 'admin'],
-    default: function () { return this.roles?.length ? this.roles[0] : 'parent'; }
-  },
-
-  // Role-specific professional info
-  organization: {
-    type: String,
-    required: function () { return ['doctor', 'therapist', 'laboratory'].includes(this.primaryRole); }
-  },
-  licenseNumber: {
-    type: String,
-    unique: true,
-    sparse: true,
-    required: function () { return ['doctor', 'therapist', 'laboratory'].includes(this.primaryRole); }
-  },
-
-  medicalRegistrationNo: { type: String, unique: true, sparse: true },
-  department: { type: String },
-  experienceYears: { type: Number, min: 0 },
-  qualification: { type: String },
-
-  specialty: {
-    type: String,
-    required: function () { return ['doctor', 'therapist'].includes(this.primaryRole); }
-  },
-  therapyType: { type: String }, // e.g., ABA, SLP, OT
-  certification: { type: String },
-
-  labAddress: {
-    type: String,
-    required: function () { return this.primaryRole === 'laboratory'; }
-  },
-  labType: {
-    type: String,
-    enum: ['general', 'audiometrist', 'pathology', 'other'],
-    default: 'general',
-    required: function () { return this.primaryRole === 'laboratory'; }
-  },
-  availableTests: [{ type: String }],
-  labRegistrationNo: { type: String, unique: true, sparse: true },
-
-  // Parent-specific
-  children: [{ type: Schema.Types.ObjectId, ref: 'Child' }],
-  address: { type: String },
-  CNIC: { type: String, unique: true, sparse: true },
-
-  // Operational relationships
-  assignedPatients: [{ type: Schema.Types.ObjectId, ref: 'Child' }], // doctors
-  assignedSessions: [{ type: Schema.Types.ObjectId, ref: 'Session' }], // therapists
-  labTests: [{ type: Schema.Types.ObjectId, ref: 'TestOrder' }], // labs
-
-  // Admin
-  permissions: [{ type: String }],
-
-  // Workflow
-  accountStatus: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected', 'suspended'],
-    default: 'pending'
-  },
-
-  // Verification & activity
+  password: { type: String, required: true, minlength: 8, select: false },
+  firstName: { type: String, required: true, trim: true },
+  lastName: { type: String, required: true, trim: true },
+  phoneNumber: { type: String, trim: true },
+  role: { type: String, enum: Object.values(ROLES), required: true, index: true },
   isEmailVerified: { type: Boolean, default: false },
-  isPhoneVerified: { type: Boolean, default: false },
-  verificationToken: { type: String },
-  lastLogin: { type: Date },
-  isActive: { type: Boolean, default: true },
-
-  // Soft-delete
-  deletedAt: { type: Date, default: null },
-
-  // Audit logs
-  auditLogs: [{
-    action: { type: String, required: true },
-    performedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    timestamp: { type: Date, default: Date.now }
-  }],
-
-  // Documents
-  documents: [{
-    docType: { type: String, required: true }, // license, certificate, CNIC, accreditation
-    url: { type: String, required: true },
-    uploadedAt: { type: Date, default: Date.now }
-  }]
+  emailVerificationToken: String,
+  emailVerificationExpires: Date,
 }, {
-  timestamps: true
+  timestamps: true,
+  discriminatorKey: 'role' // This connects the sub-schemas
 });
 
-
-
-// Pre-save hook (not strictly necessary due to timestamps, but kept for compatibility)
-userSchema.pre('save', function (next) {
-  // ensure primaryRole defaults to roles[0] if not set
-  if (!this.primaryRole && Array.isArray(this.roles) && this.roles.length) {
-    this.primaryRole = this.roles[0];
-  }
+// Hash password before saving
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-module.exports = model('User', userSchema);
+UserSchema.methods.comparePassword = async function(candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+const User = mongoose.model('User', UserSchema);
+
+// Discriminators
+User.discriminator(ROLES.CLINICIAN, new Schema({
+  specialization: { type: String, required: true },
+  licenseNumber: { type: String, required: true, unique: true },
+  approvalStatus: { type: String, enum: Object.values(APPROVAL_STATUS), default: APPROVAL_STATUS.PENDING },
+  documents: [DocumentSchema]
+}));
+
+User.discriminator(ROLES.THERAPIST, new Schema({
+  specialization: { type: String, required: true },
+  licenseNumber: { type: String, required: true },
+  approvalStatus: { type: String, enum: Object.values(APPROVAL_STATUS), default: APPROVAL_STATUS.PENDING },
+  documents: [DocumentSchema]
+}));
+
+User.discriminator(ROLES.PARENT, new Schema({
+  insuranceProvider: String,
+  policyNumber: String,
+  children: [new Schema({
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    dateOfBirth: { type: Date, required: true },
+    gender: { type: String, enum: ['male', 'female', 'other'], required: true },
+    pretermWeeks: { type: Number, default: 0 },
+    medicalHistory: String,
+    allergies: String,
+    currentMedications: String,
+    emergencyContact: { type: String, required: true },
+    emergencyPhone: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }, { _id: true })]
+}));
+
+User.discriminator(ROLES.LAB, new Schema({
+  labName: { type: String, required: true },
+  accreditation: String
+}));
+
+module.exports = { User, ROLES, APPROVAL_STATUS };

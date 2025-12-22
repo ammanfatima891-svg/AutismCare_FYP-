@@ -1,0 +1,28 @@
+{
+  "name": "MCHAT-R",
+  "questions": [
+    { "questionId": "Q1", "text": "If you point at something, does your child look at it?", "reverseScored": false },
+    { "questionId": "Q2", "text": "Have you ever wondered if your child might be deaf?", "reverseScored": true },
+    { "questionId": "Q3", "text": "Does your child play pretend or make-believe?", "reverseScored": false },
+    { "questionId": "Q4", "text": "Does your child like climbing on things?", "reverseScored": false },
+    { "questionId": "Q5", "text": "Does your child make unusual finger movements near his or her eyes?", "reverseScored": true },
+
+    { "questionId": "Q6", "text": "Does your child point with one finger to ask for something?", "reverseScored": false },
+    { "questionId": "Q7", "text": "Does your child point with one finger to show interest?", "reverseScored": false },
+    { "questionId": "Q8", "text": "Is your child interested in other children?", "reverseScored": false },
+    { "questionId": "Q9", "text": "Does your child show you things by bringing them to you?", "reverseScored": false },
+    { "questionId": "Q10", "text": "Does your child respond when you call his or her name?", "reverseScored": false },
+
+    { "questionId": "Q11", "text": "When you smile at your child, does he or she smile back?", "reverseScored": false },
+    { "questionId": "Q12", "text": "Does your child get upset by everyday noises?", "reverseScored": true },
+    { "questionId": "Q13", "text": "Does your child walk?", "reverseScored": false },
+    { "questionId": "Q14", "text": "Does your child look you in the eye?", "reverseScored": false },
+    { "questionId": "Q15", "text": "Does your child try to copy what you do?", "reverseScored": false },
+
+    { "questionId": "Q16", "text": "If you turn your head, does your child look around?", "reverseScored": false },
+    { "questionId": "Q17", "text": "Does your child try to get you to watch him or her?", "reverseScored": false },
+    { "questionId": "Q18", "text": "Does your child understand when you tell him or her to do something?", "reverseScored": false },
+    { "questionId": "Q19", "text": "If something new happens, does your child look at your face?", "reverseScored": false },
+    { "questionId": "Q20", "text": "Does your child like movement activities?", "reverseScored": false }
+  ]
+}

@@ -4,11 +4,9 @@ import { Button } from '../ui/button';
 import { QuestionnaireSelection } from './screening/QuestionnaireSelection';
 import { MCHATForm } from './screening/MCHATForm';
 import { ASQ3Form } from './screening/ASQ3Form';
-import { FacialScreening } from './screening/FacialScreening';
 import { ScreeningResults } from './screening/ScreeningResults';
-import { FacialScreeningResults } from './screening/FacialScreeningResults';
 
-type View = 'selection' | 'mchat' | 'asq3' | 'facial' | 'results' | 'facial-results';
+type View = 'selection' | 'MCHAT-R' | 'ASQ-3' | 'results';
 
 export function ScreeningSection() {
   const [currentView, setCurrentView] = useState<View>('selection');
@@ -19,18 +17,13 @@ export function ScreeningSection() {
   const handleStartScreening = (type: string, child: any) => {
     setScreeningType(type);
     setSelectedChild(child);
-    if (type === 'mchat') setCurrentView('mchat');
-    else if (type === 'asq3') setCurrentView('asq3');
-    else if (type === 'facial') setCurrentView('facial');
+    if (type === 'MCHAT-R') setCurrentView('MCHAT-R');
+    else if (type === 'ASQ-3') setCurrentView('ASQ-3');
   };
 
   const handleScreeningComplete = (screeningResults: any) => {
     setResults(screeningResults);
-    if (screeningType === 'facial') {
-      setCurrentView('facial-results');
-    } else {
-      setCurrentView('results');
-    }
+    setCurrentView('results');
   };
 
   const handleBack = () => {
@@ -57,22 +50,15 @@ export function ScreeningSection() {
         <QuestionnaireSelection onStartScreening={handleStartScreening} />
       )}
 
-      {currentView === 'mchat' && (
+      {currentView === 'MCHAT-R' && (
         <MCHATForm
           child={selectedChild}
           onComplete={handleScreeningComplete}
         />
       )}
 
-      {currentView === 'asq3' && (
+      {currentView === 'ASQ-3' && (
         <ASQ3Form
-          child={selectedChild}
-          onComplete={handleScreeningComplete}
-        />
-      )}
-
-      {currentView === 'facial' && (
-        <FacialScreening
           child={selectedChild}
           onComplete={handleScreeningComplete}
         />
@@ -82,13 +68,6 @@ export function ScreeningSection() {
         <ScreeningResults
           results={results}
           screeningType={screeningType}
-          child={selectedChild}
-        />
-      )}
-
-      {currentView === 'facial-results' && (
-        <FacialScreeningResults
-          results={results}
           child={selectedChild}
         />
       )}

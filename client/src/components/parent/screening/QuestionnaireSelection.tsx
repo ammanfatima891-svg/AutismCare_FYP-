@@ -1,29 +1,72 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Label } from '../../ui/label';
 import { ClipboardList, Baby, Info, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '../../ui/alert';
+import { childAPI } from '../../../api';
+import { getAgeDisplayString } from '../../../utils/ageUtils';
+import API from '../../../api';
 
 interface QuestionnaireSelectionProps {
   onStartScreening: (type: string, child: any) => void;
 }
 
-const mockChildren = [
-  { id: 1, name: 'Emma Johnson', age: 4 },
-  { id: 2, name: 'Noah Johnson', age: 3 },
-];
-
 export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelectionProps) {
+  const [children, setChildren] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedChild, setSelectedChild] = useState<string>('');
   const [selectedQuestionnaire, setSelectedQuestionnaire] = useState<string>('');
+  const [availableQuestionnaires, setAvailableQuestionnaires] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchChildren = async () => {
+      try {
+        const response = await childAPI.getChildren();
+        setChildren(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching children:', error);
+        setChildren([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChildren();
+  }, []);
+
+  useEffect(() => {
+    const fetchAvailableQuestionnaires = async () => {
+      if (!selectedChild) {
+        setAvailableQuestionnaires([]);
+        return;
+      }
+
+      const child = children.find((c: any) => c.id.toString() === selectedChild);
+      if (!child) return;
+
+      try {
+        const response = await API.get(`/screening/available-questionnaires?dob=${child.dateOfBirth}`);
+        setAvailableQuestionnaires(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching available questionnaires:', error);
+        setAvailableQuestionnaires([]);
+      }
+    };
+
+    fetchAvailableQuestionnaires();
+  }, [selectedChild, children]);
 
   const handleStart = () => {
     if (!selectedChild || !selectedQuestionnaire) return;
-    const child = mockChildren.find(c => c.id.toString() === selectedChild);
+    const child = children.find((c: any) => c.id.toString() === selectedChild);
     onStartScreening(selectedQuestionnaire, child);
   };
+
+  if (loading) {
+    return <div className="text-center py-8">Loading children...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -63,11 +106,11 @@ export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelect
                 <SelectValue placeholder="Choose a child" />
               </SelectTrigger>
               <SelectContent>
-                {mockChildren.map((child) => (
+                {children.map((child: any) => (
                   <SelectItem key={child.id} value={child.id.toString()}>
                     <div className="flex items-center gap-2">
                       <Baby className="w-4 h-4 text-pink-600" />
-                      {child.name} ({child.age} years old)
+                      {child.firstName} {child.lastName} ({getAgeDisplayString(child.dateOfBirth)})
                     </div>
                   </SelectItem>
                 ))}
@@ -83,7 +126,7 @@ export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelect
                 <SelectValue placeholder="Choose a questionnaire" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="mchat">
+                <SelectItem value="MCHAT-R">
                   <div>
                     <div className="font-medium">M-CHAT-R™</div>
                     <div className="text-xs text-gray-600">
@@ -91,7 +134,7 @@ export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelect
                     </div>
                   </div>
                 </SelectItem>
-                <SelectItem value="asq3">
+                <SelectItem value="ASQ-3">
                   <div>
                     <div className="font-medium">ASQ-3™</div>
                     <div className="text-xs text-gray-600">
@@ -99,14 +142,7 @@ export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelect
                     </div>
                   </div>
                 </SelectItem>
-                <SelectItem value="facial">
-                  <div>
-                    <div className="font-medium">Facial Screening (AI)</div>
-                    <div className="text-xs text-gray-600">
-                      AI-powered facial analysis (All ages)
-                    </div>
-                  </div>
-                </SelectItem>
+
               </SelectContent>
             </Select>
           </div>
@@ -123,53 +159,40 @@ export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelect
       </Card>
 
       {/* Questionnaire Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className={`cursor-pointer transition-all ${selectedQuestionnaire === 'mchat' ? 'border-2 border-purple-500 shadow-lg' : 'hover:shadow-md'}`}
-          onClick={() => setSelectedQuestionnaire('mchat')}
-        >
-          <CardHeader>
-            <CardTitle className="text-purple-600">M-CHAT-R™</CardTitle>
-            <CardDescription>Autism Screening Tool</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-gray-600">
-              • 20 yes/no questions
-            </p>
-            <p className="text-gray-600">
-              • Takes 5-10 minutes
-            </p>
-            <p className="text-gray-600">
-              • For children 16-30 months
-            </p>
-            <p className="text-gray-600">
-              • Screens for autism spectrum disorder
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={`cursor-pointer transition-all ${selectedQuestionnaire === 'asq3' ? 'border-2 border-purple-500 shadow-lg' : 'hover:shadow-md'}`}
-          onClick={() => setSelectedQuestionnaire('asq3')}
-        >
-          <CardHeader>
-            <CardTitle className="text-purple-600">ASQ-3™</CardTitle>
-            <CardDescription>Developmental Screening</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-gray-600">
-              • 30 questions across 5 domains
-            </p>
-            <p className="text-gray-600">
-              • Takes 10-15 minutes
-            </p>
-            <p className="text-gray-600">
-              • For children 2-66 months
-            </p>
-            <p className="text-gray-600">
-              • Assesses overall development
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {availableQuestionnaires.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {availableQuestionnaires.map((q: any) => (
+            <Card
+              key={q.type}
+              className={`cursor-pointer transition-all ${selectedQuestionnaire === q.type ? 'border-2 border-purple-500 shadow-lg' : 'hover:shadow-md'}`}
+              onClick={() => setSelectedQuestionnaire(q.type)}
+            >
+              <CardHeader>
+                <CardTitle className="text-purple-600">{q.name}</CardTitle>
+                <CardDescription>{q.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {q.type === 'MCHAT-R' && (
+                  <>
+                    <p className="text-gray-600">• 20 yes/no questions</p>
+                    <p className="text-gray-600">• Takes 5-10 minutes</p>
+                    <p className="text-gray-600">• For children 16-30 months</p>
+                    <p className="text-gray-600">• Screens for autism spectrum disorder</p>
+                  </>
+                )}
+                {q.type === 'ASQ-3' && (
+                  <>
+                    <p className="text-gray-600">• 30 questions across 5 domains</p>
+                    <p className="text-gray-600">• Takes 10-15 minutes</p>
+                    <p className="text-gray-600">• For children 2-66 months</p>
+                    <p className="text-gray-600">• Assesses overall development</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

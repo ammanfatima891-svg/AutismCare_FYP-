@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { RadioGroup, RadioGroupItem } from '../../ui/radio-group';
@@ -6,40 +6,39 @@ import { Label } from '../../ui/label';
 import { Progress } from '../../ui/progress';
 import { ClipboardCheck, Baby } from 'lucide-react';
 import { toast } from 'sonner';
+import API from '../../../api';
 
 interface MCHATFormProps {
   child: any;
   onComplete: (results: any) => void;
 }
 
-const questions = [
-  'If you point at something across the room, does your child look at it?',
-  'Have you ever wondered if your child might be deaf?',
-  'Does your child play pretend or make-believe?',
-  'Does your child like climbing on things?',
-  'Does your child make unusual finger movements near their eyes?',
-  'Does your child point with one finger to ask for something or to get help?',
-  'Does your child point with one finger to show you something interesting?',
-  'Is your child interested in other children?',
-  'Does your child show you things by bringing them to you or holding them up?',
-  'Does your child respond when you call their name?',
-  'When you smile at your child, does they smile back at you?',
-  'Does your child get upset by everyday noises?',
-  'Does your child walk?',
-  'Does your child look you in the eye when you are talking or playing?',
-  'Does your child try to copy what you do?',
-  'If you turn your head to look at something, does your child look around to see what you are looking at?',
-  'Does your child try to get you to watch them?',
-  'Does your child understand when you tell them to do something?',
-  'If something new happens, does your child look at your face to see how you feel about it?',
-  'Does your child like movement activities?'
-];
+
 
 export function MCHATForm({ child, onComplete }: MCHATFormProps) {
+  const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const questionsPerPage = 5;
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const response = await API.get(`/screening/questionnaires/MCHAT-R?dob=${child.dateOfBirth}`);
+        setQuestions(response.data.data.questions || []);
+      } catch (error) {
+        console.error('Error fetching MCHAT-R questions:', error);
+        toast.error('Failed to load questions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [child.dateOfBirth]);
+
   const totalPages = Math.ceil(questions.length / questionsPerPage);
   const currentQuestions = questions.slice(
     currentPage * questionsPerPage,
@@ -80,7 +79,7 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (Object.keys(answers).length < questions.length) {
       toast.error('Please answer all questions before submitting');
       return;
@@ -88,41 +87,36 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
 
     setIsSubmitting(true);
 
-    // Simulate AI analysis
-    setTimeout(() => {
-      // Calculate score (simplified)
-      const criticalItems = [1, 4, 6, 9, 13, 14];
-      let riskScore = 0;
+    try {
+      const responses = Object.entries(answers).map(([questionIndex, answer]) => ({
+        questionId: questions[parseInt(questionIndex)].questionId,
+        answer,
+      }));
 
-      Object.entries(answers).forEach(([index, answer]) => {
-        const questionIndex = parseInt(index);
-        const isCritical = criticalItems.includes(questionIndex);
-        
-        // Reverse scoring for some questions
-        if ([1, 4, 11].includes(questionIndex)) {
-          if (answer === 'yes') riskScore++;
-        } else {
-          if (answer === 'no') riskScore++;
-          if (isCritical && answer === 'no') riskScore += 2;
-        }
+      const res = await API.post("/screening/calculate-screening", {
+        childId: child.id,
+        questionnaireType: 'MCHAT-R',
+        dob: child.dateOfBirth,
+        weeksPreterm: 0, // Default to 0 for MCHAT-R
+        responses,
       });
 
-      const riskLevel = riskScore >= 8 ? 'high' : riskScore >= 3 ? 'medium' : 'low';
-
+      const submission = res.data.data;
       const results = {
-        type: 'M-CHAT-R',
-        child: child,
-        date: new Date().toISOString(),
-        totalQuestions: questions.length,
-        answeredQuestions: Object.keys(answers).length,
-        score: riskScore,
-        riskLevel: riskLevel,
-        answers: answers,
+        riskLevel: submission.riskLevel,
+        type: "M-CHAT-R",
+        date: submission.createdAt,
+        totalScore: submission.scores?.totalScore || 0,
+        elevatedItems: submission.scores?.elevatedItems || [],
+        resultDescription: submission.resultDescription,
       };
-
       onComplete(results);
+    } catch (err) {
+      console.error('Error submitting screening:', err);
+      toast.error("Failed to submit screening. Check console.");
+    } finally {
       setIsSubmitting(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -137,7 +131,7 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
                 <CardTitle className="text-purple-600">M-CHAT-R™ Screening</CardTitle>
                 <CardDescription className="flex items-center gap-2 mt-1">
                   <Baby className="w-4 h-4" />
-                  {child?.name}
+                  {child?.firstName} {child?.lastName}
                 </CardDescription>
               </div>
             </div>
@@ -177,10 +171,10 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
                     <span className="inline-block w-8 h-8 rounded-full bg-purple-600 text-white text-center leading-8 mr-3">
                       {questionIndex + 1}
                     </span>
-                    {question}
+                    {question.text}
                   </Label>
                   <RadioGroup
-                    value={answers[questionIndex]}
+                    value={answers[questionIndex] ?? ''}
                     onValueChange={(value) => handleAnswer(questionIndex, value)}
                     className="flex gap-6 mt-4"
                   >

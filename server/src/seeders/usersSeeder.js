@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const User = require('../models/User');
+const { User } = require('../models/User.js');
 
 const seedUsers = async () => {
   const users = [
@@ -12,29 +12,26 @@ const seedUsers = async () => {
       primaryRole: "parent"
     },
     {
-      fullName: "Dr. Ali",
-      email: "doctor1@example.com",
-      phone: "+923001112244",
+      firstName: "Ali",
+      lastName: "Khan",
+      email: "clinician1@example.com",
+      phoneNumber: "+923001112244",
       password: "Password123",
-      roles: ["doctor"],
-      primaryRole: "doctor",
-      organization: "AutismCare Hospital",
+      role: "clinician",
+      specialization: "Pediatrics",
       licenseNumber: "DOC12345",
-      specialty: "Pediatrics",
-      experienceYears: 5,
-      qualification: "MBBS"
+      approvalStatus: "active"
     },
     {
-      fullName: "Therapist Sara",
+      firstName: "Sara",
+      lastName: "Ahmed",
       email: "therapist1@example.com",
-      phone: "+923001112255",
+      phoneNumber: "+923001112255",
       password: "Password123",
-      roles: ["therapist"],
-      primaryRole: "therapist",
-      organization: "AutismCare Clinic",
+      role: "therapist",
+      specialization: "ABA Therapy",
       licenseNumber: "TH12345",
-      specialty: "ABA",
-      therapyType: "ABA"
+      approvalStatus: "active"
     },
     {
       fullName: "Lab A",

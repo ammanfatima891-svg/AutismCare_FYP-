@@ -1,9 +1,10 @@
-import { 
-  Baby, 
-  ClipboardCheck, 
-  Calendar, 
-  MessageSquare, 
-  TrendingUp, 
+import { useState, useEffect, useContext } from 'react';
+import {
+  Baby,
+  ClipboardCheck,
+  Calendar,
+  MessageSquare,
+  TrendingUp,
   AlertCircle,
   CheckCircle,
   Clock,
@@ -15,38 +16,69 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { childAPI } from '../../api';
+import { getAgeDisplayString } from '../../utils/ageUtils';
+import { AuthContext } from '../../context/AuthContext';
 
 interface DashboardHomeProps {
   onNavigate: (section: string) => void;
 }
 
 export function DashboardHome({ onNavigate }: DashboardHomeProps) {
-  const children = [
-    { id: 1, name: 'Emma', age: 4, lastScreening: '2 weeks ago', status: 'completed' },
-    { id: 2, name: 'Noah', age: 3, lastScreening: 'Not started', status: 'pending' },
-  ];
+  const { user } = useContext(AuthContext);
+  const [children, setChildren] = useState<any[]>([]);
+  const [screeningStats, setScreeningStats] = useState({ totalScreenings: 0, thisMonth: 0 });
+  const [loading, setLoading] = useState(true);
 
-  const upcomingAppointments = [
-    { id: 1, child: 'Emma', type: 'Speech Therapy', date: '2024-11-05', time: '10:00 AM', provider: 'Dr. Sarah Johnson' },
-    { id: 2, child: 'Emma', type: 'Occupational Therapy', date: '2024-11-07', time: '2:00 PM', provider: 'Alex Martinez' },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [childrenResponse, screeningResponse] = await Promise.all([
+          childAPI.getChildren(),
+          // TODO: Add API call for screening history when implemented
+          Promise.resolve({ data: { data: [] } }) // Placeholder for screening history
+        ]);
 
-  const recentActivities = [
-    { id: 1, title: 'Daily Routine Practice', child: 'Emma', completed: true, date: 'Today' },
-    { id: 2, title: 'Color Recognition', child: 'Noah', completed: false, date: 'Yesterday' },
-    { id: 3, title: 'Social Skills Activity', child: 'Emma', completed: true, date: 'Yesterday' },
-  ];
+        setChildren(childrenResponse.data.data || []);
+
+        // Calculate screening stats from children data
+        let totalScreenings = 0;
+        let thisMonthScreenings = 0;
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+
+        // For now, we'll set basic stats - this will be enhanced when screening history API is available
+        setScreeningStats({
+          totalScreenings,
+          thisMonth: thisMonthScreenings
+        });
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        setChildren([]);
+        setScreeningStats({ totalScreenings: 0, thisMonth: 0 });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Mock data removed - will be replaced with real appointment and activity data when implemented
+  const upcomingAppointments: any[] = [];
+  const recentActivities: any[] = [];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white relative overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
         <div className="absolute bottom-0 right-10 w-48 h-48 bg-white/10 rounded-full"></div>
         <div className="relative z-10">
-          <h2 className="mb-2">Welcome Back, Jane! 👋</h2>
+          <h2 className="mb-2">Welcome Back, {user?.firstName || 'Parent'}! 👋</h2>
           <p className="text-xl opacity-90 mb-6">Here's what's happening with your children today</p>
-          <Button 
+          <Button
             onClick={() => onNavigate('children')}
             className="bg-white text-blue-600 hover:bg-gray-100"
           >
@@ -66,7 +98,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-900">{children.length}</p>
+            <p className="text-gray-900">{loading ? '...' : children.length}</p>
             <p className="text-sm text-gray-600">Profiles created</p>
           </CardContent>
         </Card>
@@ -79,7 +111,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-900">1</p>
+            <p className="text-gray-900">{screeningStats.thisMonth}</p>
             <p className="text-sm text-gray-600">Completed this month</p>
           </CardContent>
         </Card>
@@ -105,7 +137,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-900">3</p>
+            <p className="text-gray-900">0</p>
             <p className="text-sm text-gray-600">Unread messages</p>
           </CardContent>
         </Card>
@@ -129,34 +161,44 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {children.map((child) => (
-                <div
-                  key={child.id}
-                  className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-pink-50 to-purple-50 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => onNavigate('children')}
-                >
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-purple-400 flex items-center justify-center text-white text-xl">
-                    {child.name[0]}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-pink-600">{child.name}</h3>
-                    <p className="text-sm text-gray-600">{child.age} years old</p>
-                  </div>
-                  <div className="text-right">
-                    <Badge
-                      variant={child.status === 'completed' ? 'default' : 'secondary'}
-                      className={child.status === 'completed' ? 'bg-green-500' : 'bg-yellow-500'}
-                    >
-                      {child.status === 'completed' ? (
-                        <><CheckCircle className="w-3 h-3 mr-1" /> Screened</>
-                      ) : (
-                        <><Clock className="w-3 h-3 mr-1" /> Pending</>
-                      )}
-                    </Badge>
-                    <p className="text-xs text-gray-600 mt-1">{child.lastScreening}</p>
-                  </div>
+              {loading ? (
+                <div className="text-center py-8">Loading children...</div>
+              ) : children.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Baby className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>No children profiles yet</p>
+                  <Button
+                    onClick={() => onNavigate('children')}
+                    className="mt-4 bg-pink-600 hover:bg-pink-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Child
+                  </Button>
                 </div>
-              ))}
+              ) : (
+                children.map((child) => (
+                  <div
+                    key={child.id}
+                    className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-pink-50 to-purple-50 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => onNavigate('children')}
+                  >
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-purple-400 flex items-center justify-center text-white text-xl">
+                      {child.firstName[0]}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-pink-600">{child.firstName} {child.lastName}</h3>
+                      <p className="text-sm text-gray-600">{getAgeDisplayString(child.dateOfBirth)}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="secondary" className="bg-yellow-500">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Pending Screening
+                      </Badge>
+                      <p className="text-xs text-gray-600 mt-1">Not started</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -281,3 +323,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
     </div>
   );
 }
+function setScreeningStats(arg0: { totalScreenings: number; thisMonth: number; }) {
+  throw new Error('Function not implemented.');
+}
+

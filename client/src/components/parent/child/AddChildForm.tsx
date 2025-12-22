@@ -10,6 +10,7 @@ import { Calendar } from '../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 import { CalendarIcon, Baby } from 'lucide-react';
 import { toast } from 'sonner';
+import { childAPI } from '../../../api';
 
 interface AddChildFormProps {
   onSuccess: () => void;
@@ -18,19 +19,20 @@ interface AddChildFormProps {
 interface ChildFormData {
   firstName: string;
   lastName: string;
-  dateOfBirth: Date;
   gender: string;
   medicalHistory: string;
   allergies: string;
   currentMedications: string;
   emergencyContact: string;
   emergencyPhone: string;
+  pretermWeeks: number;
 }
 
 export function AddChildForm({ onSuccess }: AddChildFormProps) {
   const [dateOfBirth, setDateOfBirth] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gender, setGender] = useState('');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const {
     register,
@@ -51,13 +53,29 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Child added:', { ...data, dateOfBirth, gender });
+    try {
+      const childData = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dateOfBirth: dateOfBirth.toISOString(),
+        gender,
+        pretermWeeks: data.pretermWeeks || 0,
+        medicalHistory: data.medicalHistory,
+        allergies: data.allergies,
+        currentMedications: data.currentMedications,
+        emergencyContact: data.emergencyContact,
+        emergencyPhone: data.emergencyPhone,
+      };
+
+      await childAPI.createChild(childData);
       toast.success('Child profile created successfully! 🎉');
-      setIsSubmitting(false);
       onSuccess();
-    }, 1500);
+    } catch (error: any) {
+      console.error('Error creating child:', error);
+      toast.error(error.response?.data?.message || 'Failed to create child profile');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -106,29 +124,35 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>Date of Birth *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left mt-1"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateOfBirth ? dateOfBirth.toLocaleDateString() : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dateOfBirth}
-                        onSelect={setDateOfBirth}
-                        initialFocus
-                        disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+                  <Input
+                    id="dateOfBirth"
+                    type="date"
+                    value={dateOfBirth ? dateOfBirth.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : undefined;
+                      setDateOfBirth(date);
+                    }}
+                    max={new Date().toISOString().split('T')[0]}
+                    min="1900-01-01"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="pretermWeeks">Preterm Weeks</Label>
+                  <Input
+                    id="pretermWeeks"
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    max="12"
+                    {...register('pretermWeeks', { valueAsNumber: true })}
+                    className="mt-1"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">Weeks born before due date (for ASQ-3 calculations)</p>
                 </div>
 
                 <div>

@@ -1,0 +1,814 @@
+
+
+[
+  {
+    "intervalMonths": 2,
+    "minAgeDays": 45,
+    "maxAgeDays": 90,
+    "domains": [
+      "Communication",
+    "Gross Motor",
+    "Fine Motor",
+    "Problem Solving",
+    "Personal-Social"
+  ],
+  "questions": [
+    { "questionId": "C1", "domain": "Communication", "text": "Does your baby sometimes make throaty or sounds?" },
+    { "questionId": "C2", "domain": "Communication", "text": "Does your baby make cooing sounds such as \"ooo\" ,\"gah\", and \"aah\"?" },
+    { "questionId": "C3", "domain": "Communication", "text": "When you speak to your baby, does she or he make sounds back to you?" },
+    { "questionId": "C4", "domain": "Communication", "text": "Does your baby smile when you talk to him or her?" },
+    { "questionId": "C5", "domain": "Communication", "text": "Does your baby chuckle softly?" },
+    { "questionId": "C6", "domain": "Communication", "text": "After you have been out of sight, does you baby smile or get excited when she or he sees you?" },
+
+    { "questionId": "GM1", "domain": "Gross Motor", "text": "While your baby is on his back, does he wavee his arms and legs, wiggle, and squirm?" },
+    { "questionId": "GM2", "domain": "Gross Motor", "text": "When your baby is on his or her tummy, does your baby turn his or her head to the side?" },
+    { "questionId": "GM3", "domain": "Gross Motor", "text": "When your baby is on his or her tummy, does your baby hold his or her head up longer than a few seconds?" },
+    { "questionId": "GM4", "domain": "Gross Motor", "text": "When your baby is on his or her back, does she or he kick her legs?" },
+    { "questionId": "GM5", "domain": "Gross Motor", "text": "When your baby is on his or her back, does she or he move his or her head from side to side?" },
+    { "questionId": "GM6", "domain": "Gross Motor", "text": "After holding her head up while on her tummy , does your baby lay her head back down on floor, rather than let it drop or fall forward?" },
+
+    { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby keep his or her hands open or partly open?" },
+    { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your baby grasp your finger when you touch his or her palm?" },
+    { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby briefly hold a toy placed in his or her hand?" },
+    { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your baby bring his or her hands together?" },
+    { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby touch his or her face with hands?" },
+    { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby move his or her fingers?" },
+
+    { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby look at objects placed in front of him or her?" },
+    { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby follow a toy with his or her eyes?" },
+    { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby watch your face when you talk?" },
+    { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby turn toward a sound?" },
+    { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby look briefly at toys?" },
+    { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby show interest in moving objects?" },
+
+    { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby smile back when you smile?" },
+    { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby respond to familiar voices?" },
+    { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby quiet when picked up?" },
+    { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby enjoy being held?" },
+    { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby recognize familiar caregivers?" },
+    { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby show pleasure when interacting?" }
+  ]
+  },
+{
+    "intervalMonths": 4,
+    "minAgeDays": 90,
+    "maxAgeDays": 150,
+    "domains": [
+      "Communication",
+      "Gross Motor",
+      "Fine Motor",
+      "Problem Solving",
+      "Personal-Social"
+    ],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your baby chuckle softly?" },
+      { "questionId": "C2", "domain": "Communication", "text": "After you have been out of sight, does your baby smile or get excited when he or she sees you?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your baby stop crying when he or she hears a voice other than yours?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your baby make high-pitched squeals?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your baby laugh?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your baby make sounds when looking at toys or people?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "While your baby is on his or her back, does your baby move his or her head from side to side?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "After holding his or her head up while on the tummy, does your baby lay the head back down gently rather than letting it drop?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "When your baby is on the tummy, does your baby hold the head up so the chin is about 3 inches from the floor for at least 15 seconds?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "When your baby is on the tummy, does your baby hold the head straight up and look around?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "When you hold your baby in a sitting position, does your baby hold the head steady?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "While your baby is on the back, does your baby bring hands together over the chest?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby hold hands open or partly open rather than in fists?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "When you put a toy in your baby’s hand, does your baby wave it about briefly?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby grab or scratch at clothes?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "When you put a toy in your baby’s hand, does your baby hold onto it for about one minute?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby touch or explore objects with hands?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby move fingers while holding objects?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby follow a moving object with the eyes?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby look at toys placed nearby?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby watch your face when you talk?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby reach toward a toy?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby show interest in new objects?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby explore objects with eyes and hands?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby smile back when you smile?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby smile at familiar people?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby enjoy being held?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby calm down when picked up?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby show excitement when seeing caregivers?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby respond positively to social interaction?" }
+]},
+{
+    "intervalMonths": 6,
+    "minAgeDays": 150,
+    "maxAgeDays": 210,
+    "domains": [
+      "Communication",
+      "Gross Motor",
+      "Fine Motor",
+      "Problem Solving",
+      "Personal-Social"
+    ],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your baby make high-pitched squeals?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your baby make grunting, growling, or other deep-toned sounds?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your baby turn toward a sound?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your baby make sounds when looking at people?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your baby babble (such as “ba,” “da,” or “ga”)?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your baby make sounds to get attention?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "While on the tummy, does your baby lift the chest off the floor using both arms?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your baby roll from back to tummy?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your baby sit with support?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "When placed in a sitting position, does your baby lean forward on hands for support?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your baby bear some weight on legs when held upright?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your baby push up on arms when lying on the tummy?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby reach for a toy using both hands?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your baby grasp a toy and shake it?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby pass a toy from one hand to the other?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your baby rake at small objects using fingers?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby reach for objects accurately?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby use fingers to explore toys?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby look at a toy placed nearby?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby try to get a toy that is out of reach?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby put toys in the mouth?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby look for a toy that has been dropped?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby bang toys on a surface?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby explore toys using hands and mouth?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby smile or laugh during play?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby recognize familiar people?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby enjoy looking at self in a mirror?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby respond happily when spoken to?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby show excitement during social interaction?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby try to get attention from caregivers?" }
+    ]
+}, 
+{
+    "intervalMonths": 8,
+    "minAgeDays": 210,
+    "maxAgeDays": 270,
+    "domains": [
+      "Communication",
+      "Gross Motor",
+      "Fine Motor",
+      "Problem Solving",
+      "Personal-Social"
+    ],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your baby make sounds like “da,” “ga,” “ka,” or “ba”?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your baby repeat sounds back to you?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your baby make sounds when looking at toys or people?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your baby respond to his or her name?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your baby vocalize to get attention?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your baby show different sounds for different needs?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your baby sit without support for a short time?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your baby roll from tummy to back?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your baby roll from back to tummy?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your baby support weight on legs when held upright?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your baby push up on hands and knees?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your baby move forward by rolling or scooting?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby pick up a small toy using fingers?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your baby pass a toy from one hand to the other?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby bang two toys together?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your baby use fingers to rake small objects?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby hold a toy in each hand?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby reach accurately for objects?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby look for a toy that has been dropped?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby try to get a toy that is out of reach?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby put toys in the mouth?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby explore toys by shaking or banging them?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby watch where a toy goes when it falls?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby show curiosity about new objects?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby smile or laugh during play?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby enjoy social games like peekaboo?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby show preference for familiar caregivers?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby react when someone leaves the room?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby try to get attention from others?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby respond positively to social interaction?" }
+    ]
+  },
+  {
+    "intervalMonths": 9,
+    "minAgeDays": 270,
+    "maxAgeDays": 300,
+    "domains": [
+      "Communication",
+      "Gross Motor",
+      "Fine Motor",
+      "Problem Solving",
+      "Personal-Social"
+    ],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your baby make sounds like “da,” “ba,” and “ma”?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your baby repeat sounds that you make?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your baby respond to his or her name?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your baby use sounds to get your attention?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your baby babble using different sounds?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your baby make sounds while playing alone?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your baby sit well without support?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your baby crawl or move forward on hands and knees?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your baby roll from back to tummy?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your baby pull to a standing position?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your baby stand holding on to furniture?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your baby move from sitting to crawling or lying down?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby pick up a small toy using thumb and fingers?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your baby pick up food using fingers?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby transfer objects from one hand to the other?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your baby bang two objects together?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby release a toy intentionally?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby use fingers to explore objects?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby look for a toy that has been hidden?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby try to get a toy that is out of reach?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby bang toys on a surface?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby explore toys in different ways?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby watch where objects go when they fall?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby show curiosity about new objects?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby show preference for familiar people?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby react when a familiar person leaves?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby enjoy social games like peekaboo?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby respond when someone talks or smiles?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby try to get attention from caregivers?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby show pleasure during social interaction?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 10,
+    "minAgeDays": 300,
+    "maxAgeDays": 330,
+    "domains": [
+      "Communication",
+      "Gross Motor",
+      "Fine Motor",
+      "Problem Solving",
+      "Personal-Social"
+    ],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your baby make sounds like “ma,” “da,” and “ba”?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your baby repeat sounds you make?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your baby respond to his or her name?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your baby use sounds to get attention?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your baby make different sounds for different needs?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your baby babble while playing?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your baby sit well without support?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your baby crawl on hands and knees?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your baby pull up to stand?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your baby stand holding onto furniture?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your baby lower himself or herself from standing to sitting?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your baby move easily between sitting and crawling?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby pick up small objects using thumb and finger?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your baby pass toys from one hand to the other?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby bang two toys together?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your baby release a toy into your hand?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby poke at small objects with fingers?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby pick up food using fingers?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby look for a toy that has been hidden?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby try to get a toy that is out of reach?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby put toys into a container?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby bang toys to make sounds?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby explore objects in different ways?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby show curiosity about new objects?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby show preference for familiar caregivers?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby react when a caregiver leaves?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby enjoy social games like peekaboo?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby try to get attention from others?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby smile or laugh during interaction?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby respond positively to familiar people?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 12,
+    "minAgeDays": 330,
+    "maxAgeDays": 390,
+    "domains": [
+      "Communication",
+      "Gross Motor",
+      "Fine Motor",
+      "Problem Solving",
+      "Personal-Social"
+    ],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your baby say one or more words such as “mama” or “dada”?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your baby imitate sounds or words?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your baby respond to simple spoken requests?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your baby use sounds or words to get attention?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your baby point to objects when wanting something?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your baby understand simple words like “no” or “bye-bye”?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your baby stand alone without support?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your baby walk holding onto furniture?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your baby take steps when held by one hand?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your baby bend down and pick up a toy from the floor?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your baby move from standing to sitting without falling?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your baby crawl up steps or onto furniture?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your baby pick up small objects using thumb and finger?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your baby put objects into a container?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your baby take objects out of a container?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your baby turn pages of a book?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your baby stack two small blocks?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your baby use fingers to feed himself or herself?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your baby try to copy actions you show?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your baby look for objects that are hidden?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your baby put objects into the correct container?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your baby explore objects by shaking or banging?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your baby use objects correctly after watching you?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your baby show interest in new experiences?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your baby play games like peekaboo or pat-a-cake?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your baby show affection to familiar people?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your baby help with dressing by holding out arms or legs?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your baby imitate household activities?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your baby show interest in other children?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your baby seek comfort from caregivers?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 14,
+    "minAgeDays": 390,
+    "maxAgeDays": 450,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child say two or more words besides “mama” and “dada”?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child point to show you something he or she wants?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow simple directions?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child shake head for “no” or nod for “yes”?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child try to name familiar objects?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child use words to get attention?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child walk without support?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child squat to pick up toys?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child climb onto furniture?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child walk backward or sideways?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child walk carrying a toy?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child stand up without using hands?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack two blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child scribble with a crayon?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child turn pages of a book?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child pick up small objects with thumb and finger?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child put objects into a container?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child use a spoon with some spilling?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child copy actions you demonstrate?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child try to use objects correctly?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child look for hidden objects?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child drop objects into containers?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child explore toys in different ways?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child show curiosity about new objects?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child hug or show affection?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child imitate household activities?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child play simple games with you?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child seek help when needed?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child show interest in other children?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child try to feed himself or herself?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 16,
+    "minAgeDays": 450,
+    "maxAgeDays": 510,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child say three or more words?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child point to pictures in a book?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow simple commands?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child try to repeat words you say?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child name familiar people?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child use words to ask for things?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child walk well and rarely fall?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child climb stairs with help?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child kick a ball forward?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child run stiffly?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child bend to pick up toys?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child walk backward?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack three blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child scribble spontaneously?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child turn book pages one at a time?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child use a spoon with less spilling?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child place pegs into holes?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child remove socks or shoes?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child match objects to pictures?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child use objects as tools?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child copy simple problem-solving actions?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child attempt puzzles?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child explore cause-and-effect toys?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child try different ways to reach a goal?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child imitate adult activities?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child show affection to caregivers?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child play near other children?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child help with dressing?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child seek comfort when upset?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child show independence?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 18,
+    "minAgeDays": 510,
+    "maxAgeDays": 570,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child say eight or more words?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child combine words and gestures?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child point to body parts when asked?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child name familiar objects?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child follow two-step directions?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child ask for help using words?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child run well?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child walk up stairs with help?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child kick a ball forward?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child climb playground equipment?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child squat during play?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child carry toys while walking?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack four blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child turn pages of a book easily?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child use a spoon and fork?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child scribble with purpose?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child remove simple clothing?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child place shapes into a sorter?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete simple puzzles?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child pretend to use objects?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child imitate problem-solving actions?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child find hidden objects?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child use objects appropriately?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child try new ways to solve problems?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child feed himself or herself?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child show affection to others?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child imitate adult routines?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child play with other children?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child help with simple tasks?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child show empathy when others are upset?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 20,
+    "minAgeDays": 570,
+    "maxAgeDays": 630,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child say at least 10 words?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child combine two words together?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow two-step directions?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child name familiar objects?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child point to pictures when named?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child ask for help using words?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child run without falling often?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child walk up stairs holding a hand?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child kick a ball forward?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child climb onto furniture?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child squat to pick up toys?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child carry toys while walking?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack four blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child turn pages of a book?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child use a spoon with little spilling?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child scribble spontaneously?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child remove simple clothing?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child place shapes into a sorter?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete simple puzzles?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child pretend to use objects?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child imitate problem-solving actions?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child find hidden objects?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child try different ways to solve a problem?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child show curiosity about how things work?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child feed himself or herself?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child imitate adult activities?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child play alongside other children?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child show affection to familiar people?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child help with simple household tasks?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child seek comfort when upset?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 22,
+    "minAgeDays": 630,
+    "maxAgeDays": 690,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child use two- or three-word phrases?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child name familiar people or pets?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow simple directions without gestures?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child point to objects when asked?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child use words to express needs?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child imitate words you say?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child run easily?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child walk up stairs holding a railing?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child jump with both feet?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child kick a ball without losing balance?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child climb playground equipment?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child walk backward a few steps?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack five blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child turn pages one at a time?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child use a spoon and fork?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child imitate drawing lines?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child open containers?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child remove shoes or socks?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete simple shape sorters?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child pretend objects are something else?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child imitate everyday problem solving?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child look for objects that are hidden?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child use objects in the correct way?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child try more than one solution to a problem?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child feed himself or herself neatly?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child show affection to family members?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child play near other children?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child imitate household routines?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child ask for help when needed?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child show independence?" }
+    ]
+  },
+  {
+    "intervalMonths": 24,
+    "minAgeDays": 690,
+    "maxAgeDays": 750,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child use two-word sentences?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child name objects in pictures?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow two-step commands?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child use words instead of gestures?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child ask simple questions?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child combine words regularly?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child run smoothly?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child jump with both feet off the ground?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child walk up and down stairs holding a rail?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child kick a ball forward?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child climb ladders or playground equipment?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child stand on tiptoes?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack six blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child turn pages one by one?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child imitate vertical or circular strokes?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child use a spoon with minimal spilling?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child open doors using handles?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child remove clothing items?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete puzzles with a few pieces?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child match shapes or colors?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child pretend objects are something else?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child imitate adult problem solving?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child try new strategies to solve problems?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child show interest in how things work?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child play beside other children?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child help with dressing?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child show affection to others?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child imitate household activities?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child feed himself or herself?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child show independence in daily tasks?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 27,
+    "minAgeDays": 750,
+    "maxAgeDays": 840,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child speak in short sentences?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child name actions in pictures?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow two-step directions easily?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child ask questions using words?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child talk about familiar events?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child use words to express feelings?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child jump forward?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child walk up stairs alternating feet with help?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child run and stop without falling?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child kick a ball accurately?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child climb playground structures independently?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child balance briefly on one foot?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack seven or more blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child draw lines or circles?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child turn pages carefully?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child use utensils well?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child put small items into containers?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child remove most clothing items?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete puzzles with more pieces?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child match objects by shape or color?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child pretend play using objects?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child imitate adult problem solving?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child try different ways to complete a task?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child show curiosity and persistence?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child play with other children?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child take turns with help?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child show concern for others?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child help with simple chores?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child dress with some help?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child express emotions clearly?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 30,
+    "minAgeDays": 840,
+    "maxAgeDays": 930,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child use sentences of three or more words?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child name actions in pictures?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child follow two-step directions?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child ask questions like “what” or “where”?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child talk about recent events?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child use words to express needs and feelings?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child run and stop easily?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child jump forward with both feet?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child walk up stairs alternating feet with help?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child kick a ball with control?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child climb playground equipment?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child balance briefly on one foot?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child stack eight or more blocks?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child draw lines and circles?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child turn book pages one at a time?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child use a spoon and fork well?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child put small objects into containers?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child remove most clothing items?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete puzzles with several pieces?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child match objects by shape or color?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child engage in pretend play?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child imitate adult problem solving?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child try different ways to solve problems?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child persist when a task is challenging?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child play with other children?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child take turns with help?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child show concern for others?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child help with simple chores?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child dress with some help?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child express emotions clearly?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 33,
+    "minAgeDays": 930,
+    "maxAgeDays": 1020,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child speak clearly enough for familiar people to understand?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child use sentences with three to four words?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child answer simple questions?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child talk about what he or she is doing?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child ask for help using words?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child use words to describe feelings?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child jump forward easily?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child go up and down stairs alternating feet?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child run and turn without falling?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child kick a ball accurately?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child climb confidently?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child balance on one foot briefly?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child draw a vertical line?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child copy a circle?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child stack nine or more blocks?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child use scissors with help?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child turn pages carefully?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child button or unzip with help?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete puzzles with more pieces?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child sort objects by size or color?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child pretend play with multiple steps?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child imitate adult problem solving?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child plan actions before doing them?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child try again after failing?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child play cooperatively with others?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child take turns without reminders?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child show empathy toward others?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child help with household routines?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child dress with minimal help?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child manage simple self-care tasks?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 36,
+    "minAgeDays": 1020,
+    "maxAgeDays": 1140,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child speak in sentences of four or more words?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child tell you about something that happened?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child answer “who,” “what,” or “where” questions?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child use words to express feelings?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child follow three-step directions?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child speak clearly most of the time?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child jump forward and land on both feet?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child pedal a tricycle?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child walk up stairs alternating feet without help?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child stand on one foot for a few seconds?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child run smoothly and stop easily?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child climb playground equipment confidently?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child draw a circle?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child copy a vertical line?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child stack ten or more blocks?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child use scissors to cut paper?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child button large buttons?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child hold a crayon with fingers?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child complete age-appropriate puzzles?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child match shapes or colors?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child engage in pretend play with a storyline?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child solve simple problems independently?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child plan before acting?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child persist when tasks are difficult?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child play cooperatively with other children?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child take turns without reminders?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child show empathy toward others?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child dress independently with minimal help?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child help with household chores?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child express emotions appropriately?" }
+    ]
+  },
+
+  {
+    "intervalMonths": 42,
+    "minAgeDays": 1140,
+    "maxAgeDays": 1320,
+    "domains": ["Communication","Gross Motor","Fine Motor","Problem Solving","Personal-Social"],
+    "questions": [
+      { "questionId": "C1", "domain": "Communication", "text": "Does your child speak clearly so strangers can understand?" },
+      { "questionId": "C2", "domain": "Communication", "text": "Does your child tell stories with a beginning and end?" },
+      { "questionId": "C3", "domain": "Communication", "text": "Does your child answer questions about stories?" },
+      { "questionId": "C4", "domain": "Communication", "text": "Does your child use correct pronouns?" },
+      { "questionId": "C5", "domain": "Communication", "text": "Does your child ask many questions?" },
+      { "questionId": "C6", "domain": "Communication", "text": "Does your child explain ideas using words?" },
+
+      { "questionId": "GM1", "domain": "Gross Motor", "text": "Does your child hop on one foot?" },
+      { "questionId": "GM2", "domain": "Gross Motor", "text": "Does your child pedal and steer a tricycle?" },
+      { "questionId": "GM3", "domain": "Gross Motor", "text": "Does your child walk down stairs alternating feet?" },
+      { "questionId": "GM4", "domain": "Gross Motor", "text": "Does your child catch a large ball?" },
+      { "questionId": "GM5", "domain": "Gross Motor", "text": "Does your child climb and descend playground equipment safely?" },
+      { "questionId": "GM6", "domain": "Gross Motor", "text": "Does your child run and change direction easily?" },
+
+      { "questionId": "FM1", "domain": "Fine Motor", "text": "Does your child draw a person with two or more body parts?" },
+      { "questionId": "FM2", "domain": "Fine Motor", "text": "Does your child copy a cross?" },
+      { "questionId": "FM3", "domain": "Fine Motor", "text": "Does your child use scissors to cut along a line?" },
+      { "questionId": "FM4", "domain": "Fine Motor", "text": "Does your child color within lines?" },
+      { "questionId": "FM5", "domain": "Fine Motor", "text": "Does your child fasten buttons or zippers?" },
+      { "questionId": "FM6", "domain": "Fine Motor", "text": "Does your child hold a pencil with good control?" },
+
+      { "questionId": "PS1", "domain": "Problem Solving", "text": "Does your child solve problems using reasoning?" },
+      { "questionId": "PS2", "domain": "Problem Solving", "text": "Does your child complete complex puzzles?" },
+      { "questionId": "PS3", "domain": "Problem Solving", "text": "Does your child plan steps to complete tasks?" },
+      { "questionId": "PS4", "domain": "Problem Solving", "text": "Does your child understand cause and effect?" },
+      { "questionId": "PS5", "domain": "Problem Solving", "text": "Does your child try multiple strategies?" },
+      { "questionId": "PS6", "domain": "Problem Solving", "text": "Does your child persist until a task is finished?" },
+
+      { "questionId": "PE1", "domain": "Personal-Social", "text": "Does your child play cooperatively in groups?" },
+      { "questionId": "PE2", "domain": "Personal-Social", "text": "Does your child follow group rules?" },
+      { "questionId": "PE3", "domain": "Personal-Social", "text": "Does your child show empathy toward peers?" },
+      { "questionId": "PE4", "domain": "Personal-Social", "text": "Does your child manage self-care independently?" },
+      { "questionId": "PE5", "domain": "Personal-Social", "text": "Does your child help others without being asked?" },
+      { "questionId": "PE6", "domain": "Personal-Social", "text": "Does your child express emotions appropriately in social situations?" }
+    ]
+  }
+]
+

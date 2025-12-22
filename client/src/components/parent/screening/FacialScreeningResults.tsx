@@ -69,7 +69,7 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
                   Facial Screening Complete! 🎉
                 </CardTitle>
                 <CardDescription className="mt-1">
-                  AI Analysis for {child?.name}
+                  AI Analysis for {child?.firstName} {child?.lastName}
                 </CardDescription>
               </div>
             </div>
