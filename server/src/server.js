@@ -35,10 +35,12 @@ const upload = multer({
 });
 
 // Middleware
-app.use(cors({
+const corsOptions = {
   origin: 'http://localhost:4173',
-  credentials: true
-}));
+  credentials: true, // allow cookies
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
@@ -46,6 +48,7 @@ const authRoutes = require('./routes/auth.routes.js');
 const adminRoutes = require('./routes/admin.routes.js');
 const childRoutes = require('./routes/child.routes.js');
 const screeningRoutes = require('./routes/screening.routes.js');
+const labRoutes = require('./routes/lab.routes.js');
 
 const connectDB = require('./config/database.js');
 
@@ -53,9 +56,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/child", childRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/screening", screeningRoutes);
+app.use("/api/lab", labRoutes);
 
 
-    
+
 const port = process.env.PORT || 4000;
 
 const startServer = () => {

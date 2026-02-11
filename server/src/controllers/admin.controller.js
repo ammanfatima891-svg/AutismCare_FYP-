@@ -6,7 +6,7 @@ exports.getPendingProfessionals = async (req, res) => {
     const pendingUsers = await User.find({
       role: { $in: ['clinician', 'therapist'] },
       approvalStatus: APPROVAL_STATUS.PENDING
-    }).select('firstName lastName email role specialization licenseNumber createdAt');
+    }).select('firstName lastName email role specialization licenseNumber documents createdAt');
 
     res.status(200).json({ users: pendingUsers });
   } catch (err) {

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription } from '../../ui/alert';
 import { useState, useEffect } from 'react';
-import API from '../../../api';
+import API, { screeningAPI } from '../../../api';
 import jsPDF from 'jspdf';
 
 interface ScreeningResultsProps {
@@ -35,6 +35,9 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
   const [questions, setQuestions] = useState<any[]>([]);
   const [cliniciansAndTherapists, setCliniciansAndTherapists] = useState({ clinicians: [], therapists: [] });
   const [loading, setLoading] = useState(false);
+  const [submission, setSubmission] = useState<any>(null);
+
+
 
   useEffect(() => {
     if (screeningType === 'M-CHAT-R') {
@@ -54,7 +57,7 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
     const fetchCliniciansAndTherapists = async () => {
       setLoading(true);
       try {
-        const response = await API.get('/screening/available-clinicians-therapists');
+        const response = await screeningAPI.getAvailableCliniciansAndTherapists();
         setCliniciansAndTherapists(response.data.data);
       } catch (error) {
         console.error('Error fetching clinicians and therapists:', error);
@@ -65,6 +68,20 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
 
     fetchCliniciansAndTherapists();
   }, []);
+
+  useEffect(() => {
+    if ((screeningType === 'M-CHAT-R' || screeningType === 'ASQ-3') && results.submissionId) {
+      const fetchSubmission = async () => {
+        try {
+          const response = await screeningAPI.getSubmissionById(results.submissionId);
+          setSubmission(response.data.data);
+        } catch (error) {
+          console.error('Error fetching submission:', error);
+        }
+      };
+      fetchSubmission();
+    }
+  }, [screeningType, results.submissionId]);
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
@@ -126,7 +143,7 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
 
     // Title
     doc.setFontSize(20);
-    doc.text('M-CHAT-R Screening Report', 20, 30);
+    doc.text(`${screeningType} Screening Report`, 20, 30);
 
     // Child info
     doc.setFontSize(12);
@@ -143,31 +160,43 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
     doc.setFontSize(14);
     doc.text('Results:', 20, 80);
     doc.setFontSize(12);
-    doc.text(`Total Score: ${results.totalScore}/20`, 20, 95);
-    doc.text(`Result: ${results.result?.toUpperCase() || 'UNKNOWN'}`, 20, 105);
-    doc.text(`Risk Level: ${results.riskLevel.toUpperCase()}`, 20, 115);
 
-    if (results.resultDescription) {
-      doc.text(`Description: ${results.resultDescription}`, 20, 130);
-    }
+    if (screeningType === 'M-CHAT-R') {
+      doc.text(`Total Score: ${results.scores?.totalScore || 0}/20`, 20, 95);
+      doc.text(`Result: ${(results.result || 'UNKNOWN').toUpperCase()}`, 20, 105);
+      doc.text(`Risk Level: ${results.riskLevel.toUpperCase()}`, 20, 115);
 
-    // Elevated items
-    if (results.elevatedItems && results.elevatedItems.length > 0) {
-      doc.text('Elevated Items:', 20, 150);
-      let yPos = 165;
-      results.elevatedItems.forEach((itemId: number, index: number) => {
-        const question = questions.find((q: any) => q.questionId === itemId);
-        doc.text(`${index + 1}. Question ${itemId}${question ? ': ' + question.text : ''}`, 20, yPos);
-        yPos += 10;
-        if (yPos > 270) {
-          doc.addPage();
-          yPos = 30;
-        }
-      });
+      if (results.resultDescription) {
+        doc.text(`Description: ${results.resultDescription}`, 20, 130);
+      }
+
+      if (submission?.result) {
+        doc.text(`Database Result: ${submission.result}`, 20, 145);
+      }
+
+      if (results.scores?.elevatedItems && results.scores.elevatedItems.length > 0) {
+        let yPos = submission?.result ? 160 : 145;
+        doc.text('Elevated Items:', 20, yPos);
+        results.scores.elevatedItems.forEach((item: any, index: number) => {
+          doc.text(`  ${index + 1}. Question ${item}`, 30, yPos + 10 + index * 10);
+        });
+      }
+    } else if (screeningType === 'ASQ-3') {
+      doc.text(`Overall Risk Level: ${results.riskLevel.toUpperCase()}`, 20, 95);
+
+      if (results.scores?.domainScores && results.scores?.domainStatuses) {
+        doc.text('Domain Scores:', 20, 110);
+        let yPos = 125;
+        Object.entries(results.scores.domainScores).forEach(([domain, score]: [string, any]) => {
+          const status = results.scores.domainStatuses[domain];
+          doc.text(`${domain}: ${score}/60 (${status})`, 30, yPos);
+          yPos += 15;
+        });
+      }
     }
 
     // Save the PDF
-    doc.save(`MCHAT-R_Report_${child?.firstName}_${new Date(results.date).toISOString().split('T')[0]}.pdf`);
+    doc.save(`${screeningType}_Report_${child?.firstName}_${new Date(results.date).toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -203,14 +232,75 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
           <Alert className={`bg-${color}-100 border-${color}-300`}>
             <Sparkles className={`h-4 w-4 text-${color}-600`} />
             <AlertDescription className={`text-${color}-900`}>
-              {getRiskMessage(results.riskLevel, screeningType)}
+              {(screeningType === 'MCHAT-R' || screeningType === 'M-CHAT-R') && results.resultDescription ? results.resultDescription : getRiskMessage(results.riskLevel, screeningType)}
             </AlertDescription>
           </Alert>
         </CardContent>
       </Card>
 
+      {/* MCHAT-R Scores */}
+      {screeningType === 'M-CHAT-R' && results.scores && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-purple-600" />
+              M-CHAT-R Scores
+            </CardTitle>
+            <CardDescription>
+              Total score, result, and elevated items
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <span className="text-gray-900 font-medium">Total Score</span>
+              <div className="text-right">
+                <div className="text-lg font-bold text-gray-900">
+                  {results.scores.totalScore}/20
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <span className="text-gray-900 font-medium">Result</span>
+              <Badge className={`bg-${getRiskColor(results.riskLevel)}-500 text-white`}>
+                {results.result}
+              </Badge>
+            </div>
+            {results.scores.elevatedItems && results.scores.elevatedItems.length > 0 && (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <span className="text-gray-900 font-medium">Elevated Items</span>
+                <ul className="mt-2 list-disc list-inside text-sm text-gray-600">
+                  {results.scores.elevatedItems.map((item: any, index: number) => (
+                    <li key={index}>Question {item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* MCHAT-R Score Object */}
+      {screeningType === 'M-CHAT-R' && submission?.scores && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-purple-600" />
+              M-CHAT-R Score Object
+            </CardTitle>
+            <CardDescription>
+              Complete score object from the M-CHAT-R submission
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="bg-gray-50 p-4 rounded-lg text-sm overflow-x-auto">
+              {JSON.stringify(submission.scores, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Domain Scores (ASQ-3 only) */}
-      {results.domainScores && results.domainStatuses && screeningType === 'ASQ-3' && (
+      {results.scores?.domainScores && results.scores?.domainStatuses && screeningType === 'ASQ-3' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -222,8 +312,8 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(results.domainScores).map(([domain, score]: [string, any]) => {
-              const status = results.domainStatuses[domain];
+            {Object.entries(results.scores.domainScores).map(([domain, score]: [string, any]) => {
+              const status = results.scores.domainStatuses[domain];
               let statusColor = 'gray';
               let statusText = '';
 
@@ -270,8 +360,8 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
         </Card>
       )}
 
-      {/* Available Clinicians and Therapists (ASQ-3 only) */}
-      {(cliniciansAndTherapists.clinicians.length > 0 || cliniciansAndTherapists.therapists.length > 0) && (screeningType === 'ASQ-3' || screeningType === 'M-CHAT-R') && (
+      {/* Available Clinicians and Therapists */}
+      {(cliniciansAndTherapists.clinicians.length > 0 || cliniciansAndTherapists.therapists.length > 0) && (screeningType === 'ASQ-3' || screeningType === 'MCHAT-R') && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-600">
@@ -372,65 +462,7 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
         </Card>
       )}
 
-      {/* M-CHAT-R Results */}
-      {screeningType === 'M-CHAT-R' && (
-        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-600">
-              <Target className="w-5 h-5" />
-              M-CHAT-R Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <h4 className="text-blue-900 font-medium">Total Score</h4>
-              <div className="text-3xl font-bold text-blue-600">{results.totalScore}/20</div>
-              <p className="text-sm text-gray-600">Elevated responses out of 20 questions</p>
-            </div>
 
-            {results.elevatedItems && results.elevatedItems.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-blue-900 font-medium">Elevated Items</h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowDetails(!showDetails)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    {showDetails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    {showDetails ? 'Hide' : 'Show'} Details
-                  </Button>
-                </div>
-                {showDetails && (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {results.elevatedItems.map((itemId: number, index: number) => {
-                      const question = questions.find((q: any) => q.questionId === itemId);
-                      return (
-                        <div key={index} className="p-3 bg-white rounded-lg border border-gray-200">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">
-                                Question {itemId}
-                              </p>
-                              {question && (
-                                <p className="text-sm text-gray-600 mt-1">
-                                  {question.text}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Action Buttons */}
       <Card>
@@ -442,7 +474,7 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
         </CardHeader>
         <CardContent>
           <div className="flex gap-3">
-            <Button variant="outline" className="flex items-center gap-2">
+            <Button variant="outline" className="flex items-center gap-2" onClick={downloadReport}>
               <Download className="w-4 h-4" />
               Download Report
             </Button>

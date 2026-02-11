@@ -6,7 +6,7 @@ const ASQ_CUTOFFS = require("./asqCutoffs");
 const SCORE_MAP = {
   yes: 10,
   sometimes: 5,
-  not_yet: 0,
+  "not-yet": 0,
 };
 
 /**

@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../ui/button';
 import { QuestionnaireSelection } from './screening/QuestionnaireSelection';
+import { ScreeningIntro } from './screening/ScreeningIntro';
 import { MCHATForm } from './screening/MCHATForm';
 import { ASQ3Form } from './screening/ASQ3Form';
 import { ScreeningResults } from './screening/ScreeningResults';
 
-type View = 'selection' | 'MCHAT-R' | 'ASQ-3' | 'results';
+type View = 'selection' | 'intro' | 'MCHAT-R' | 'ASQ-3' | 'results';
 
 export function ScreeningSection() {
   const [currentView, setCurrentView] = useState<View>('selection');
@@ -27,15 +28,29 @@ export function ScreeningSection() {
   };
 
   const handleBack = () => {
-    setCurrentView('selection');
-    setSelectedChild(null);
-    setScreeningType('');
-    setResults(null);
+    if (currentView === 'intro') {
+      setCurrentView('selection');
+      setSelectedChild(null);
+      setScreeningType('');
+    } else {
+      setCurrentView('selection');
+      setSelectedChild(null);
+      setScreeningType('');
+      setResults(null);
+    }
   };
+
+  function handleIntroComplete(): void {
+    throw new Error('Function not implemented.');
+  }
+
+  function handleIntroCancel(): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
-      {currentView !== 'selection' && (
+      {currentView !== 'selection' && currentView !== 'intro' && (
         <Button
           variant="ghost"
           onClick={handleBack}
@@ -48,6 +63,14 @@ export function ScreeningSection() {
 
       {currentView === 'selection' && (
         <QuestionnaireSelection onStartScreening={handleStartScreening} />
+      )}
+
+      {currentView === 'intro' && (
+        <ScreeningIntro
+          onStart={handleIntroComplete}
+          onCancel={handleIntroCancel}
+          questionnaireType={screeningType}
+        />
       )}
 
       {currentView === 'MCHAT-R' && (

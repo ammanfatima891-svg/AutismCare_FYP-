@@ -1,15 +1,18 @@
 const mongoose = require('mongoose');
 const { User } = require('../models/User.js');
+const connectDB = require('../config/database.js');
 
 const seedUsers = async () => {
+  await connectDB();
+  await User.deleteMany({});
   const users = [
     {
-      fullName: "Parent One",
+      firstName: "Parent",
+      lastName: "One",
       email: "parent1@example.com",
-      phone: "+923001112233",
+      phoneNumber: "+923001112233",
       password: "Password123",
-      roles: ["parent"],
-      primaryRole: "parent"
+      role: "parent"
     },
     {
       firstName: "Ali",
@@ -34,30 +37,30 @@ const seedUsers = async () => {
       approvalStatus: "active"
     },
     {
-      fullName: "Lab A",
+      firstName: "Lab",
+      lastName: "A",
       email: "lab1@example.com",
-      phone: "+923001112266",
+      phoneNumber: "+923001112266",
       password: "Password123",
-      roles: ["laboratory"],
-      primaryRole: "laboratory",
-      organization: "AutismCare Lab",
-      licenseNumber: "LAB123",
-      labAddress: "123 Lab Street",
-      labType: "general"
+      role: "lab",
+      labName: "AutismCare Lab",
+      accreditation: "ISO 9001"
     },
     {
-      fullName: "Admin One",
+      firstName: "Admin",
+      lastName: "One",
       email: "admin1@example.com",
-      phone: "+923001112277",
+      phoneNumber: "+923001112277",
       password: "Password123",
-      roles: ["admin"],
-      primaryRole: "admin",
-      permissions: ["manageUsers", "viewReports", "manageTherapies"]
+      role: "admin"
     }
   ];
 
-  await User.insertMany(users);
+  for (const userData of users) {
+    const user = new User(userData);
+    await user.save();
+  }
   console.log("Users seeded.");
 };
 
-module.exports = seedUsers;
+seedUsers().catch(console.error);

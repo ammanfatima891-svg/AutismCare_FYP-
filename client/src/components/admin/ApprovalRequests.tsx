@@ -6,6 +6,13 @@ import { CheckCircle, XCircle, Clock, User, Stethoscope, Users } from "lucide-re
 import { toast } from "sonner";
 import API from "../../api";
 
+interface Document {
+  name: string;
+  url: string;
+  type: string;
+  uploadedAt: string;
+}
+
 interface PendingUser {
   _id: string;
   firstName: string;
@@ -14,6 +21,7 @@ interface PendingUser {
   role: string;
   specialization?: string;
   licenseNumber?: string;
+  documents?: Document[];
   createdAt: string;
 }
 
@@ -129,6 +137,33 @@ export default function ApprovalRequests() {
                       <div>
                         <span className="text-sm font-medium text-gray-700">License Number:</span>
                         <span className="text-sm text-gray-600 ml-2">{user.licenseNumber}</span>
+                      </div>
+                    )}
+
+                    {user.documents && user.documents.length > 0 && (
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Documents:</span>
+                        <div className="mt-2 space-y-2">
+                          {user.documents.map((doc, index) => (
+                            <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                              <User className="h-4 w-4 text-gray-500" />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-900">{doc.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {doc.type} • Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Button
+                                onClick={() => window.open(doc.url, '_blank')}
+                                variant="outline"
+                                size="sm"
+                                className="text-xs"
+                              >
+                                View
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 

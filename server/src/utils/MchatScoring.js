@@ -46,8 +46,8 @@ exports.scoreMCHATFromDB = (questionnaire, responses) => {
 
   return {
     totalScore: score,
-    elevatedItems,
-    resultLabel,
+    result: resultLabel,
     resultDescription,
+    elevatedItems,
   };
 };

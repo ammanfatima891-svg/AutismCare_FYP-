@@ -8,40 +8,7 @@ interface ClinicianHomeProps {
 }
 
 export function ClinicianHome({ onNavigate }: ClinicianHomeProps) {
-  const stats = [
-    {
-      title: 'Active Patients',
-      value: '24',
-      description: 'Currently under care',
-      icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50'
-    },
-    {
-      title: 'Pending Reviews',
-      value: '8',
-      description: 'Screening results to review',
-      icon: ClipboardList,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50'
-    },
-    {
-      title: 'Today\'s Appointments',
-      value: '6',
-      description: 'Scheduled for today',
-      icon: Calendar,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50'
-    },
-    {
-      title: 'Unread Messages',
-      value: '12',
-      description: 'From parents and staff',
-      icon: MessageSquare,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50'
-    }
-  ];
+  const stats: any[] = [];
 
   const recentActivities = [
     { patient: 'Emma Johnson', action: 'Screening completed', time: '2 hours ago', urgent: false },

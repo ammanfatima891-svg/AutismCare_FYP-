@@ -1,19 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
-import { Badge } from '../../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import {
   Edit,
   FileText,
-  TrendingUp,
-  ClipboardCheck,
   Pill,
   AlertCircle,
   Phone,
   Activity
 } from 'lucide-react';
-import { Progress } from '../../ui/progress';
 import { childAPI } from '../../../api';
 
 interface ChildProfileProps {
@@ -23,20 +19,15 @@ interface ChildProfileProps {
 export function ChildProfile({ childId }: ChildProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [child, setChild] = useState<any>(null);
-  const [screeningStatus, setScreeningStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchChildData = async () => {
       try {
-        const [childResponse, screeningResponse] = await Promise.all([
-          childAPI.getChildById(childId),
-          childAPI.getChildScreeningStatus(childId)
-        ]);
+        const childResponse = await childAPI.getChildById(childId);
 
         setChild(childResponse.data.data);
-        setScreeningStatus(screeningResponse.data.data);
       } catch (err) {
         setError('Failed to load child data');
         console.error('Error fetching child:', err);
@@ -58,27 +49,6 @@ export function ChildProfile({ childId }: ChildProfileProps) {
 
   const fullName = `${child.firstName} ${child.lastName}`;
   const age = Math.floor((new Date().getTime() - new Date(child.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-
-  const screeningHistory = [
-    {
-      id: 1,
-      type: 'M-CHAT-R',
-      date: '2024-10-15',
-      score: 'Low Risk',
-      status: 'completed',
-      details: 'All developmental milestones on track',
-    },
-    {
-      id: 2,
-      type: 'ASQ-3',
-      date: '2024-09-01',
-      score: 'Low Risk',
-      status: 'completed',
-      details: 'Age-appropriate development',
-    },
-  ];
-
-
 
   return (
     <div className="space-y-6">
@@ -112,9 +82,8 @@ export function ChildProfile({ childId }: ChildProfileProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-1 lg:w-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="screening">Screening</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -196,104 +165,11 @@ export function ChildProfile({ childId }: ChildProfileProps) {
               </CardContent>
             </Card>
 
-            {/* Quick Stats */}
-            <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-blue-600">
-                  <TrendingUp className="w-5 h-5" />
-                  Progress Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Screenings Completed</span>
-                    <span className="text-gray-900">{screeningStatus?.totalScreenings || 0}</span>
-                  </div>
-                  <Progress value={screeningStatus?.totalScreenings > 0 ? 100 : 0} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Current Status</span>
-                    <span className="text-gray-900">{screeningStatus?.overallStatus || 'Not Screened'}</span>
-                  </div>
-                  <Progress
-                    value={
-                      screeningStatus?.latestRiskLevel === 'low' ? 25 :
-                      screeningStatus?.latestRiskLevel === 'medium' ? 50 :
-                      screeningStatus?.latestRiskLevel === 'high' ? 100 : 0
-                    }
-                    className="h-2"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Last Screening</span>
-                    <span className="text-gray-900">
-                      {screeningStatus?.latestScreeningDate ?
-                        new Date(screeningStatus.latestScreeningDate).toLocaleDateString() :
-                        'None'
-                      }
-                    </span>
-                  </div>
-                  <Progress value={screeningStatus?.latestScreeningDate ? 100 : 0} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
         </TabsContent>
 
-        {/* Screening History Tab */}
-        <TabsContent value="screening" className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-purple-600">Screening History</h3>
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              <ClipboardCheck className="w-4 h-4 mr-2" />
-              New Screening
-            </Button>
-          </div>
-          {screeningStatus?.screeningHistory && screeningStatus.screeningHistory.length > 0 ? (
-            screeningStatus.screeningHistory.map((screening: any, index: number) => (
-              <Card key={index}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="text-purple-600">{screening.type}</h4>
-                        <Badge className={
-                          screening.riskLevel === 'low' ? 'bg-green-500' :
-                          screening.riskLevel === 'medium' ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }>
-                          {screening.riskLevel === 'low' ? 'Low Risk' :
-                           screening.riskLevel === 'medium' ? 'Medium Risk' :
-                           'High Risk'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Score: {screening.totalScore || 'N/A'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(screening.completedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">View Report</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <ClipboardCheck className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Screenings Yet</h3>
-                <p className="text-gray-500 text-center">
-                  No screening history available for this child.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+
 
 
       </Tabs>

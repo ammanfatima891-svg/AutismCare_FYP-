@@ -51,9 +51,10 @@ exports.register = async (req, res) => {
     // 4. Handle document uploads for professionals
     let documents = [];
     if ((normalizedRole === 'clinician' || normalizedRole === 'therapist') && req.files && req.files.length > 0) {
+      const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4000}`;
       documents = req.files.map(file => ({
         name: file.originalname,
-        url: `/uploads/documents/${file.filename}`,
+        url: `${serverUrl}/uploads/documents/${file.filename}`,
         type: path.extname(file.originalname).toLowerCase()
       }));
     }

@@ -14,14 +14,17 @@ registerSW();
 
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import { ThemeProvider } from "next-themes";
 const container = document.getElementById("root");
 
 if (container) {
   createRoot(container).render(
     <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
