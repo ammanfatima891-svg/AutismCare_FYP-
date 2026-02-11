@@ -1,214 +1,149 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { ClipboardList, Upload, Bell, TrendingUp, AlertCircle, Clock, CheckCircle } from 'lucide-react';
-import API from '../../api';
+import { ClipboardList, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { labAPI } from '../../api';
 
 interface LabHomeProps {
-    onNavigate: (section: 'home' | 'orders' | 'upload' | 'notifications', orderId?: string) => void;
+    onNavigate: (section: string) => void;
 }
 
 interface Stats {
     pending: number;
-    inProgress: number;
-    completedToday: number;
-    urgent: number;
-}
-
-interface RecentOrder {
-    _id: string;
-    childName: string;
-    testName: string;
-    status: string;
-    priority: string;
-    createdAt: string;
+    uploaded: number;
+    released: number;
+    totalReports: number;
 }
 
 export function LabHome({ onNavigate }: LabHomeProps) {
-    const [stats, setStats] = useState<Stats>({ pending: 0, inProgress: 0, completedToday: 0, urgent: 0 });
-    const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+    const [stats, setStats] = useState<Stats>({ pending: 0, uploaded: 0, released: 0, totalReports: 0 });
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchData();
+        fetchStats();
     }, []);
 
-    const fetchData = async () => {
+    const fetchStats = async () => {
         try {
-            const [statsRes, ordersRes] = await Promise.all([
-                API.get('/lab/stats'),
-                API.get('/lab/orders?limit=5')
-            ]);
-
-            if (statsRes.data.success) {
-                setStats(statsRes.data.data);
-            }
-
-            if (ordersRes.data.success) {
-                setRecentOrders(ordersRes.data.data.slice(0, 5));
-            }
-        } catch (error) {
-            console.error('Error fetching lab data:', error);
+            setLoading(true);
+            const { data } = await labAPI.getStats();
+            setStats(data.data);
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Failed to load statistics');
         } finally {
             setLoading(false);
         }
     };
 
-    const statCards = [
+    const summaryCards = [
         {
-            title: 'Pending Orders',
-            value: stats.pending.toString(),
-            description: 'Awaiting processing',
+            title: 'Pending Requests',
+            value: stats.pending,
             icon: Clock,
-            color: 'text-cyan-600',
-            bgColor: 'bg-cyan-50'
+            color: 'from-amber-500 to-orange-600',
+            bgLight: 'bg-amber-50',
+            textColor: 'text-amber-700',
+            onClick: () => onNavigate('requests')
         },
         {
-            title: 'In Progress',
-            value: stats.inProgress.toString(),
-            description: 'Currently processing',
-            icon: ClipboardList,
-            color: 'text-blue-600',
-            bgColor: 'bg-blue-50'
+            title: 'Uploaded Reports',
+            value: stats.uploaded,
+            icon: FileText,
+            color: 'from-blue-500 to-indigo-600',
+            bgLight: 'bg-blue-50',
+            textColor: 'text-blue-700',
+            onClick: () => onNavigate('reports')
         },
         {
-            title: 'Completed Today',
-            value: stats.completedToday.toString(),
-            description: 'Tests finished today',
+            title: 'Released Reports',
+            value: stats.released,
             icon: CheckCircle,
-            color: 'text-green-600',
-            bgColor: 'bg-green-50'
+            color: 'from-emerald-500 to-teal-600',
+            bgLight: 'bg-emerald-50',
+            textColor: 'text-emerald-700',
+            onClick: () => onNavigate('reports')
         },
         {
-            title: 'Urgent Orders',
-            value: stats.urgent.toString(),
-            description: 'High priority tests',
-            icon: AlertCircle,
-            color: 'text-red-600',
-            bgColor: 'bg-red-50'
+            title: 'Total Reports',
+            value: stats.totalReports,
+            icon: ClipboardList,
+            color: 'from-purple-500 to-violet-600',
+            bgLight: 'bg-purple-50',
+            textColor: 'text-purple-700',
+            onClick: () => onNavigate('reports')
         }
     ];
 
-    const getStatusBadge = (status: string) => {
-        const variants: Record<string, string> = {
-            pending: 'bg-yellow-100 text-yellow-800',
-            in_progress: 'bg-blue-100 text-blue-800',
-            completed: 'bg-green-100 text-green-800',
-            cancelled: 'bg-gray-100 text-gray-800'
-        };
-        return variants[status] || 'bg-gray-100 text-gray-800';
-    };
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+            </div>
+        );
+    }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-cyan-600 mb-2">Lab Technician Dashboard</h2>
-                <p className="text-gray-600">Welcome back! Here's your overview for today.</p>
+        <div>
+            {/* Header */}
+            <div className="mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Lab Overview</h2>
+                <p className="text-gray-500 mt-1">Welcome to your laboratory dashboard</p>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {statCards.map((stat, index) => {
-                    const Icon = stat.icon;
+            {/* Error banner */}
+            {error && (
+                <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>{error}</span>
+                </div>
+            )}
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {summaryCards.map((card) => {
+                    const Icon = card.icon;
                     return (
-                        <Card key={index} className="hover:shadow-lg transition-shadow">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-gray-600">
-                                    {stat.title}
-                                </CardTitle>
-                                <div className={`p-2 rounded-full ${stat.bgColor}`}>
-                                    <Icon className={`h-4 w-4 ${stat.color}`} />
+                        <button
+                            key={card.title}
+                            onClick={card.onClick}
+                            className="text-left bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <div className={`p-3 rounded-lg ${card.bgLight}`}>
+                                    <Icon className={`w-6 h-6 ${card.textColor}`} />
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                                <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
-                            </CardContent>
-                        </Card>
+                            </div>
+                            <p className="text-sm font-medium text-gray-500">{card.title}</p>
+                            <p className="text-3xl font-bold text-gray-900 mt-1">{card.value}</p>
+                        </button>
                     );
                 })}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Recent Orders */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <TrendingUp className="h-5 w-5 text-cyan-600" />
-                            Recent Test Orders
-                        </CardTitle>
-                        <CardDescription>Latest test orders requiring attention</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="text-center py-4 text-gray-500">Loading...</div>
-                        ) : recentOrders.length === 0 ? (
-                            <div className="text-center py-4 text-gray-500">No recent orders</div>
-                        ) : (
-                            <div className="space-y-4">
-                                {recentOrders.map((order) => (
-                                    <div key={order._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            {order.priority === 'urgent' && <AlertCircle className="h-4 w-4 text-red-500" />}
-                                            <div>
-                                                <p className="font-medium text-gray-900">{order.childName}</p>
-                                                <p className="text-sm text-gray-600">{order.testName}</p>
-                                            </div>
-                                        </div>
-                                        <Badge className={getStatusBadge(order.status)}>
-                                            {order.status.replace('_', ' ')}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
-                        <CardDescription>Common tasks and shortcuts</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-3">
-                            <Button
-                                variant="outline"
-                                className="h-20 flex flex-col items-center gap-2"
-                                onClick={() => onNavigate('orders')}
-                            >
-                                <ClipboardList className="h-6 w-6 text-blue-600" />
-                                <span className="text-sm">View Orders</span>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-20 flex flex-col items-center gap-2"
-                                onClick={() => onNavigate('upload')}
-                            >
-                                <Upload className="h-6 w-6 text-green-600" />
-                                <span className="text-sm">Upload Report</span>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-20 flex flex-col items-center gap-2"
-                                onClick={() => onNavigate('notifications')}
-                            >
-                                <Bell className="h-6 w-6 text-orange-600" />
-                                <span className="text-sm">Notifications</span>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-20 flex flex-col items-center gap-2"
-                                onClick={() => onNavigate('orders')}
-                            >
-                                <AlertCircle className="h-6 w-6 text-red-600" />
-                                <span className="text-sm">Urgent Tests</span>
-                            </Button>
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button
+                        onClick={() => onNavigate('requests')}
+                        className="flex items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 transition-colors border border-teal-100"
+                    >
+                        <ClipboardList className="w-5 h-5 text-teal-600" />
+                        <div>
+                            <p className="text-sm font-semibold text-teal-800">View Test Requests</p>
+                            <p className="text-xs text-teal-600">Review and process pending lab requests</p>
                         </div>
-                    </CardContent>
-                </Card>
+                    </button>
+                    <button
+                        onClick={() => onNavigate('reports')}
+                        className="flex items-center gap-3 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 transition-colors border border-purple-100"
+                    >
+                        <FileText className="w-5 h-5 text-purple-600" />
+                        <div>
+                            <p className="text-sm font-semibold text-purple-800">View Reports</p>
+                            <p className="text-xs text-purple-600">Browse all uploaded lab reports</p>
+                        </div>
+                    </button>
+                </div>
             </div>
         </div>
     );

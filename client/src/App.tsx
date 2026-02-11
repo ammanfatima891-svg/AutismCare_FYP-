@@ -57,16 +57,6 @@ function App() {
         }
       />
 
-      {/* Screening Form (Protected) */}
-      <Route
-        path="/screening"
-        element={
-          <ProtectedRoute roles={["parent", "clinician", "therapist"]}>
-            <ScreeningForm />
-          </ProtectedRoute>
-        }
-      />
-
       {/* Lab Dashboard (Protected) */}
       <Route
         path="/lab-dashboard"
@@ -77,7 +67,15 @@ function App() {
         }
       />
 
-      {/* Add more role-specific dashboards later */}
+      {/* Screening Form (Protected) */}
+      <Route
+        path="/screening"
+        element={
+          <ProtectedRoute roles={["parent", "clinician", "therapist"]}>
+            <ScreeningForm />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }

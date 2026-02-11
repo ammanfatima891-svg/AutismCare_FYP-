@@ -17,6 +17,28 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Response interceptor — auto-logout on 401 (stale/invalid token)
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Token is invalid or user no longer exists — clear everything and redirect
+      localStorage.removeItem('token');
+      localStorage.removeItem('role');
+      localStorage.removeItem('firstName');
+      localStorage.removeItem('lastName');
+      localStorage.removeItem('email');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('role');
+      sessionStorage.removeItem('firstName');
+      sessionStorage.removeItem('lastName');
+      sessionStorage.removeItem('email');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Child API endpoints
 export const childAPI = {
   getChildren: () => API.get('/child'),
@@ -44,15 +66,16 @@ export const screeningAPI = {
 // Lab API endpoints
 export const labAPI = {
   getStats: () => API.get('/lab/stats'),
-  getTestOrders: (params) => API.get('/lab/orders', { params }),
-  getTestOrderById: (id) => API.get(`/lab/orders/${id}`),
-  createTestOrder: (data) => API.post('/lab/orders', data),
-  assignTestOrder: (id) => API.post(`/lab/orders/${id}/assign`),
-  updateTestOrder: (id, data) => API.put(`/lab/orders/${id}`, data),
-  uploadReport: (id, formData) => API.post(`/lab/orders/${id}/report`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  completeTestOrder: (id, data) => API.post(`/lab/orders/${id}/complete`, data)
+  getRequests: (params) => API.get('/lab/requests', { params }),
+  getRequestById: (id) => API.get(`/lab/requests/${id}`),
+  uploadReport: (formData, onUploadProgress) =>
+    API.post('/lab/reports/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress
+    }),
+  updateStatus: (id, status) => API.patch(`/lab/requests/${id}/status`, { status }),
+  getReportById: (id) => API.get(`/lab/reports/${id}`),
+  getAllReports: () => API.get('/lab/reports')
 };
 
 // Appointment API endpoints

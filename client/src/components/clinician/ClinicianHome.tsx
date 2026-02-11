@@ -10,12 +10,7 @@ interface ClinicianHomeProps {
 export function ClinicianHome({ onNavigate }: ClinicianHomeProps) {
   const stats: any[] = [];
 
-  const recentActivities = [
-    { patient: 'Emma Johnson', action: 'Screening completed', time: '2 hours ago', urgent: false },
-    { patient: 'Noah Smith', action: 'Appointment rescheduled', time: '4 hours ago', urgent: false },
-    { patient: 'Sophia Davis', action: 'High-risk screening result', time: '6 hours ago', urgent: true },
-    { patient: 'Liam Wilson', action: 'New patient intake', time: '1 day ago', urgent: false }
-  ];
+  const recentActivities: any[] = [];
 
   return (
     <div className="space-y-6">

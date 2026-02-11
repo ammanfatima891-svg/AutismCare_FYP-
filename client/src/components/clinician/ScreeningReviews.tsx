@@ -18,49 +18,7 @@ interface ScreeningResult {
   reviewer?: string;
 }
 
-const mockScreenings: ScreeningResult[] = [
-  {
-    id: 1,
-    patientName: 'Emma Johnson',
-    patientAge: 4,
-    testType: 'ASQ-3',
-    submittedDate: '2024-01-20',
-    status: 'pending',
-    score: '85/100',
-    riskLevel: 'medium'
-  },
-  {
-    id: 2,
-    patientName: 'Noah Smith',
-    patientAge: 3,
-    testType: 'M-CHAT',
-    submittedDate: '2024-01-19',
-    status: 'needs_attention',
-    score: '12/20',
-    riskLevel: 'high'
-  },
-  {
-    id: 3,
-    patientName: 'Sophia Davis',
-    patientAge: 5,
-    testType: 'ASQ-3',
-    submittedDate: '2024-01-18',
-    status: 'reviewed',
-    score: '95/100',
-    riskLevel: 'low',
-    reviewer: 'Dr. Johnson'
-  },
-  {
-    id: 4,
-    patientName: 'Liam Wilson',
-    patientAge: 2,
-    testType: 'ASQ-3',
-    submittedDate: '2024-01-17',
-    status: 'pending',
-    score: '78/100',
-    riskLevel: 'medium'
-  }
-];
+const mockScreenings: ScreeningResult[] = [];
 
 export function ScreeningReviews() {
   const [selectedTab, setSelectedTab] = useState('pending');
@@ -92,10 +50,7 @@ export function ScreeningReviews() {
     }
   };
 
-  const filteredScreenings = mockScreenings.filter(screening => {
-    if (selectedTab === 'all') return true;
-    return screening.status === selectedTab;
-  });
+  const filteredScreenings = mockScreenings;
 
   return (
     <div className="space-y-6">

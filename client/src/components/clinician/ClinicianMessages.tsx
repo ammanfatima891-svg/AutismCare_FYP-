@@ -20,51 +20,7 @@ interface Message {
   patientName?: string;
 }
 
-const mockMessages: Message[] = [
-  {
-    id: 1,
-    from: 'Sarah Johnson',
-    fromRole: 'parent',
-    subject: 'Concern about Emma\'s progress',
-    content: 'Hi Dr. Smith, I wanted to discuss Emma\'s recent therapy sessions. She seems more withdrawn lately and I\'m worried about her progress.',
-    timestamp: '2024-01-20T10:30:00Z',
-    read: false,
-    urgent: true,
-    patientName: 'Emma Johnson'
-  },
-  {
-    id: 2,
-    from: 'Dr. Michael Chen',
-    fromRole: 'therapist',
-    subject: 'Weekly progress report - Noah Smith',
-    content: 'Noah has shown significant improvement in his communication skills this week. Please review the attached assessment.',
-    timestamp: '2024-01-19T14:15:00Z',
-    read: true,
-    urgent: false,
-    patientName: 'Noah Smith'
-  },
-  {
-    id: 3,
-    from: 'Admin Office',
-    fromRole: 'admin',
-    subject: 'Updated clinic policies',
-    content: 'Please review the updated clinic policies regarding patient confidentiality and emergency procedures.',
-    timestamp: '2024-01-18T09:00:00Z',
-    read: true,
-    urgent: false
-  },
-  {
-    id: 4,
-    from: 'Lisa Wilson',
-    fromRole: 'parent',
-    subject: 'Appointment rescheduling request',
-    content: 'Hi, I need to reschedule Sophia\'s appointment for next week due to a family emergency.',
-    timestamp: '2024-01-17T16:45:00Z',
-    read: false,
-    urgent: false,
-    patientName: 'Sophia Wilson'
-  }
-];
+const mockMessages: Message[] = [];
 
 export function ClinicianMessages() {
   const [selectedTab, setSelectedTab] = useState('inbox');
@@ -75,12 +31,7 @@ export function ClinicianMessages() {
   const unreadCount = mockMessages.filter(m => !m.read).length;
   const urgentCount = mockMessages.filter(m => m.urgent).length;
 
-  const filteredMessages = mockMessages.filter(message => {
-    if (selectedTab === 'inbox') return true;
-    if (selectedTab === 'unread') return !message.read;
-    if (selectedTab === 'urgent') return message.urgent;
-    return true;
-  });
+  const filteredMessages = mockMessages;
 
   const handleSendReply = () => {
     if (!replyContent.trim()) return;
@@ -122,9 +73,8 @@ export function ClinicianMessages() {
                   <div
                     key={message.id}
                     onClick={() => setSelectedMessage(message)}
-                    className={`p-4 cursor-pointer border-b border-gray-100 hover:bg-gray-50 ${
-                      selectedMessage?.id === message.id ? 'bg-blue-50' : ''
-                    } ${!message.read ? 'bg-blue-25' : ''}`}
+                    className={`p-4 cursor-pointer border-b border-gray-100 hover:bg-gray-50 ${selectedMessage?.id === message.id ? 'bg-blue-50' : ''
+                      } ${!message.read ? 'bg-blue-25' : ''}`}
                   >
                     <div className="flex items-start gap-3">
                       <Avatar className="h-8 w-8">

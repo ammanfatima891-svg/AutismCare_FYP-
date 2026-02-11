@@ -18,67 +18,13 @@ interface Patient {
   nextAppointment?: string;
 }
 
-const mockPatients: Patient[] = [
-  {
-    id: 1,
-    name: 'Emma Johnson',
-    age: 4,
-    parent: 'Sarah Johnson',
-    status: 'active',
-    riskLevel: 'medium',
-    lastVisit: '2024-01-15',
-    nextAppointment: '2024-01-25'
-  },
-  {
-    id: 2,
-    name: 'Noah Smith',
-    age: 3,
-    parent: 'Michael Smith',
-    status: 'active',
-    riskLevel: 'high',
-    lastVisit: '2024-01-12',
-    nextAppointment: '2024-01-22'
-  },
-  {
-    id: 3,
-    name: 'Sophia Davis',
-    age: 5,
-    parent: 'Lisa Davis',
-    status: 'inactive',
-    riskLevel: 'low',
-    lastVisit: '2024-01-08'
-  },
-  {
-    id: 4,
-    name: 'Liam Wilson',
-    age: 2,
-    parent: 'David Wilson',
-    status: 'pending',
-    riskLevel: 'medium',
-    lastVisit: '2024-01-10'
-  },
-  {
-    id: 5,
-    name: 'Olivia Brown',
-    age: 6,
-    parent: 'Jennifer Brown',
-    status: 'active',
-    riskLevel: 'low',
-    lastVisit: '2024-01-18',
-    nextAppointment: '2024-01-28'
-  }
-];
+const mockPatients: Patient[] = [];
 
 export function PatientManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredPatients = mockPatients.filter(patient => {
-    const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         patient.parent.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || patient.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredPatients = mockPatients;
 
   const getStatusColor = (status: string) => {
     switch (status) {

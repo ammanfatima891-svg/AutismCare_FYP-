@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Home, ClipboardList, Upload, Bell } from 'lucide-react';
+import { Home, ClipboardList, FileText } from 'lucide-react';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { LabHome } from './LabHome';
-import { TestOrderManagement } from './TestOrderManagement';
-import { LabReportUpload } from './LabReportUpload';
-import { LabNotifications } from './LabNotifications';
+import { LabTestRequests } from './LabTestRequests';
+import { LabTestRequestDetail } from './LabTestRequestDetail';
+import { LabReports } from './LabReports';
 
-type Section = 'home' | 'orders' | 'upload' | 'notifications';
+type Section = 'home' | 'requests' | 'request-detail' | 'reports';
 
 interface LabDashboardProps {
     user?: any;
@@ -14,37 +14,47 @@ interface LabDashboardProps {
 }
 
 const navigation = [
-    { id: 'home', label: 'Dashboard', icon: Home, color: 'text-cyan-600' },
-    { id: 'orders', label: 'Test Orders', icon: ClipboardList, color: 'text-blue-600' },
-    { id: 'upload', label: 'Upload Reports', icon: Upload, color: 'text-green-600' },
-    { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-orange-600' },
+    { id: 'home', label: 'Dashboard', icon: Home, color: 'text-teal-600' },
+    { id: 'requests', label: 'Test Requests', icon: ClipboardList, color: 'text-blue-600' },
+    { id: 'reports', label: 'Reports', icon: FileText, color: 'text-purple-600' },
 ];
 
 export function LabDashboard({ user, onLogout }: LabDashboardProps) {
     const [currentSection, setCurrentSection] = useState<Section>('home');
-    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+    const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
-    const handleSectionChange = (section: Section) => {
-        setCurrentSection(section);
+    const handleSectionChange = (section: string) => {
+        setCurrentSection(section as Section);
+        if (section !== 'request-detail') {
+            setSelectedRequestId(null);
+        }
     };
 
-    const handleNavigate = (section: string, orderId?: string) => {
+    // Navigate to request detail view
+    const handleViewRequest = (requestId: string) => {
+        setSelectedRequestId(requestId);
+        setCurrentSection('request-detail');
+    };
+
+    const handleNavigate = (section: string) => {
         setCurrentSection(section as Section);
-        if (orderId) {
-            setSelectedOrderId(orderId);
-        }
     };
 
     const renderSection = () => {
         switch (currentSection) {
             case 'home':
                 return <LabHome onNavigate={handleNavigate} />;
-            case 'orders':
-                return <TestOrderManagement onNavigate={handleNavigate} />;
-            case 'upload':
-                return <LabReportUpload selectedOrderId={selectedOrderId} onNavigate={handleNavigate} />;
-            case 'notifications':
-                return <LabNotifications />;
+            case 'requests':
+                return <LabTestRequests onViewRequest={handleViewRequest} />;
+            case 'request-detail':
+                return (
+                    <LabTestRequestDetail
+                        requestId={selectedRequestId}
+                        onBack={() => setCurrentSection('requests')}
+                    />
+                );
+            case 'reports':
+                return <LabReports />;
             default:
                 return <LabHome onNavigate={handleNavigate} />;
         }
@@ -53,8 +63,8 @@ export function LabDashboard({ user, onLogout }: LabDashboardProps) {
     return (
         <DashboardLayout
             navigation={navigation}
-            currentSection={currentSection}
-            onSectionChange={(section: string) => setCurrentSection(section as Section)}
+            currentSection={currentSection === 'request-detail' ? 'requests' : currentSection}
+            onSectionChange={handleSectionChange}
             onLogout={onLogout}
             title="Lab Dashboard"
         >

@@ -41,6 +41,7 @@ interface Appointment {
   createdAt: string;
 }
 
+<<<<<<< HEAD
 // ─── Action Modal ────────────────────────────────────────────────────────────
 
 function ActionModal({ title, appointment, onClose, onSubmit, children: content }: {
@@ -68,6 +69,9 @@ function ActionModal({ title, appointment, onClose, onSubmit, children: content 
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
+=======
+const mockAppointments: Appointment[] = [];
+>>>>>>> 79aa2993700384359ecc5eb7c8e994be013cb26e
 
 export function AppointmentsManagement() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -76,11 +80,15 @@ export function AppointmentsManagement() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 0 });
 
+<<<<<<< HEAD
   // Modal states
   const [activeModal, setActiveModal] = useState<{ type: string; appointment: Appointment } | null>(null);
   const [modalData, setModalData] = useState<any>({});
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+=======
+  const filteredAppointments = mockAppointments;
+>>>>>>> 79aa2993700384359ecc5eb7c8e994be013cb26e
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);

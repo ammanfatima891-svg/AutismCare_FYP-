@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
+<<<<<<< HEAD
 const crypto = require('crypto');
 
 const AUDIT_ACTIONS = {
@@ -24,59 +25,44 @@ const RESOURCE_TYPES = {
     USER: 'User',
     APPOINTMENT: 'Appointment'
 };
+=======
+>>>>>>> 79aa2993700384359ecc5eb7c8e994be013cb26e
 
 const AuditLogSchema = new Schema({
-    uuid: {
-        type: String,
-        default: () => crypto.randomUUID(),
-        unique: true,
-        index: true
-    },
     userId: {
         type: Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
-        index: true
+        required: [true, 'User ID is required']
     },
     action: {
         type: String,
-        enum: Object.values(AUDIT_ACTIONS),
-        required: true
+        enum: ['UPLOAD', 'UPDATE', 'DELETE'],
+        required: [true, 'Action is required']
     },
-    resourceType: {
+    resource: {
         type: String,
-        enum: Object.values(RESOURCE_TYPES),
-        required: true
+        required: [true, 'Resource type is required']
     },
     resourceId: {
-        type: String,
-        required: true,
-        index: true
-    },
-    ipAddress: {
-        type: String
-    },
-    userAgent: {
-        type: String
+        type: Schema.Types.ObjectId,
+        required: [true, 'Resource ID is required']
     },
     details: {
-        type: Schema.Types.Mixed
+        type: String,
+        default: ''
+    },
+    ipAddress: {
+        type: String,
+        default: ''
     },
     timestamp: {
         type: Date,
-        default: Date.now,
-        index: true
+        default: Date.now
     }
-}, {
-    timestamps: false
 });
 
-// TTL index: automatically delete logs after 90 days
-AuditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+// Index for querying audit trails efficiently
+AuditLogSchema.index({ userId: 1, timestamp: -1 });
+AuditLogSchema.index({ resource: 1, resourceId: 1 });
 
-// Compound index for querying by user and action
-AuditLogSchema.index({ userId: 1, action: 1, timestamp: -1 });
-
-const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
-
-module.exports = { AuditLog, AUDIT_ACTIONS, RESOURCE_TYPES };
+module.exports = mongoose.model('AuditLog', AuditLogSchema);
