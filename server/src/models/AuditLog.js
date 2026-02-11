@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
-<<<<<<< HEAD
 const crypto = require('crypto');
 
 const AUDIT_ACTIONS = {
@@ -25,8 +24,7 @@ const RESOURCE_TYPES = {
     USER: 'User',
     APPOINTMENT: 'Appointment'
 };
-=======
->>>>>>> 79aa2993700384359ecc5eb7c8e994be013cb26e
+
 
 const AuditLogSchema = new Schema({
     userId: {
@@ -36,22 +34,26 @@ const AuditLogSchema = new Schema({
     },
     action: {
         type: String,
-        enum: ['UPLOAD', 'UPDATE', 'DELETE'],
+        enum: Object.values(AUDIT_ACTIONS),
         required: [true, 'Action is required']
     },
-    resource: {
+    resourceType: {
         type: String,
         required: [true, 'Resource type is required']
     },
     resourceId: {
-        type: Schema.Types.ObjectId,
+        type: String,
         required: [true, 'Resource ID is required']
     },
     details: {
+        type: Schema.Types.Mixed,
+        default: {}
+    },
+    ipAddress: {
         type: String,
         default: ''
     },
-    ipAddress: {
+    userAgent: {
         type: String,
         default: ''
     },
@@ -63,6 +65,12 @@ const AuditLogSchema = new Schema({
 
 // Index for querying audit trails efficiently
 AuditLogSchema.index({ userId: 1, timestamp: -1 });
-AuditLogSchema.index({ resource: 1, resourceId: 1 });
+AuditLogSchema.index({ resourceType: 1, resourceId: 1 });
 
-module.exports = mongoose.model('AuditLog', AuditLogSchema);
+const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
+
+module.exports = {
+    AuditLog,
+    AUDIT_ACTIONS,
+    RESOURCE_TYPES
+};

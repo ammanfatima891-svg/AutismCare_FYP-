@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const LabTestRequest = require('../models/LabTestRequest');
 const LabReport = require('../models/LabReport');
-const AuditLog = require('../models/AuditLog');
+const { AuditLog } = require('../models/AuditLog');
 const { User } = require('../models/User');
 const sendEmail = require('../utils/email');
 
