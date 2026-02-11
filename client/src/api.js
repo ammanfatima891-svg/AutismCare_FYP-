@@ -41,4 +41,18 @@ export const screeningAPI = {
   getAvailableCliniciansAndTherapists: () => API.get('/screening/available-clinicians-therapists')
 };
 
+// Lab API endpoints
+export const labAPI = {
+  getStats: () => API.get('/lab/stats'),
+  getTestOrders: (params) => API.get('/lab/orders', { params }),
+  getTestOrderById: (id) => API.get(`/lab/orders/${id}`),
+  createTestOrder: (data) => API.post('/lab/orders', data),
+  assignTestOrder: (id) => API.post(`/lab/orders/${id}/assign`),
+  updateTestOrder: (id, data) => API.put(`/lab/orders/${id}`, data),
+  uploadReport: (id, formData) => API.post(`/lab/orders/${id}/report`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  completeTestOrder: (id, data) => API.post(`/lab/orders/${id}/complete`, data)
+};
+
 export default API;
