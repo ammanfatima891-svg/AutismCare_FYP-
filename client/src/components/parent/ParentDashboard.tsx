@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Home, Baby, ClipboardList } from 'lucide-react';
+import { Home, Baby, ClipboardList, Calendar } from 'lucide-react';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { DashboardHome } from './DashboardHome';
 import { ChildManagement } from './ChildManagement';
 import { ScreeningSection } from './ScreeningSection';
+import { AppointmentsSection } from './AppointmentsSection';
 
-type Section = 'home' | 'children' | 'screening';
+type Section = 'home' | 'children' | 'screening' | 'appointments';
 
 interface AuthUser {
   token: string;
@@ -24,6 +25,7 @@ const navigation = [
   { id: 'home', label: 'Home', icon: Home, color: 'text-blue-600' },
   { id: 'children', label: 'My Children', icon: Baby, color: 'text-pink-600' },
   { id: 'screening', label: 'Screening', icon: ClipboardList, color: 'text-purple-600' },
+  { id: 'appointments', label: 'Appointments', icon: Calendar, color: 'text-orange-600' },
 ];
 
 export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
@@ -45,6 +47,8 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
         return <ChildManagement />;
       case 'screening':
         return <ScreeningSection />;
+      case 'appointments':
+        return <AppointmentsSection />;
       default:
         return <DashboardHome onNavigate={handleNavigate} />;
     }

@@ -9,7 +9,15 @@ const NOTIFICATION_TYPES = {
     ORDER_COMPLETED: 'order_completed',
     REPORT_RELEASED: 'report_released',
     URGENT_ORDER: 'urgent_order',
-    SYSTEM: 'system'
+    SYSTEM: 'system',
+    // Appointment notification types
+    APPOINTMENT_REQUESTED: 'appointment_requested',
+    APPOINTMENT_APPROVED: 'appointment_approved',
+    APPOINTMENT_REJECTED: 'appointment_rejected',
+    APPOINTMENT_RESCHEDULED: 'appointment_rescheduled',
+    APPOINTMENT_COMPLETED: 'appointment_completed',
+    APPOINTMENT_CANCELLED: 'appointment_cancelled',
+    APPOINTMENT_REMINDER: 'appointment_reminder'
 };
 
 const NotificationSchema = new Schema({

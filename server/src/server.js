@@ -9,7 +9,7 @@ require('dotenv').config();
 const app = express();
 
 // Ensure upload directories exist
-const uploadDirs = ['uploads/documents', 'uploads/lab-reports'];
+const uploadDirs = ['uploads/documents', 'uploads/lab-reports', 'uploads/appointment-documents'];
 uploadDirs.forEach(dir => {
   const fullPath = path.join(process.cwd(), dir);
   if (!fs.existsSync(fullPath)) {
@@ -45,19 +45,10 @@ const upload = multer({
 });
 
 // Middleware
-<<<<<<< HEAD
-const corsOptions = {
-  origin: 'http://localhost:4173',
-  credentials: true, // allow cookies
-};
-
-app.use(cors(corsOptions));
-=======
 app.use(cors({
   origin: ['http://localhost:4173', 'http://localhost:5173'],
   credentials: true
 }));
->>>>>>> f964305d1affdca82e71facaaa065df5db097354
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
@@ -68,6 +59,7 @@ const childRoutes = require('./routes/child.routes.js');
 const screeningRoutes = require('./routes/screening.routes.js');
 const labRoutes = require('./routes/lab.routes.js');
 const notificationRoutes = require('./routes/notification.routes.js');
+const appointmentRoutes = require('./routes/appointment.routes.js');
 
 const connectDB = require('./config/database.js');
 
@@ -78,6 +70,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/screening", screeningRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/appointments", appointmentRoutes);
 
 const port = process.env.PORT || 4000;
 

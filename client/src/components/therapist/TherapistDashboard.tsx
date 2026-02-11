@@ -6,8 +6,9 @@ import { TherapistClients } from './TherapistClients';
 import { TherapyPlans } from './TherapyPlans';
 import { TherapistSessions } from './TherapistSessions';
 import { TherapistMessages } from './TherapistMessages';
+import { TherapistAppointments } from './TherapistAppointments';
 
-type Section = 'home' | 'clients' | 'plans' | 'sessions' | 'messages';
+type Section = 'home' | 'clients' | 'plans' | 'sessions' | 'messages' | 'appointments';
 
 interface User {
   _id: string;
@@ -26,6 +27,7 @@ const navigation = [
   { id: 'home', label: 'Dashboard', icon: Home, color: 'text-green-600' },
   { id: 'clients', label: 'My Clients', icon: Users, color: 'text-blue-600' },
   { id: 'plans', label: 'Therapy Plans', icon: ClipboardList, color: 'text-purple-600' },
+  { id: 'appointments', label: 'Appointments', icon: Calendar, color: 'text-teal-600' },
   { id: 'sessions', label: 'Sessions', icon: Calendar, color: 'text-orange-600' },
   { id: 'messages', label: 'Messages', icon: MessageSquare, color: 'text-indigo-600' },
 ];
@@ -49,6 +51,8 @@ export function TherapistDashboard({ user, onLogout }: TherapistDashboardProps) 
         return <TherapistClients />;
       case 'plans':
         return <TherapyPlans />;
+      case 'appointments':
+        return <TherapistAppointments />;
       case 'sessions':
         return <TherapistSessions />;
       case 'messages':

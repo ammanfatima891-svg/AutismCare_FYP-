@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "../components/ui/card";
-import { Users, Clock } from "lucide-react";
+import { Users, Clock, Calendar } from "lucide-react";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import ApprovalRequests from "../components/admin/ApprovalRequests";
+import { AdminAppointments } from "../components/admin/AdminAppointments";
 
 const navigation = [
   {
@@ -11,6 +12,12 @@ const navigation = [
     label: "Pending Approvals",
     icon: Clock,
     color: "text-blue-600"
+  },
+  {
+    id: "appointments",
+    label: "Appointments",
+    icon: Calendar,
+    color: "text-orange-600"
   },
   {
     id: "users",
@@ -22,6 +29,7 @@ const navigation = [
 
 const menuItems = {
   approvals: ApprovalRequests,
+  appointments: AdminAppointments,
   users: () => (
     <Card>
       <CardContent className="flex flex-col items-center justify-center py-12">
@@ -66,3 +74,4 @@ export default function AdminDashboard() {
     </DashboardLayout>
   );
 }
+

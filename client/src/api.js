@@ -55,4 +55,26 @@ export const labAPI = {
   completeTestOrder: (id, data) => API.post(`/lab/orders/${id}/complete`, data)
 };
 
+// Appointment API endpoints
+export const appointmentAPI = {
+  // Parent endpoints
+  create: (formData) => API.post('/appointments', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getMyAppointments: (params) => API.get('/appointments/my', { params }),
+  cancel: (id) => API.put(`/appointments/${id}/cancel`),
+  getAvailableProfessionals: (type) => API.get(`/appointments/professionals/${type}`),
+
+  // Professional endpoints
+  getProfessionalAppointments: (params) => API.get('/appointments/professional', { params }),
+  approve: (id, data) => API.put(`/appointments/${id}/approve`, data),
+  reject: (id, data) => API.put(`/appointments/${id}/reject`, data),
+  reschedule: (id, data) => API.put(`/appointments/${id}/reschedule`, data),
+  complete: (id, data) => API.put(`/appointments/${id}/complete`, data),
+
+  // Admin endpoints
+  getAll: (params) => API.get('/appointments/all', { params }),
+  getStats: () => API.get('/appointments/stats')
+};
+
 export default API;

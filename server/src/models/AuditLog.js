@@ -10,14 +10,19 @@ const AUDIT_ACTIONS = {
     UPLOAD: 'UPLOAD',
     ASSIGN: 'ASSIGN',
     COMPLETE: 'COMPLETE',
-    RELEASE: 'RELEASE'
+    RELEASE: 'RELEASE',
+    APPROVE: 'APPROVE',
+    REJECT: 'REJECT',
+    RESCHEDULE: 'RESCHEDULE',
+    CANCEL: 'CANCEL'
 };
 
 const RESOURCE_TYPES = {
     LAB_TEST_ORDER: 'LabTestOrder',
     LAB_REPORT: 'LabReport',
     NOTIFICATION: 'Notification',
-    USER: 'User'
+    USER: 'User',
+    APPOINTMENT: 'Appointment'
 };
 
 const AuditLogSchema = new Schema({
