@@ -19,7 +19,7 @@ const container = document.getElementById("root");
 
 if (container) {
   createRoot(container).render(
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
           <App />

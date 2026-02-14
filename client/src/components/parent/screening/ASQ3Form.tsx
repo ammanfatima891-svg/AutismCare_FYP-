@@ -204,6 +204,8 @@ export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
         result: submission.result,
         resultDescription: submission.resultDescription,
         submissionId: submission.submissionId,
+        reportEmailed: submission.reportEmailed === true,
+        reportEmailError: submission.reportEmailError || null,
       };
       onComplete(results);
     } catch (err) {

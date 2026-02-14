@@ -195,12 +195,15 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
 
       const submission = res.data.data;
       const results = {
+        submissionId: submission.submissionId,
         riskLevel: submission.riskLevel,
-        type: "MCHAT-R",
+        type: "M-CHAT-R",
         date: submission.createdAt,
         scores: submission.scores,
         result: submission.result,
         resultDescription: submission.resultDescription,
+        reportEmailed: submission.reportEmailed === true,
+        reportEmailError: submission.reportEmailError || null,
       };
       onComplete(results);
     } catch (err) {
