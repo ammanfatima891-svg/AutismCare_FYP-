@@ -7,6 +7,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import { ClinicianDashboard } from "./components/clinician/ClinicianDashboard";
 import { ParentDashboard } from "./components/parent/ParentDashboard";
 import { LabDashboard } from "./components/lab/LabDashboard";
+import { TherapistDashboard } from "./components/therapist/TherapistDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ScreeningForm from "./components/ScreeningForm";
 
@@ -63,6 +64,16 @@ function App() {
         element={
           <ProtectedRoute roles={["lab"]}>
             <LabDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Therapist Dashboard (Protected) */}
+      <Route
+        path="/therapist-dashboard"
+        element={
+          <ProtectedRoute roles={["therapist"]}>
+            <TherapistDashboard />
           </ProtectedRoute>
         }
       />

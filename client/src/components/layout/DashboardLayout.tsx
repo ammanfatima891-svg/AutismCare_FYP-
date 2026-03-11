@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -9,15 +9,23 @@ import {
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
+
+interface NavigationChild {
+  id: string;
+  label: string;
+}
 
 interface NavigationItem {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
+  children?: NavigationChild[];
 }
 
 interface DashboardLayoutProps {
@@ -38,8 +46,16 @@ export function DashboardLayout({
   title = "AutismCare"
 }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedDropdown, setExpandedDropdown] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
   const { user } = useContext(AuthContext);
+
+  useEffect(() => {
+    const parent = navigation.find((item) =>
+      item.children?.some((c) => c.id === currentSection)
+    );
+    if (parent) setExpandedDropdown(parent.id);
+  }, [currentSection, navigation]);
 
   // Extract user initials for avatar
   const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
@@ -104,6 +120,44 @@ export function DashboardLayout({
           <div className="lg:hidden border-t border-gray-200 pb-3 bg-white shadow-lg">
             {navigation.map((item) => {
               const Icon = item.icon;
+              const hasChildren = item.children && item.children.length > 0;
+              const isParentActive = hasChildren && item.children!.some((c) => currentSection === c.id);
+              const isExpanded = expandedDropdown === item.id;
+              if (hasChildren) {
+                return (
+                  <div key={item.id} className="border-b border-gray-100 last:border-b-0">
+                    <button
+                      onClick={() => setExpandedDropdown(isExpanded ? null : item.id)}
+                      className={`w-full flex items-center justify-between gap-3 px-6 py-3 transition-colors ${
+                        isParentActive ? 'bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className={`w-5 h-5 ${isParentActive ? item.color : 'text-gray-600'}`} />
+                        <span className={`font-medium ${isParentActive ? item.color : 'text-gray-700'}`}>{item.label}</span>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                    </button>
+                    {isExpanded && item.children!.map((child) => {
+                      const isChildActive = currentSection === child.id;
+                      return (
+                        <button
+                          key={child.id}
+                          onClick={() => {
+                            onSectionChange(child.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 pl-14 pr-6 py-2.5 text-sm transition-colors ${
+                            isChildActive ? 'bg-blue-50 border-l-4 border-blue-600 text-blue-600 font-medium' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          {child.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              }
               const isActive = currentSection === item.id;
               return (
                 <button
@@ -132,6 +186,49 @@ export function DashboardLayout({
           <nav className="p-4 space-y-2">
             {navigation.map((item) => {
               const Icon = item.icon;
+              const hasChildren = item.children && item.children.length > 0;
+              const isParentActive = hasChildren && item.children!.some((c) => currentSection === c.id);
+              const isExpanded = expandedDropdown === item.id;
+              if (hasChildren) {
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      onClick={() => setExpandedDropdown(isExpanded ? null : item.id)}
+                      className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-lg transition-colors ${
+                        isParentActive
+                          ? 'bg-gradient-to-r from-blue-50 to-purple-50 shadow-sm'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Icon className={`w-5 h-5 shrink-0 ${isParentActive ? item.color : 'text-gray-600'}`} />
+                        <span className={`truncate ${isParentActive ? item.color : 'text-gray-700'}`}>{item.label}</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
+                        {item.children!.map((child) => {
+                          const isChildActive = currentSection === child.id;
+                          return (
+                            <button
+                              key={child.id}
+                              onClick={() => onSectionChange(child.id)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                                isChildActive
+                                  ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 font-medium'
+                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              }`}
+                            >
+                              {child.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               const isActive = currentSection === item.id;
               return (
                 <button

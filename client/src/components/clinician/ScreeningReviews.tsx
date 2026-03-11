@@ -1,27 +1,62 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { AlertTriangle, CheckCircle, Clock, Eye, FileText } from 'lucide-react';
+import { clinicianAPI, screeningAPI } from '../../api';
 
-interface ScreeningResult {
-  id: number;
-  patientName: string;
-  patientAge: number;
-  testType: 'ASQ-3' | 'M-CHAT';
-  submittedDate: string;
-  status: 'pending' | 'reviewed' | 'needs_attention';
-  score: string;
-  riskLevel: 'low' | 'medium' | 'high';
-  reviewer?: string;
+type RiskLevel = 'low' | 'medium' | 'high' | 'unknown';
+type ScreeningStatus = 'pending' | 'reviewed' | 'needs_attention';
+
+interface ClinicianScreeningReview {
+  id: string;
+  parent: {
+    id: string | null;
+    name: string;
+    email: string;
+  };
+  child: {
+    id: string | null;
+    name: string;
+    ageYears: number | null;
+  };
+  questionnaireType: 'ASQ-3' | 'MCHAT-R' | string;
+  score: number | null;
+  result: string;
+  riskLevel: RiskLevel;
+  status: ScreeningStatus;
+  createdAt: string;
 }
-
-const mockScreenings: ScreeningResult[] = [];
 
 export function ScreeningReviews() {
   const [selectedTab, setSelectedTab] = useState('pending');
+  const [screenings, setScreenings] = useState<ClinicianScreeningReview[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedScreeningId, setSelectedScreeningId] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    const fetchScreenings = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await clinicianAPI.getScreeningReviews();
+        const data = response.data?.data || [];
+        setScreenings(data);
+      } catch (err: any) {
+        console.error('Failed to load screening reviews:', err);
+        setError(err.response?.data?.message || 'Failed to load screening reviews');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScreenings();
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -50,26 +85,69 @@ export function ScreeningReviews() {
     }
   };
 
-  const filteredScreenings = mockScreenings;
+  const filteredScreenings = screenings.filter((screening) => {
+    if (selectedTab === 'all') return true;
+    if (selectedTab === 'pending') return screening.status === 'pending';
+    if (selectedTab === 'needs_attention') return screening.status === 'needs_attention';
+    if (selectedTab === 'reviewed') return screening.status === 'reviewed';
+    return true;
+  });
+
+  const handleViewDetails = async (id: string) => {
+    try {
+      setSelectedScreeningId(id);
+      setLoadingDetail(true);
+      setSelectedSubmission(null);
+      const res = await screeningAPI.getSubmissionById(id);
+      const submission = res.data?.data || res.data;
+      setSelectedSubmission(submission);
+    } catch (err: any) {
+      console.error('Failed to load submission details:', err);
+      setError(err.response?.data?.message || 'Failed to load screening details');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const closeDetails = () => {
+    setSelectedScreeningId(null);
+    setSelectedSubmission(null);
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-blue-600 mb-2">Screening Reviews</h2>
-        <p className="text-gray-600">Review and analyze screening test results</p>
+        <p className="text-gray-600">Review and analyze screening test results submitted by parents</p>
       </div>
+
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-3 text-sm text-red-700">
+            {error}
+          </CardContent>
+        </Card>
+      )}
+
+      {loading && (
+        <Card>
+          <CardContent className="py-6 text-sm text-gray-600">
+            Loading screening reviews...
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all">All ({mockScreenings.length})</TabsTrigger>
+          <TabsTrigger value="all">All ({screenings.length})</TabsTrigger>
           <TabsTrigger value="pending">
-            Pending ({mockScreenings.filter(s => s.status === 'pending').length})
+            Pending ({screenings.filter(s => s.status === 'pending').length})
           </TabsTrigger>
           <TabsTrigger value="needs_attention">
-            Needs Attention ({mockScreenings.filter(s => s.status === 'needs_attention').length})
+            Needs Attention ({screenings.filter(s => s.status === 'needs_attention').length})
           </TabsTrigger>
           <TabsTrigger value="reviewed">
-            Reviewed ({mockScreenings.filter(s => s.status === 'reviewed').length})
+            Reviewed ({screenings.filter(s => s.status === 'reviewed').length})
           </TabsTrigger>
         </TabsList>
 
@@ -82,14 +160,17 @@ export function ScreeningReviews() {
                     <Avatar className="h-10 w-10">
                       <AvatarImage src="" />
                       <AvatarFallback className="bg-blue-100 text-blue-600">
-                        {screening.patientName.split(' ').map(n => n[0]).join('')}
+                        {screening.child.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <CardTitle className="text-lg">{screening.patientName}</CardTitle>
+                      <CardTitle className="text-lg">{screening.child.name}</CardTitle>
                       <CardDescription>
-                        {screening.patientAge} years old • {screening.testType} • Submitted {new Date(screening.submittedDate).toLocaleDateString()}
+                        {screening.child.ageYears ?? '—'} years old • {screening.questionnaireType} • Submitted {new Date(screening.createdAt).toLocaleDateString()}
                       </CardDescription>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Parent: <span className="font-medium">{screening.parent.name}</span> ({screening.parent.email})
+                      </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -107,16 +188,14 @@ export function ScreeningReviews() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="text-sm text-gray-600">
-                      <span className="font-medium">Score:</span> {screening.score}
+                      <span className="font-medium">Score:</span> {screening.score ?? 'N/A'}
                     </div>
-                    {screening.reviewer && (
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Reviewed by:</span> {screening.reviewer}
-                      </div>
-                    )}
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">Result:</span> {screening.result}
+                    </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(screening.id)}>
                       <Eye className="h-4 w-4 mr-2" />
                       View Details
                     </Button>
@@ -132,7 +211,7 @@ export function ScreeningReviews() {
             </Card>
           ))}
 
-          {filteredScreenings.length === 0 && (
+          {!loading && filteredScreenings.length === 0 && (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="h-12 w-12 text-gray-400 mb-4" />
@@ -148,6 +227,70 @@ export function ScreeningReviews() {
           )}
         </TabsContent>
       </Tabs>
+
+      {selectedScreeningId && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="text-lg">Screening Details</CardTitle>
+            <CardDescription>
+              Full questionnaire responses and scoring details
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loadingDetail && (
+              <p className="text-sm text-gray-600">Loading details...</p>
+            )}
+
+            {!loadingDetail && selectedSubmission && (
+              <>
+                <div className="text-sm text-gray-700">
+                  <div>
+                    <span className="font-medium">Questionnaire:</span>{' '}
+                    {selectedSubmission.questionnaireType}
+                  </div>
+                  <div>
+                    <span className="font-medium">Created:</span>{' '}
+                    {new Date(selectedSubmission.createdAt).toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-700">
+                  <span className="font-medium">Total Score:</span>{' '}
+                  {selectedSubmission.scores?.totalScore ?? 'N/A'}
+                </div>
+
+                <div className="space-y-2 max-h-80 overflow-y-auto border-t pt-3">
+                  <h4 className="text-sm font-semibold text-gray-800">
+                    Questionnaire Responses
+                  </h4>
+                  {(selectedSubmission.responses || []).map((resp: any, idx: number) => (
+                    <div
+                      key={resp.questionId || idx}
+                      className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-800"
+                    >
+                      <div className="font-medium mb-1">
+                        Q{idx + 1}. {resp.questionId}
+                      </div>
+                      <div>
+                        Answer:{' '}
+                        <span className="font-semibold">
+                          {String(resp.answer)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={closeDetails}>
+                Close
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

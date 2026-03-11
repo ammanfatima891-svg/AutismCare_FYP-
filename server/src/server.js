@@ -65,6 +65,8 @@ const labRoutes = require('./routes/lab.routes.js');
 const notificationRoutes = require('./routes/notification.routes.js');
 const appointmentRoutes = require('./routes/appointment.routes.js');
 const therapistRoutes = require('./routes/therapist.routes.js');
+const parentRoutes = require('./routes/parent.routes.js');
+const clinicianRoutes = require('./routes/clinician.routes.js');
 
 
 const connectDB = require('./config/database.js');
@@ -72,12 +74,14 @@ const connectDB = require('./config/database.js');
 // Register routes
 app.use("/api/auth", authRoutes);
 app.use("/api/child", childRoutes);
+app.use("/api/parent", parentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/screening", screeningRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/therapist", therapistRoutes);
+app.use("/api/clinician", clinicianRoutes);
 
 
 const port = process.env.PORT || 4000;

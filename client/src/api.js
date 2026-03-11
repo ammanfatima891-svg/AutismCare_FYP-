@@ -89,6 +89,21 @@ export const labAPI = {
   getParentReports: () => API.get('/lab/parent/reports')
 };
 
+// Therapist API endpoints
+export const therapistAPI = {
+  getDashboardStats: () => API.get('/therapist/dashboard-stats')
+};
+
+// Parent API endpoints
+export const parentAPI = {
+  getScreenings: () => API.get('/parent/screenings')
+};
+
+// Clinician API endpoints
+export const clinicianAPI = {
+  getScreeningReviews: () => API.get('/clinician/screening-reviews')
+};
+
 // Appointment API endpoints
 export const appointmentAPI = {
   // Parent endpoints

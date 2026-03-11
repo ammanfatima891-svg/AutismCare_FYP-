@@ -391,8 +391,13 @@ function AppointmentTimeline({ appointment }: { appointment: Appointment }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export function AppointmentsSection() {
-  const [showBooking, setShowBooking] = useState(false);
+interface AppointmentsSectionProps {
+  initialShowBooking?: boolean;
+  formOnly?: boolean;
+}
+
+export function AppointmentsSection({ initialShowBooking = false, formOnly = false }: AppointmentsSectionProps = {}) {
+  const [showBooking, setShowBooking] = useState(initialShowBooking);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
@@ -428,7 +433,7 @@ export function AppointmentsSection() {
     }
   };
 
-  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  useEffect(() => { if (!formOnly) fetchAppointments(); }, [fetchAppointments, formOnly]);
   useEffect(() => { fetchChildren(); }, []);
 
   const handleCancel = async (id: string) => {
@@ -457,21 +462,41 @@ export function AppointmentsSection() {
   const upcoming = appointments.filter(a => upcomingStatuses.includes(a.status));
   const past = appointments.filter(a => pastStatuses.includes(a.status));
 
+  if (formOnly) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        {showBooking ? (
+          <BookingForm
+            children={children}
+            onClose={() => setShowBooking(false)}
+            onSuccess={handleBookingSuccess}
+          />
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <CalendarIcon className="h-12 w-12 text-orange-400 mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Book Appointment</h2>
+              <p className="text-gray-600 text-center mb-6">Schedule a healthcare appointment for your child</p>
+              <Button
+                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                onClick={() => setShowBooking(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Book Appointment
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-orange-600 mb-1">Appointments</h2>
-          <p className="text-gray-600">Manage your children's healthcare appointments</p>
-        </div>
-        <Button
-          className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
-          onClick={() => setShowBooking(true)}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Book Appointment
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold text-orange-600 mb-1">Appointments</h2>
+        <p className="text-gray-600">Manage your children's healthcare appointments</p>
       </div>
 
       {/* Filters */}
@@ -525,13 +550,8 @@ export function AppointmentsSection() {
             <CalendarIcon className="h-12 w-12 text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments found</h3>
             <p className="text-gray-500 text-center mb-4">
-              {statusFilter || typeFilter ? 'Try adjusting your filters.' : 'Book your first appointment to get started.'}
+              {statusFilter || typeFilter ? 'Try adjusting your filters.' : 'No appointments found. Use the Book Appointment menu to schedule one.'}
             </p>
-            {!statusFilter && !typeFilter && (
-              <Button onClick={() => setShowBooking(true)} className="bg-orange-600 hover:bg-orange-700">
-                <Plus className="w-4 h-4 mr-2" /> Book Appointment
-              </Button>
-            )}
           </CardContent>
         </Card>
       ) : (
@@ -673,8 +693,8 @@ export function AppointmentsSection() {
         </div>
       )}
 
-      {/* Booking Modal */}
-      {showBooking && (
+      {/* Booking Modal - only shown in formOnly (Book Appointment) view */}
+      {formOnly && showBooking && (
         <BookingForm
           children={children}
           onClose={() => setShowBooking(false)}

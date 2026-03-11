@@ -192,6 +192,91 @@ export function TherapistHome({ onNavigate }: TherapistHomeProps) {
           </Card>
         </motion.div>
       </motion.div>
+
+      {/* Quick Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.5 }}
+      >
+        <h3 className="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Button
+            variant="outline"
+            className="h-auto py-4 justify-start gap-3 border-2 hover:border-purple-300 hover:bg-purple-50"
+            onClick={() => onNavigate('clients')}
+          >
+            <Users className="w-5 h-5 text-purple-600" />
+            <span>View My Clients</span>
+            <ArrowRight className="w-4 h-4 ml-auto text-gray-400" />
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 justify-start gap-3 border-2 hover:border-purple-300 hover:bg-purple-50"
+            onClick={() => onNavigate('plans')}
+          >
+            <ClipboardCheck className="w-5 h-5 text-purple-600" />
+            <span>Therapy Plans</span>
+            <ArrowRight className="w-4 h-4 ml-auto text-gray-400" />
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 justify-start gap-3 border-2 hover:border-purple-300 hover:bg-purple-50"
+            onClick={() => onNavigate('sessions')}
+          >
+            <Calendar className="w-5 h-5 text-purple-600" />
+            <span>Today&apos;s Sessions</span>
+            <ArrowRight className="w-4 h-4 ml-auto text-gray-400" />
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 justify-start gap-3 border-2 hover:border-purple-300 hover:bg-purple-50"
+            onClick={() => onNavigate('progress')}
+          >
+            <TrendingUp className="w-5 h-5 text-purple-600" />
+            <span>Progress Tracking</span>
+            <ArrowRight className="w-4 h-4 ml-auto text-gray-400" />
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Sessions Overview Chart */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.6 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+              Sessions Overview (Last 6 Months)
+            </CardTitle>
+            <CardDescription>Completed vs scheduled sessions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[280px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={progressData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} />
+                  <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="sessions" name="Scheduled" fill="#a78bfa" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </motion.div>
   );
 }
