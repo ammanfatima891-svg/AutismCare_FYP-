@@ -75,11 +75,7 @@ The platform integrates **ASQ-3** and **M-CHAT-R** screening tools, maintains se
 ---
 
 ## 👥 Team
-
-**Team Lead:**  
 - Hafsa Mudassar (2022-CS-569)
-
-**Team Members:**  
 - Amman Fatima (2022-CS-506)  
 - Hassam Akram (2022-CS-542)  
 - Rabia Babar (2022-CS-561)
