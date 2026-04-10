@@ -56,7 +56,7 @@ export default function ApprovalRequests() {
     try {
       await API.post("/admin/update-professional-status", {
         userId,
-        status
+        status,
       });
 
       toast.success(`Professional ${status === "active" ? "approved" : "rejected"} successfully`);

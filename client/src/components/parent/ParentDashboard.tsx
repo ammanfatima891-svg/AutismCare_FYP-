@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Home, Baby, ClipboardList, Calendar, FlaskConical, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { DashboardHome } from './DashboardHome';
 import { ChildManagement } from './ChildManagement';
@@ -7,8 +7,36 @@ import { ScreeningSection } from './ScreeningSection';
 import { AppointmentsSection } from './AppointmentsSection';
 import { ParentLabReports } from './ParentLabReports';
 import { ParentScreenings } from './ParentScreenings';
+import { ParentHomeAssignments } from './ParentHomeAssignments';
+import { ParentTherapyReports } from '../reports/ParentTherapyReports';
+import { getParentNavigationItems } from './parentNavigation';
 
-type Section = 'home' | 'children' | 'screening' | 'total-screenings' | 'book-appointment' | 'appointments' | 'lab-reports';
+type Section =
+  | 'home'
+  | 'children'
+  | 'home-activities'
+  | 'therapy-reports'
+  | 'screening'
+  | 'total-screenings'
+  | 'book-appointment'
+  | 'appointments'
+  | 'lab-reports';
+
+const VALID_SECTIONS: Section[] = [
+  'home',
+  'children',
+  'home-activities',
+  'therapy-reports',
+  'screening',
+  'total-screenings',
+  'book-appointment',
+  'appointments',
+  'lab-reports',
+];
+
+function isSection(s: string): s is Section {
+  return VALID_SECTIONS.includes(s as Section);
+}
 
 interface AuthUser {
   token: string;
@@ -23,33 +51,27 @@ interface ParentDashboardProps {
   onLogout?: () => void;
 }
 
-const navigation = [
-  { id: 'home', label: 'Home', icon: Home, color: 'text-blue-600' },
-  { id: 'children', label: 'My Children', icon: Baby, color: 'text-pink-600' },
-  { id: 'screening', label: 'Screening', icon: ClipboardList, color: 'text-purple-600' },
-  { id: 'total-screenings', label: 'Total Screenings', icon: FileText, color: 'text-indigo-600' },
-  {
-    id: 'appointments',
-    label: 'Appointments',
-    icon: Calendar,
-    color: 'text-orange-600',
-    children: [
-      { id: 'book-appointment', label: 'Book Appointment' },
-      { id: 'appointments', label: 'Total Appointments' },
-    ],
-  },
-  { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical, color: 'text-teal-600' },
-];
-
 export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
   const [currentSection, setCurrentSection] = useState<Section>('home');
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const handleSectionChange = (section: Section) => {
-    setCurrentSection(section);
+  useEffect(() => {
+    const s = (location.state as { section?: string } | null)?.section;
+    if (s && isSection(s)) {
+      setCurrentSection(s);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
+  const navigation = getParentNavigationItems();
+
+  const handleSectionChange = (section: string) => {
+    setCurrentSection(section as Section);
   };
 
   const handleNavigate = (section: string) => {
-    setCurrentSection(section as Section);
+    if (isSection(section)) setCurrentSection(section);
   };
 
   const renderSection = () => {
@@ -58,6 +80,10 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
         return <DashboardHome onNavigate={handleNavigate} />;
       case 'children':
         return <ChildManagement />;
+      case 'home-activities':
+        return <ParentHomeAssignments />;
+      case 'therapy-reports':
+        return <ParentTherapyReports />;
       case 'screening':
         return <ScreeningSection />;
       case 'total-screenings':
@@ -77,11 +103,10 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
     <DashboardLayout
       navigation={navigation}
       currentSection={currentSection}
-      onSectionChange={(section: string) => setCurrentSection(section as Section)}
+      onSectionChange={handleSectionChange}
       onLogout={onLogout}
     >
       {renderSection()}
     </DashboardLayout>
   );
 }
-

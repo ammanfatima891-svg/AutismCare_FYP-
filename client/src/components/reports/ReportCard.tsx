@@ -1,0 +1,121 @@
+import React from 'react';
+import { MoreHorizontal, Eye, Download } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { cn } from '../ui/utils';
+import type { ReportListRow } from './reportLabels';
+import { reportCardSummary, reportTypeLabel } from './reportLabels';
+
+function truncate(text: string, max = 140) {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max).trim()}…`;
+}
+
+export function ReportCard({
+  row,
+  onView,
+  className,
+}: {
+  row: ReportListRow;
+  onView: () => void;
+  className?: string;
+}) {
+  const summary = reportCardSummary(row);
+  const dateStr = row.generatedAt ? new Date(row.generatedAt).toLocaleString() : '—';
+
+  return (
+    <article
+      className={cn(
+        'group flex flex-col gap-4 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm transition-all duration-200',
+        'hover:border-sky-200 hover:shadow-md',
+        className
+      )}
+    >
+      <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold tracking-tight text-slate-900">{row.childName || 'Child'}</h3>
+            <Badge
+              variant="outline"
+              className="border-sky-200 bg-sky-50/80 font-medium text-sky-900"
+            >
+              {reportTypeLabel(row.type)}
+            </Badge>
+            {row.insufficientData ? (
+              <Badge
+                variant="outline"
+                className="border-amber-200/80 bg-amber-50/90 font-medium text-amber-950"
+              >
+                Partial data
+              </Badge>
+            ) : null}
+          </div>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Generated {dateStr}</p>
+          <p className="text-sm leading-relaxed text-slate-600">{truncate(summary)}</p>
+        </div>
+
+        <div className="flex shrink-0 flex-row items-center gap-2 sm:flex-col sm:items-end lg:flex-row lg:items-center">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-sky-200 bg-white text-sky-900 hover:bg-sky-50"
+            onClick={onView}
+          >
+            <Eye className="mr-1.5 h-4 w-4" />
+            View
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-slate-200 text-slate-400"
+            disabled
+            title="Download coming soon"
+          >
+            <Download className="mr-1.5 h-4 w-4" />
+            Download
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-slate-500">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">More</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={onView}>Open in viewer</DropdownMenuItem>
+              <DropdownMenuItem disabled>Share (soon)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export function ReportCardSkeleton() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+        <div className="flex-1 space-y-3">
+          <div className="h-5 w-40 rounded-md bg-slate-100" />
+          <div className="h-3 w-28 rounded bg-slate-100" />
+          <div className="h-4 w-full max-w-md rounded bg-slate-100" />
+          <div className="h-4 w-full max-w-sm rounded bg-slate-100" />
+        </div>
+        <div className="flex gap-2">
+          <div className="h-9 w-20 rounded-md bg-slate-100" />
+          <div className="h-9 w-24 rounded-md bg-slate-100" />
+        </div>
+      </div>
+    </div>
+  );
+}

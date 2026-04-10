@@ -11,9 +11,10 @@ import {
   Activity
 } from 'lucide-react';
 import { childAPI } from '../../../api';
+import { ParentTherapySessionInstructions } from '../ParentTherapySessionInstructions';
 
 interface ChildProfileProps {
-  childId: string;
+  childId: string | number;
 }
 
 export function ChildProfile({ childId }: ChildProfileProps) {
@@ -88,6 +89,8 @@ export function ChildProfile({ childId }: ChildProfileProps) {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          <ParentTherapySessionInstructions childId={String(childId)} />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Personal Information */}
             <Card>

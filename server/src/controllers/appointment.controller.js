@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const { Appointment, APPOINTMENT_STATUS, APPOINTMENT_TYPES, TYPE_TO_ROLE } = require('../models/Appointment');
 const { User, ROLES } = require('../models/User');
-const { createNotification } = require('../utils/notification');
+const { createNotification, createNotificationIfNotExists } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { logAction, AUDIT_ACTIONS, RESOURCE_TYPES } = require('../utils/audit');
+const { ChildCase } = require('../models/ChildCase');
 
 // ─── Helper: get professional display name ───────────────────────────────────
 
@@ -328,6 +329,18 @@ exports.approveAppointment = async (req, res) => {
 
         await appointment.save();
 
+        let childCaseSyncWarning = null;
+        // Auto-create/sync child case when a clinician approves (idempotent per child + clinician)
+        if (String(appointment.professionalRole) === 'clinician') {
+            try {
+                const { ensureCaseFromApprovedAppointment } = require('../services/childCase.service');
+                await ensureCaseFromApprovedAppointment(appointment);
+            } catch (caseErr) {
+                console.error('Child case auto-create failed:', caseErr);
+                childCaseSyncWarning = 'Appointment approved, but child case sync failed.';
+            }
+        }
+
         // Log audit
         await logAction({
             userId: professionalId,
@@ -352,6 +365,7 @@ exports.approveAppointment = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Appointment approved successfully',
+            childCaseSyncWarning,
             data: appointment
         });
     } catch (error) {
@@ -599,6 +613,25 @@ exports.completeAppointment = async (req, res) => {
             relatedResourceType: 'Appointment',
             relatedResourceId: appointment._id
         });
+
+        // Therapist session completion acts as a therapy progress update signal for clinicians.
+        if (
+            String(appointment.professionalRole) === 'therapist' &&
+            String(appointment.appointmentType) === APPOINTMENT_TYPES.THERAPY
+        ) {
+            const childCases = await ChildCase.find({ childId: appointment.child }).select('_id clinicianId').lean();
+            for (const childCase of childCases) {
+                if (!childCase?.clinicianId) continue;
+                await createNotificationIfNotExists({
+                    recipientId: childCase.clinicianId,
+                    type: NOTIFICATION_TYPES.PROGRESS_UPDATED,
+                    title: 'Therapy Progress Updated',
+                    message: 'New therapy session logged for child',
+                    relatedResourceType: 'Appointment',
+                    relatedResourceId: appointment._id
+                });
+            }
+        }
 
         res.status(200).json({
             success: true,

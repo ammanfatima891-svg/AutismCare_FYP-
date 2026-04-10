@@ -31,7 +31,11 @@ const SubmissionSchema = new mongoose.Schema({
   type: String,
   enum: ["Pass", "Monitor", "Fail"]
 },
-  resultDescription: String
+  resultDescription: String,
+  riskLevel: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'unknown'],
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Submission", SubmissionSchema);

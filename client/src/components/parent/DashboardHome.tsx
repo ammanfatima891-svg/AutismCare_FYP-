@@ -147,6 +147,10 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
           Let's take care of your child's development together. This is not a diagnosis - just helpful information.
         </p>
+        <p className="text-sm text-slate-600 max-w-xl mx-auto">
+          Use <span className="font-medium text-sky-800">Child Case</span> in the sidebar for therapy sessions,
+          guidance, home activities, and progress.
+        </p>
       </motion.div>
 
       {/* Quick Stats - always visible, interactive Child Profile card */}

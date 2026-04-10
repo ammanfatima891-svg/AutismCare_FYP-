@@ -9,16 +9,23 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const role = localStorage.getItem('role') || sessionStorage.getItem('role');
-    const firstName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName');
-    const lastName = localStorage.getItem('lastName') || sessionStorage.getItem('lastName');
-    const email = localStorage.getItem('email') || sessionStorage.getItem('email');
+    // Prefer sessionStorage so a fresh login without "remember me" wins over stale localStorage
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const role = sessionStorage.getItem('role') || localStorage.getItem('role');
+    const firstName = sessionStorage.getItem('firstName') || localStorage.getItem('firstName');
+    const lastName = sessionStorage.getItem('lastName') || localStorage.getItem('lastName');
+    const email = sessionStorage.getItem('email') || localStorage.getItem('email');
     if (token && role) setUser({ token, role, firstName, lastName, email });
   }, []);
 
   const login = async (email, password, rememberMe = false) => {
     const { data } = await API.post('/auth/login', { email, password });
+    // Clear both storages so we never mix an old token with a new role (fixes 403 / wrong dashboard)
+    const keys = ['token', 'role', 'firstName', 'lastName', 'email'];
+    keys.forEach((k) => {
+      localStorage.removeItem(k);
+      sessionStorage.removeItem(k);
+    });
     const storage = rememberMe ? localStorage : sessionStorage;
     storage.setItem('token', data.token);
     storage.setItem('role', data.role);

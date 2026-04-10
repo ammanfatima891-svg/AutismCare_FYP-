@@ -1,4 +1,5 @@
 const { Notification, NOTIFICATION_TYPES } = require('../models/Notification');
+const { ClinicalEvaluation } = require('../models/ClinicalEvaluation');
 
 /**
  * Create a notification for a user
@@ -9,6 +10,7 @@ const { Notification, NOTIFICATION_TYPES } = require('../models/Notification');
  * @param {string} params.message - Notification message
  * @param {string} params.relatedResourceType - Type of related resource (optional)
  * @param {string} params.relatedResourceId - ID of related resource (optional)
+ * @param {string} params.relatedCaseId - ChildCase id (optional)
  */
 const createNotification = async ({
     recipientId,
@@ -16,7 +18,8 @@ const createNotification = async ({
     title,
     message,
     relatedResourceType,
-    relatedResourceId
+    relatedResourceId,
+    relatedCaseId
 }) => {
     try {
         const notification = new Notification({
@@ -25,7 +28,8 @@ const createNotification = async ({
             title,
             message,
             relatedResourceType,
-            relatedResourceId
+            relatedResourceId,
+            relatedCaseId
         });
 
         await notification.save();
@@ -36,6 +40,42 @@ const createNotification = async ({
         return notification;
     } catch (error) {
         console.error('Error creating notification:', error);
+        return null;
+    }
+};
+
+/**
+ * Create a notification only if same recipient/type/resource does not already exist.
+ */
+const createNotificationIfNotExists = async ({
+    recipientId,
+    type,
+    title,
+    message,
+    relatedResourceType,
+    relatedResourceId,
+    relatedCaseId
+}) => {
+    try {
+        const existing = await Notification.findOne({
+            recipientId,
+            type,
+            relatedResourceId: relatedResourceId || null
+        }).lean();
+
+        if (existing) return existing;
+
+        return await createNotification({
+            recipientId,
+            type,
+            title,
+            message,
+            relatedResourceType,
+            relatedResourceId,
+            relatedCaseId
+        });
+    } catch (error) {
+        console.error('Error creating deduped notification:', error);
         return null;
     }
 };
@@ -126,6 +166,48 @@ const markAllAsRead = async (userId) => {
 };
 
 /**
+ * Delete one notification that belongs to the user.
+ */
+const deleteNotification = async (notificationId, userId) => {
+    try {
+        return await Notification.findOneAndDelete({ _id: notificationId, recipientId: userId });
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+        return null;
+    }
+};
+
+/**
+ * Create FOLLOW_UP notifications for final evaluations older than X days.
+ * Uses evaluation _id as related resource for idempotency.
+ */
+const createFollowUpDueNotifications = async (clinicianId, days = 7) => {
+    try {
+        const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const dueEvaluations = await ClinicalEvaluation.find({
+            clinicianId,
+            status: 'final',
+            createdAt: { $lte: threshold }
+        })
+            .select('_id caseId createdAt')
+            .lean();
+
+        for (const ev of dueEvaluations) {
+            await createNotificationIfNotExists({
+                recipientId: clinicianId,
+                type: NOTIFICATION_TYPES.FOLLOW_UP,
+                title: 'Follow-up Due',
+                message: `Follow-up review required for case ${ev.caseId}`,
+                relatedResourceType: 'ClinicalEvaluation',
+                relatedResourceId: ev._id
+            });
+        }
+    } catch (error) {
+        console.error('Error creating follow-up notifications:', error);
+    }
+};
+
+/**
  * Get unread notification count for a user
  * @param {string} userId - User ID
  */
@@ -140,11 +222,14 @@ const getUnreadCount = async (userId) => {
 
 module.exports = {
     createNotification,
+    createNotificationIfNotExists,
     createBulkNotifications,
     getUnreadNotifications,
     getNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    createFollowUpDueNotifications,
     getUnreadCount,
     NOTIFICATION_TYPES
 };

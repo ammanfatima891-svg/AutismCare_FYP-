@@ -8,7 +8,7 @@ const API = axios.create({
 // Request interceptor to add auth token
 API.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -56,7 +56,7 @@ export const screeningAPI = {
   getQuestionnaireByType: (type) => API.get(`/screening/questionnaires/${type}`),
   getAvailableQuestionnaires: () => API.get('/screening/available-questionnaires'),
   getScreeningHistory: () => API.get('/screening/screening-history'),
-  getSubmissionById: (id) => API.get(`/screening/submission/${id}`),
+  getSubmissionById: (id) => API.get(`screening/submission/${id}`),
   downloadSubmissionReport: (id) => API.get(`/screening/submission/${id}/download`, { responseType: 'blob' }),
   getChildScreeningStatus: (childId) => API.get(`/screening/child/${childId}/screening-status`),
   getScreeningStats: () => API.get('/screening/stats'),
@@ -78,12 +78,12 @@ export const labAPI = {
   getReportById: (id) => API.get(`/lab/reports/${id}`),
   getAllReports: () => API.get('/lab/reports'),
 
-  // Clinician endpoints
-  getClinicianRequests: (params) => API.get('/lab/clinician/requests', { params }),
-  getClinicianRequestById: (id) => API.get(`/lab/clinician/requests/${id}`),
-  releaseReport: (id) => API.patch(`/lab/clinician/requests/${id}/release`),
-  searchParents: (search) => API.get('/lab/clinician/parents', { params: { search } }),
-  createTestRequest: (data) => API.post('/lab/clinician/requests', data),
+  // Clinician endpoints (no leading `/` so path stays under baseURL `/api`)
+  getClinicianRequests: (params) => API.get('lab/clinician/requests', { params }),
+  getClinicianRequestById: (id) => API.get(`lab/clinician/requests/${id}`),
+  releaseReport: (id) => API.patch(`lab/clinician/requests/${id}/release`),
+  searchParents: (search) => API.get('lab/clinician/parents', { params: { search } }),
+  createTestRequest: (data) => API.post('lab/clinician/requests', data),
 
   // Parent endpoints
   getParentReports: () => API.get('/lab/parent/reports')
@@ -91,17 +91,166 @@ export const labAPI = {
 
 // Therapist API endpoints
 export const therapistAPI = {
-  getDashboardStats: () => API.get('/therapist/dashboard-stats')
+  getDashboardStats: () => API.get('/therapist/dashboard-stats'),
+  /** Metrics + lists (assignedCases, upcoming, alerts) for therapist home. */
+  getDashboardSummary: () => API.get('therapist/dashboard-summary'),
+  getDashboard: () => API.get('therapist/dashboard'),
+  startTherapyFromReferral: (id) => API.patch(`therapist/referrals/${id}/start-therapy`),
+  /** Aggregated case file for tabbed UI (child, parent, referral, plan, sessions, assignments). */
+  getCaseFile: (caseId) => API.get(`therapist/case/${caseId}`),
+  createAssignment: (caseId, payload) => API.post(`/therapist/cases/${caseId}/assignments`, payload),
+  getAssignmentsByCase: (caseId) => API.get(`/therapist/cases/${caseId}/assignments`),
+  /** REST aliases: POST /api/assignments, GET /api/assignments/case/:caseId, PATCH review */
+  createHomeAssignment: (payload) => API.post('assignments', payload),
+  /** All assignments for logged-in therapist (childName, caseId, status, dueDate). */
+  listAllHomeAssignments: () => API.get('assignments'),
+  /** Dashboard metrics: active, completed, new submissions, behind schedule. */
+  getHomeAssignmentsSummary: () => API.get('assignments/summary'),
+  getHomeAssignmentsByCase: (caseId) => API.get(`assignments/case/${caseId}`),
+  reviewHomeAssignment: (id, payload) => API.patch(`assignments/${id}/review`, payload),
+  createSessionLog: (caseId, payload) => API.post(`/therapist/cases/${caseId}/sessions`, payload),
+};
+
+/** Session logs (also integrated with case file; same schema as therapist/cases/:caseId/sessions). */
+export const sessionAPI = {
+  /** All sessions for logged-in therapist (enriched with childName, therapyDomain). */
+  listAll: () => API.get('/sessions'),
+  create: (payload) => API.post('/sessions', payload),
+  getByCase: (caseId) => API.get(`sessions/case/${caseId}`),
+  update: (id, payload) => API.patch(`sessions/${id}`, payload),
+};
+
+/** Recurring therapy schedules + generated session slots (not appointment booking). */
+export const scheduleAPI = {
+  create: (payload) => API.post('/schedules', payload),
+  /** Therapist Schedule tab: one request for rules + slots (same auth as case file). */
+  getTherapistScheduleBundle: (caseId) => API.get(`therapist/case/${caseId}/schedule-bundle`),
+  getByCase: (caseId) => API.get(`therapist/case/${caseId}/schedules`),
+  getSessionSlots: (caseId) => API.get(`therapist/case/${caseId}/session-slots`),
+  updateSessionSlot: (slotId, payload) => API.patch(`therapist/session-slots/${slotId}`, payload),
+  /** Parent / clinician / therapist — generic case access (used on parent dashboard). */
+  getSessionSlotsPublic: (caseId) => API.get(`sessionslots/${caseId}`),
+};
+
+/** Activity library: templates + legacy CRUD (therapist-owned). */
+export const activityAPI = {
+  list: (params) => API.get('activities', { params }),
+  create: (payload) => API.post('activities', payload),
+  update: (id, payload) => API.patch(`activities/${id}`, payload),
+  clone: (id) => API.post(`activities/${id}/clone`),
+  /** Longer timeout: large template lists / slow DB can otherwise leave UI stuck on “Loading…”. */
+  listTemplates: (params) => API.get('activities/templates', { params, timeout: 60000 }),
+  createTemplate: (payload) => API.post('activities/templates', payload),
+  updateTemplate: (id, payload) => API.patch(`activities/templates/${id}`, payload),
+  cloneTemplate: (id) => API.post(`activities/templates/${id}/clone`),
+  assign: (id, payload) => API.post(`activities/${id}/assign`, payload),
+};
+
+/** Therapist therapy plan CRUD (domains, long/short goals, activities). */
+export const therapyPlanAPI = {
+  list: () => API.get('therapy-plan'),
+  create: (payload) => API.post('therapy-plan', payload),
+  getByCase: (caseId) => API.get(`therapy-plan/${caseId}`),
+  getAssignContext: (caseId) => API.get(`therapy-plan/case/${caseId}/assign-context`),
+  assignPlan: (payload) => API.post('therapy-plan/assign', payload),
+  update: (planId, payload) => API.patch(`therapy-plan/${planId}`, payload),
+  /** POST /therapy-plan/duplicate { originalPlanId, caseId } (childId optional, from case if omitted) */
+  duplicatePlan: (payload) => API.post('therapy-plan/duplicate', payload),
+  duplicate: (planId, payload) => API.post(`therapy-plan/${planId}/duplicate`, payload),
 };
 
 // Parent API endpoints
 export const parentAPI = {
-  getScreenings: () => API.get('/parent/screenings')
+  getScreenings: () => API.get('/parent/screenings'),
+  /** ChildCase rows for parent (caseId, childId, childName) — integration dashboard. */
+  getCases: () => API.get('/parent/cases'),
+  /** Session summaries + parentInstructions (therapist → parent). */
+  getCaseSessions: (caseId) => API.get(`parent/case/${caseId}/sessions`),
+  /** Home assignments for one case (activity name, due date, status). */
+  getCaseAssignments: (caseId) => API.get(`parent/case/${caseId}/assignments`),
+  getHomeAssignments: () => API.get('/parent/home-assignments'),
+  getAssignmentsByCase: (caseId) => API.get(`parent/assignments/${caseId}`),
+  /** Multipart: pass browser FormData with field "file" (server sets submissionUrl from upload). */
+  submitAssignmentEvidence: (id, formData) => API.patch(`parent/assignments/${id}/submit`, formData),
+  /** JSON submit: { submissionUrl, fileType: 'image' | 'video' } */
+  submitAssignmentEvidenceUrl: (id, payload) => API.patch(`parent/assignments/${id}/submit`, payload),
+  completeAssignment: (id) => API.patch(`parent/assignments/${id}/complete`),
+  /** Therapist session parentInstructions visible to parent (optional childId filter). */
+  getTherapySessionInstructions: (params) =>
+    API.get('/parent/therapy-session-instructions', { params }),
+  /** Therapy session slots (scheduled times — not appointment booking). */
+  getSessionSlots: (caseId) => API.get(`sessionslots/${caseId}`),
 };
 
-// Clinician API endpoints
+/** Case-centric integration (parent / clinician / therapist with case access). */
+export const integrationAPI = {
+  getCaseProgress: (caseId) => API.get(`case/${caseId}/progress`),
+  getCaseSummary: (caseId) => API.get(`case/${caseId}/summary`),
+};
+
+// Clinician API endpoints (no leading `/` so path stays under baseURL `/api`)
 export const clinicianAPI = {
-  getScreeningReviews: () => API.get('/clinician/screening-reviews')
+  getScreeningReviews: () => API.get('clinician/screening-reviews')
+};
+
+// Child case management (clinician only)
+export const caseAPI = {
+  list: (params) => API.get('cases', { params }),
+  getById: (id) => API.get(`cases/${id}`),
+  updateStatus: (id, status) => API.patch(`cases/${id}/status`, { status }),
+  create: (body) => API.post('cases/create', body),
+  fromAppointment: (appointmentId) =>
+    API.post('cases/from-appointment', { appointmentId }),
+};
+
+// Clinical evaluations (clinician only)
+export const evaluationAPI = {
+  create: (payload) => API.post('evaluations', payload),
+  listByCase: (caseId) => API.get(`evaluations/${caseId}`),
+  getById: (id) => API.get(`evaluations/single/${id}`),
+  updateVersion: (id, payload) => API.patch(`evaluations/${id}`, payload),
+};
+
+// Referrals (clinician -> therapist workflow)
+export const referralAPI = {
+  // Clinician
+  create: (payload) => API.post('referrals', payload),
+  getByCase: (caseId) => API.get(`referrals/case/${caseId}`),
+
+  // Therapist
+  getAssigned: () => API.get('referrals/assigned'),
+  accept: (id) => API.patch(`referrals/${id}/accept`),
+  start: (id) => API.patch(`referrals/${id}/start`),
+};
+
+// Therapy oversight (clinician read-only on therapy data + recommendation notes)
+export const therapyAPI = {
+  getPlan: (caseId) => API.get(`therapy/${caseId}/plan`),
+  getSessions: (caseId) => API.get(`therapy/${caseId}/sessions`),
+  getGoals: (caseId) => API.get(`therapy/${caseId}/goals`),
+  getNotes: (caseId) => API.get(`therapy/${caseId}/notes`),
+  addNote: (caseId, note) => API.post(`therapy/${caseId}/notes`, { note }),
+};
+
+// Progress monitoring analytics (clinician read-only)
+export const progressAPI = {
+  getOverview: (caseId) => API.get(`progress/${caseId}/overview`),
+  getDomain: (caseId, domain) => API.get(`progress/${caseId}/domain/${encodeURIComponent(domain)}`),
+  getSessions: (caseId) => API.get(`progress/${caseId}/sessions`),
+};
+
+/** Therapist case analytics (aggregated from sessions, plan, assignments). */
+export const analyticsAPI = {
+  getByCase: (caseId) => API.get(`analytics/${encodeURIComponent(String(caseId))}`),
+};
+
+/** Auto-generated therapy reports (therapist generates; parent/clinician read role-filtered types). */
+export const reportAPI = {
+  generate: (payload) => API.post('reports', payload),
+  generateLegacy: (payload) => API.post('reports/generate', payload),
+  listMine: (params) => API.get('reports', { params }),
+  listByCase: (caseId) => API.get(`reports/${encodeURIComponent(String(caseId))}`),
+  getById: (id) => API.get(`reports/view/${encodeURIComponent(String(id))}`),
 };
 
 // Appointment API endpoints
@@ -124,6 +273,23 @@ export const appointmentAPI = {
   // Admin endpoints
   getAll: (params) => API.get('/appointments/all', { params }),
   getStats: () => API.get('/appointments/stats')
+};
+
+/** Parent ↔ therapist case messaging (Conversation + Message). */
+export const messagingAPI = {
+  listConversations: () => API.get('messaging/conversations'),
+  getOrCreateConversation: (caseId) => API.get(`messaging/conversations/${caseId}`),
+  listMessages: (conversationId) => API.get(`messaging/messages/${conversationId}`),
+  sendMessage: (payload) => API.post('messaging/messages', payload),
+};
+
+// Notifications
+export const notificationAPI = {
+  list: (params) => API.get('notifications', { params }),
+  getCount: () => API.get('notifications/count'),
+  markRead: (id) => API.patch(`notifications/${id}/read`),
+  markAllRead: () => API.patch('notifications/read-all'),
+  remove: (id) => API.delete(`notifications/${id}`),
 };
 
 export default API;

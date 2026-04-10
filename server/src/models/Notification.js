@@ -17,7 +17,19 @@ const NOTIFICATION_TYPES = {
     APPOINTMENT_RESCHEDULED: 'appointment_rescheduled',
     APPOINTMENT_COMPLETED: 'appointment_completed',
     APPOINTMENT_CANCELLED: 'appointment_cancelled',
-    APPOINTMENT_REMINDER: 'appointment_reminder'
+    APPOINTMENT_REMINDER: 'appointment_reminder',
+    // Clinician event-based alerts
+    CASE_CREATED: 'CASE_CREATED',
+    REFERRAL_ACCEPTED: 'REFERRAL_ACCEPTED',
+    PROGRESS_UPDATED: 'PROGRESS_UPDATED',
+    LAB_UPLOADED: 'LAB_UPLOADED',
+    FOLLOW_UP: 'FOLLOW_UP',
+    /** Therapist / parent therapy workflow */
+    THERAPIST_NEW_REFERRAL: 'THERAPIST_NEW_REFERRAL',
+    THERAPIST_ASSIGNMENT_SUBMITTED: 'THERAPIST_ASSIGNMENT_SUBMITTED',
+    THERAPIST_GOAL_REVIEW_DUE: 'THERAPIST_GOAL_REVIEW_DUE',
+    PARENT_SESSION_MISSED: 'PARENT_SESSION_MISSED',
+    PARENT_SCHEDULE_CREATED: 'PARENT_SCHEDULE_CREATED',
 };
 
 const NotificationSchema = new Schema({
@@ -51,6 +63,12 @@ const NotificationSchema = new Schema({
     },
     relatedResourceId: {
         type: Schema.Types.ObjectId
+    },
+    /** Optional ChildCase link for therapy-module alerts */
+    relatedCaseId: {
+        type: Schema.Types.ObjectId,
+        ref: 'ChildCase',
+        index: true,
     },
     isRead: {
         type: Boolean,

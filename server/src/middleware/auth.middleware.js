@@ -17,8 +17,20 @@ exports.protect = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const currentUser = await User.findById(decoded.id);
+    const userId = decoded.id || decoded.userId || decoded._id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Invalid token payload. Please log in again.' });
+    }
+
+    const currentUser = await User.findById(userId);
     if (!currentUser) return res.status(401).json({ message: 'User not found' });
+
+    // Signed JWT role (always attach for restrictTo fallback if Mongoose omits role on the document)
+    req.jwtRole = decoded.role;
+
+    if (decoded.role != null && decoded.role !== '') {
+      currentUser.role = decoded.role;
+    }
 
     req.user = currentUser;
     next();
@@ -34,10 +46,12 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Role-based authorization
+// Role-based authorization (trim + case-insensitive match)
 exports.restrictTo = (...roles) => {
+  const allowed = roles.map((r) => String(r).trim().toLowerCase());
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    const userRole = String(req.user?.role ?? req.jwtRole ?? '').trim().toLowerCase();
+    if (!allowed.includes(userRole)) {
       return res.status(403).json({ message: 'Permission denied' });
     }
     next();

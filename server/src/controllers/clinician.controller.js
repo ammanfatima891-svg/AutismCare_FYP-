@@ -8,8 +8,9 @@ const { User, ROLES } = require("../models/User");
  */
 exports.getScreeningReviewsForClinician = async (req, res) => {
   try {
-    // Safety: this route is also protected by restrictTo('clinician') middleware
-    if (!req.user || req.user.role !== ROLES.CLINICIAN) {
+    // Safety: align with restrictTo (normalized role string)
+    const userRole = String(req.user?.role ?? req.jwtRole ?? "").trim().toLowerCase();
+    if (!req.user || userRole !== ROLES.CLINICIAN) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 

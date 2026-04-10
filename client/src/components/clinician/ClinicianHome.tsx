@@ -1,10 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Users, ClipboardList, Calendar, MessageSquare, TrendingUp, AlertCircle } from 'lucide-react';
+import { Users, ClipboardList, Calendar, MessageSquare, TrendingUp, AlertCircle, Briefcase } from 'lucide-react';
 
 interface ClinicianHomeProps {
-  onNavigate: (section: 'home' | 'patients' | 'screenings' | 'appointments' | 'messages') => void;
+  onNavigate: (
+    section: 'home' | 'patients' | 'screenings' | 'cases' | 'lab-reports' | 'appointments' | 'messages'
+  ) => void;
 }
 
 export function ClinicianHome({ onNavigate }: ClinicianHomeProps) {
@@ -79,7 +81,7 @@ export function ClinicianHome({ onNavigate }: ClinicianHomeProps) {
             <CardDescription>Common tasks and shortcuts</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Button
                 variant="outline"
                 className="h-20 flex flex-col items-center gap-2"
@@ -95,6 +97,14 @@ export function ClinicianHome({ onNavigate }: ClinicianHomeProps) {
               >
                 <ClipboardList className="h-6 w-6 text-purple-600" />
                 <span className="text-sm">Review Screenings</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-20 flex flex-col items-center gap-2"
+                onClick={() => onNavigate('cases')}
+              >
+                <Briefcase className="h-6 w-6 text-sky-600" />
+                <span className="text-sm">Child Cases</span>
               </Button>
               <Button
                 variant="outline"

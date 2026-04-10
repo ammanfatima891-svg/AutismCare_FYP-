@@ -6,6 +6,8 @@ const LabReport = require('../models/LabReport');
 const { AuditLog } = require('../models/AuditLog');
 const { User } = require('../models/User');
 const sendEmail = require('../utils/email');
+const { createNotificationIfNotExists } = require('../utils/notification');
+const { NOTIFICATION_TYPES } = require('../models/Notification');
 
 // -------------------------------------------------------------------
 // Multer configuration for lab report uploads (25MB max)
@@ -168,6 +170,16 @@ exports.uploadReport = [
             });
 
             // --- Send notifications ---
+            // In-app clinician notification (future-ready lab alert channel)
+            await createNotificationIfNotExists({
+                recipientId: testRequest.clinicianId,
+                type: NOTIFICATION_TYPES.LAB_UPLOADED,
+                title: 'New Lab Report Uploaded',
+                message: `A new lab report has been uploaded for ${testRequest.childName}`,
+                relatedResourceType: 'LabReport',
+                relatedResourceId: report._id
+            });
+
             // Notify clinician
             try {
                 const clinician = await User.findById(testRequest.clinicianId);

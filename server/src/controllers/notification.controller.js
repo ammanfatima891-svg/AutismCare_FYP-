@@ -3,20 +3,43 @@ const {
     getUnreadNotifications,
     markAsRead,
     markAllAsRead,
-    getUnreadCount
+    getUnreadCount,
+    deleteNotification,
+    createFollowUpDueNotifications
 } = require('../utils/notification');
+
+function isClinician(req) {
+    const role = String(req.user?.role ?? req.jwtRole ?? '').trim().toLowerCase();
+    return role === 'clinician';
+}
+
+/** Mongoose documents expose both _id and id; JWT-only flows may differ. */
+function authUserId(req) {
+    return req.user?._id || req.user?.id;
+}
 
 // Get all notifications for authenticated user
 const getUserNotifications = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const { unreadOnly, limit } = req.query;
+        const userId = authUserId(req);
+        const { unreadOnly, limit, page } = req.query;
+
+        // Lazy follow-up generator (idempotent) for clinician module.
+        if (isClinician(req)) {
+            await createFollowUpDueNotifications(userId, 7);
+        }
+
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const offset = (pageNum - 1) * limitNum;
 
         let notifications;
         if (unreadOnly === 'true') {
-            notifications = await getUnreadNotifications(userId, parseInt(limit) || 50);
+            const unread = await getUnreadNotifications(userId, 1000);
+            notifications = unread.slice(offset, offset + limitNum);
         } else {
-            notifications = await getNotifications(userId, parseInt(limit) || 100);
+            const all = await getNotifications(userId, 2000);
+            notifications = all.slice(offset, offset + limitNum);
         }
 
         const unreadCount = await getUnreadCount(userId);
@@ -25,7 +48,11 @@ const getUserNotifications = async (req, res) => {
             success: true,
             data: {
                 notifications,
-                unreadCount
+                unreadCount,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum
+                }
             }
         });
     } catch (error) {
@@ -40,7 +67,7 @@ const getUserNotifications = async (req, res) => {
 // Mark a notification as read
 const markNotificationAsRead = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = authUserId(req);
         const { id } = req.params;
 
         const notification = await markAsRead(id, userId);
@@ -69,7 +96,7 @@ const markNotificationAsRead = async (req, res) => {
 // Mark all notifications as read
 const markAllNotificationsAsRead = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = authUserId(req);
 
         const result = await markAllAsRead(userId);
 
@@ -90,7 +117,10 @@ const markAllNotificationsAsRead = async (req, res) => {
 // Get unread notification count
 const getNotificationCount = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = authUserId(req);
+        if (isClinician(req)) {
+            await createFollowUpDueNotifications(userId, 7);
+        }
         const count = await getUnreadCount(userId);
 
         res.status(200).json({
@@ -106,9 +136,37 @@ const getNotificationCount = async (req, res) => {
     }
 };
 
+// Delete a notification
+const removeNotification = async (req, res) => {
+    try {
+        const userId = authUserId(req);
+        const { id } = req.params;
+        const deleted = await deleteNotification(id, userId);
+
+        if (!deleted) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Notification deleted'
+        });
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to delete notification'
+        });
+    }
+};
+
 module.exports = {
     getUserNotifications,
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    getNotificationCount
+    getNotificationCount,
+    removeNotification
 };
