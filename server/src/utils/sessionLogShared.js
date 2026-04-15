@@ -3,8 +3,15 @@
  */
 
 const { parseResponseScore } = require('./sessionResponseScore');
+const {
+  validateGoalDataArray,
+  deriveChildResponseFromGoalData,
+} = require('./sessionGoalDataValidation');
+
+const SessionLog = require('../models/SessionLog');
 
 const SESSION_STATUS = ['completed', 'missed', 'rescheduled'];
+const NOTE_STATES = SessionLog.NOTE_STATES || ['draft', 'signed', 'locked'];
 
 function validateSessionBody(body, { requireGoalsAndActivities = true, isUpdate = false } = {}) {
   const {
@@ -16,6 +23,10 @@ function validateSessionBody(body, { requireGoalsAndActivities = true, isUpdate 
     notes = '',
     parentInstructions = '',
     status = 'completed',
+    goalData: rawGoalData,
+    noteState: rawNoteState,
+    lateEntry,
+    lateEntryReason,
   } = body || {};
 
   if (!sessionDate) {
@@ -36,9 +47,16 @@ function validateSessionBody(body, { requireGoalsAndActivities = true, isUpdate 
     return { ok: false, message: 'At least one activity is required' };
   }
 
-  const cr = String(childResponse || '').trim();
+  const gd = validateGoalDataArray(rawGoalData);
+  if (!gd.ok) return gd;
+
+  let cr = String(childResponse || '').trim();
+  if (!cr && gd.rows && gd.rows.length > 0) {
+    const derived = deriveChildResponseFromGoalData(g, gd.rows);
+    if (derived) cr = derived;
+  }
   if (!cr) {
-    return { ok: false, message: 'childResponse is required' };
+    return { ok: false, message: 'childResponse is required (or provide goalData with measurable rows per goal)' };
   }
   if (parseResponseScore(cr) == null) {
     return {
@@ -53,6 +71,9 @@ function validateSessionBody(body, { requireGoalsAndActivities = true, isUpdate 
     return { ok: false, message: 'status must be completed, missed, or rescheduled' };
   }
 
+  const ns = rawNoteState != null ? String(rawNoteState).trim() : 'draft';
+  const noteState = NOTE_STATES.includes(ns) ? ns : 'draft';
+
   return {
     ok: true,
     payload: {
@@ -64,11 +85,16 @@ function validateSessionBody(body, { requireGoalsAndActivities = true, isUpdate 
       notes: String(notes || '').trim(),
       parentInstructions: String(parentInstructions || '').trim(),
       status: st,
+      goalData: gd.rows || [],
+      noteState,
+      lateEntry: Boolean(lateEntry),
+      lateEntryReason: String(lateEntryReason || '').trim(),
     },
   };
 }
 
 module.exports = {
   SESSION_STATUS,
+  NOTE_STATES,
   validateSessionBody,
 };

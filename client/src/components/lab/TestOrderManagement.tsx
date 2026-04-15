@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -91,18 +92,18 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
 
     const getStatusBadge = (status: string) => {
         const variants: Record<string, string> = {
-            pending: 'bg-yellow-100 text-yellow-800',
-            in_progress: 'bg-blue-100 text-blue-800',
-            completed: 'bg-green-100 text-green-800',
-            cancelled: 'bg-gray-100 text-gray-800'
+            pending: 'bg-accent/10 text-accent-foreground',
+            in_progress: 'bg-secondary/70 text-primary',
+            completed: 'bg-secondary text-primary',
+            cancelled: 'bg-muted text-foreground'
         };
-        return variants[status] || 'bg-gray-100 text-gray-800';
+        return variants[status] || 'bg-muted text-foreground';
     };
 
     const getPriorityBadge = (priority: string) => {
         return priority === 'urgent'
-            ? 'bg-red-100 text-red-800'
-            : 'bg-gray-100 text-gray-800';
+            ? 'bg-muted text-destructive'
+            : 'bg-muted text-foreground';
     };
 
     const formatDate = (dateString: string) => {
@@ -118,14 +119,14 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold text-blue-600 mb-2">Test Order Management</h2>
-                <p className="text-gray-600">View and manage patient test orders</p>
+                <h2 className="mb-2 text-2xl font-bold text-foreground">Test Order Management</h2>
+                <p className="text-muted-foreground">View and manage patient test orders</p>
             </div>
 
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Search by patient name or test..."
                         value={searchTerm}
@@ -137,7 +138,7 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input h-10 w-auto px-4 py-2"
                     >
                         <option value="all">All Status</option>
                         <option value="pending">Pending</option>
@@ -153,35 +154,35 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
                 <Card className="lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <ClipboardList className="h-5 w-5 text-blue-600" />
+                            <ClipboardList className="h-5 w-5 text-primary" />
                             Test Orders
                         </CardTitle>
                         <CardDescription>{filteredOrders.length} orders found</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
-                            <div className="text-center py-8 text-gray-500">Loading orders...</div>
+                            <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
                         ) : filteredOrders.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">No orders found</div>
+                            <div className="text-center py-8 text-muted-foreground">No orders found</div>
                         ) : (
                             <div className="space-y-3 max-h-[500px] overflow-y-auto">
                                 {filteredOrders.map((order) => (
                                     <div
                                         key={order._id}
                                         className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedOrder?._id === order._id
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                                                ? 'border-primary bg-secondary/30'
+                                                : 'border-border hover:border-primary/40 hover:bg-muted'
                                             }`}
                                         onClick={() => setSelectedOrder(order)}
                                     >
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-2">
                                                 {order.priority === 'urgent' && (
-                                                    <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                                    <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                                                 )}
                                                 <div>
-                                                    <p className="font-medium text-gray-900">{order.childName}</p>
-                                                    <p className="text-sm text-gray-600">{order.testName}</p>
+                                                    <p className="font-medium text-foreground">{order.childName}</p>
+                                                    <p className="text-sm text-muted-foreground">{order.testName}</p>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-1">
@@ -195,7 +196,7 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
                                                 )}
                                             </div>
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-2">
+                                        <p className="text-xs text-muted-foreground mt-2">
                                             <Calendar className="h-3 w-3 inline mr-1" />
                                             {formatDate(order.createdAt)}
                                         </p>
@@ -210,7 +211,7 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
                 <Card className="lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Eye className="h-5 w-5 text-cyan-600" />
+                            <Eye className="h-5 w-5 text-primary" />
                             Order Details
                         </CardTitle>
                         <CardDescription>
@@ -219,56 +220,57 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
                     </CardHeader>
                     <CardContent>
                         {!selectedOrder ? (
-                            <div className="text-center py-12 text-gray-500">
-                                <ClipboardList className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                            <div className="text-center py-12 text-muted-foreground">
+                                <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                                 <p>Select an order from the list to view details</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-sm font-medium text-gray-500">Patient Name</label>
-                                        <p className="font-medium text-gray-900">{selectedOrder.childName}</p>
+                                        <label className="text-sm font-medium text-muted-foreground">Patient Name</label>
+                                        <p className="font-medium text-foreground">{selectedOrder.childName}</p>
                                     </div>
                                     <div>
-                                        <label className="text-sm font-medium text-gray-500">Test Type</label>
-                                        <p className="font-medium text-gray-900 capitalize">{selectedOrder.testType}</p>
+                                        <label className="text-sm font-medium text-muted-foreground">Test Type</label>
+                                        <p className="font-medium text-foreground capitalize">{selectedOrder.testType}</p>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">Test Name</label>
-                                    <p className="font-medium text-gray-900">{selectedOrder.testName}</p>
+                                    <label className="text-sm font-medium text-muted-foreground">Test Name</label>
+                                    <p className="font-medium text-foreground">{selectedOrder.testName}</p>
                                 </div>
 
                                 {selectedOrder.testDetails && (
                                     <div>
-                                        <label className="text-sm font-medium text-gray-500">Test Details</label>
-                                        <p className="text-gray-700">{selectedOrder.testDetails}</p>
+                                        <label className="text-sm font-medium text-muted-foreground">Test Details</label>
+                                        <p className="text-foreground">{selectedOrder.testDetails}</p>
                                     </div>
                                 )}
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-sm font-medium text-gray-500">Ordering Clinician</label>
-                                        <p className="font-medium text-gray-900">
+                                        <label className="text-sm font-medium text-muted-foreground">Ordering Clinician</label>
+                                        <p className="font-medium text-foreground">
                                             Dr. {selectedOrder.clinicianId?.firstName} {selectedOrder.clinicianId?.lastName}
                                         </p>
-                                        <p className="text-sm text-gray-600">{selectedOrder.clinicianId?.specialization}</p>
+                                        <p className="text-sm text-muted-foreground">{selectedOrder.clinicianId?.specialization}</p>
                                     </div>
                                     <div>
-                                        <label className="text-sm font-medium text-gray-500">Parent Contact</label>
-                                        <p className="font-medium text-gray-900">
+                                        <label className="text-sm font-medium text-muted-foreground">Parent Contact</label>
+                                        <p className="font-medium text-foreground">
                                             {selectedOrder.parentId?.firstName} {selectedOrder.parentId?.lastName}
                                         </p>
-                                        <p className="text-sm text-gray-600">{selectedOrder.parentId?.email}</p>
+                                        <p className="text-sm text-muted-foreground">{selectedOrder.parentId?.email}</p>
                                     </div>
                                 </div>
 
                                 <div className="flex gap-2 mt-6">
                                     {selectedOrder.status === 'pending' && (
                                         <Button
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                            className="flex-1"
+                                            variant="default"
                                             onClick={() => handleAssignOrder(selectedOrder._id)}
                                         >
                                             <Play className="h-4 w-4 mr-2" />
@@ -277,7 +279,8 @@ export function TestOrderManagement({ onNavigate }: TestOrderManagementProps) {
                                     )}
                                     {selectedOrder.status === 'in_progress' && (
                                         <Button
-                                            className="flex-1 bg-green-600 hover:bg-green-700"
+                                            className="flex-1"
+                                            variant="default"
                                             onClick={() => onNavigate('upload', selectedOrder._id)}
                                         >
                                             <Upload className="h-4 w-4 mr-2" />

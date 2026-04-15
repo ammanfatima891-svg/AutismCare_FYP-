@@ -8,6 +8,7 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
 const ClinicianDashboard = lazy(() =>
   import("./components/clinician/ClinicianDashboard").then((m) => ({ default: m.ClinicianDashboard }))
 );
@@ -37,7 +38,7 @@ const ScreeningForm = lazy(() => import("./components/ScreeningForm"));
 
 function RouteFallback() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center bg-slate-50/80 text-sm text-slate-500">
+    <div className="flex min-h-[40vh] items-center justify-center bg-muted/80 text-sm text-muted-foreground">
       Loading…
     </div>
   );
@@ -49,7 +50,7 @@ function App() {
       <Toaster position="top-center" richColors closeButton />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<AuthForm />} />
+          <Route path="/" element={<Onboarding />} />
           <Route path="/login" element={<AuthForm />} />
           <Route path="/register" element={<AuthForm />} />
 

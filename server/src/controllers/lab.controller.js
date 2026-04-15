@@ -1,16 +1,21 @@
+const { getCurrentTime, getCurrentTimeMs, getAgeYearsFromDob, getAgeMonthsFromDob } = require('../utils/time.js');
+const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const LabTestRequest = require('../models/LabTestRequest');
 const LabReport = require('../models/LabReport');
+const { ChildCase } = require('../models/ChildCase');
 const { AuditLog } = require('../models/AuditLog');
 const { User } = require('../models/User');
 const sendEmail = require('../utils/email');
 const { createNotificationIfNotExists } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
+const { validateFileStrict, wrapMulter } = require('../middleware/uploadValidation');
 
 // -------------------------------------------------------------------
-// Multer configuration for lab report uploads (25MB max)
+// Multer configuration for lab report uploads
+// Global rule: Images (jpeg/png/webp) <=5MB, PDFs <=10MB.
 // -------------------------------------------------------------------
 const uploadsDir = path.join(process.cwd(), 'uploads/lab-reports');
 if (!fs.existsSync(uploadsDir)) {
@@ -20,29 +25,36 @@ if (!fs.existsSync(uploadsDir)) {
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const uniqueSuffix = getCurrentTimeMs() + '-' + Math.round(Math.random() * 1e9);
         cb(null, 'lab-report-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
 const labUpload = multer({
     storage,
-    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max (PDF). Images further restricted to 5MB.
     fileFilter: (req, file, cb) => {
-        const allowed = /jpeg|jpg|png|pdf/;
-        const extValid = allowed.test(path.extname(file.originalname).toLowerCase());
-        const mimeValid = allowed.test(file.mimetype);
-        if (extValid && mimeValid) return cb(null, true);
-        cb(new Error('Only PDF, JPG, and PNG files are allowed'));
+        const v = validateFileStrict({ ...file, size: 0 }, ['image', 'pdf']);
+        if (v.ok) return cb(null, true);
+        cb(new Error('Only jpeg/png/webp images or PDFs are allowed'));
     }
 });
+
+const labUploadSingle = wrapMulter(labUpload.single('report'));
 
 // -------------------------------------------------------------------
 // Helper: create an audit log entry
 // -------------------------------------------------------------------
-const createAuditLog = async ({ userId, action, resource, resourceId, details, ipAddress }) => {
+const createAuditLog = async ({ userId, action, resourceType, resource, resourceId, details, ipAddress }) => {
     try {
-        await AuditLog.create({ userId, action, resource, resourceId, details, ipAddress });
+        await AuditLog.create({
+            userId,
+            action,
+            resourceType: resourceType || resource,
+            resourceId: String(resourceId),
+            details,
+            ipAddress
+        });
     } catch (err) {
         console.error('Audit log error:', err.message);
     }
@@ -53,11 +65,15 @@ const createAuditLog = async ({ userId, action, resource, resourceId, details, i
 // -------------------------------------------------------------------
 exports.getTestRequests = async (req, res) => {
     try {
-        const { status, testType, startDate, endDate, page = 1, limit = 20 } = req.query;
+        const { status, testType, startDate, endDate, page = 1, limit = 20, category, purpose } = req.query;
 
         const filter = {};
         if (status) filter.status = status;
+        // Legacy filter: testType is still supported.
         if (testType) filter.testType = testType;
+        // New filter: category matches any requestedItems.category
+        if (category) filter.requestedItems = { $elemMatch: { category } };
+        if (purpose) filter.requestPurpose = purpose;
         if (startDate || endDate) {
             filter.createdAt = {};
             if (startDate) filter.createdAt.$gte = new Date(startDate);
@@ -119,11 +135,16 @@ exports.getTestRequestById = async (req, res) => {
 // POST /api/lab/reports/upload — upload a lab report file
 // -------------------------------------------------------------------
 exports.uploadReport = [
-    labUpload.single('report'),
+    labUploadSingle,
     async (req, res) => {
         try {
             if (!req.file) {
                 return res.status(400).json({ success: false, message: 'No file uploaded' });
+            }
+            const strict = validateFileStrict(req.file, ['image', 'pdf']);
+            if (!strict.ok) {
+                if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+                return res.status(400).json({ success: false, message: strict.message, errorCode: strict.errorCode });
             }
 
             const { testRequestId } = req.body;
@@ -241,6 +262,22 @@ exports.updateTestStatus = async (req, res) => {
         }
 
         const previousStatus = request.status;
+
+        // Transition guards:
+        // PENDING -> UPLOADED, UPLOADED -> RELEASED, and idempotent same-status updates only.
+        if (previousStatus === 'PENDING' && status === 'RELEASED') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid transition: PENDING requests cannot be marked RELEASED directly'
+            });
+        }
+        if (previousStatus === 'RELEASED' && status !== 'RELEASED') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid transition: RELEASED requests cannot be changed'
+            });
+        }
+
         request.status = status;
 
         // If releasing, mark the release timestamp on associated reports
@@ -248,7 +285,7 @@ exports.updateTestStatus = async (req, res) => {
             request.releasedToParent = true;
             await LabReport.updateMany(
                 { testRequestId: request._id, releasedAt: null },
-                { releasedAt: new Date() }
+                { releasedAt: getCurrentTime() }
             );
         }
 
@@ -422,6 +459,14 @@ exports.releaseReport = async (req, res) => {
             });
         }
 
+        const reportCount = await LabReport.countDocuments({ testRequestId: request._id });
+        if (reportCount === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot release: no uploaded report metadata found for this request'
+            });
+        }
+
         // Update status to RELEASED
         request.status = 'RELEASED';
         request.releasedToParent = true;
@@ -430,7 +475,7 @@ exports.releaseReport = async (req, res) => {
         // Set releasedAt on all reports for this request
         await LabReport.updateMany(
             { testRequestId: request._id, releasedAt: null },
-            { releasedAt: new Date() }
+            { releasedAt: getCurrentTime() }
         );
 
         // Audit log
@@ -490,20 +535,26 @@ exports.searchParentsWithChildren = async (req, res) => {
             .select('firstName lastName email phoneNumber children')
             .limit(20);
 
-        // Transform children to include computed age
+        // Transform children to include computed age (years + months for under one year)
         const data = parents.map(p => {
             const parent = p.toObject();
             parent.children = (parent.children || []).map(child => {
-                const now = new Date();
                 const dob = new Date(child.dateOfBirth);
-                const age = Math.floor((now - dob) / (365.25 * 24 * 60 * 60 * 1000));
+                const ageYears = getAgeYearsFromDob(dob);
+                const ageMonths = getAgeMonthsFromDob(dob);
+                const ageLabel =
+                    ageYears >= 1
+                        ? `${ageYears} year${ageYears === 1 ? '' : 's'} old`
+                        : `${ageMonths} month${ageMonths === 1 ? '' : 's'} old`;
                 return {
                     _id: child._id,
                     firstName: child.firstName,
                     lastName: child.lastName,
                     dateOfBirth: child.dateOfBirth,
                     gender: child.gender,
-                    age
+                    age: ageYears,
+                    ageMonths,
+                    ageLabel,
                 };
             });
             return parent;
@@ -521,24 +572,93 @@ exports.searchParentsWithChildren = async (req, res) => {
 // -------------------------------------------------------------------
 exports.createTestRequest = async (req, res) => {
     try {
-        const { parentId, childId, childName, childAge, testType, notes } = req.body;
+        const {
+            parentId,
+            childId,
+            childName,
+            childAge,
+            testType,
+            notes,
+            caseId,
+            requestPurpose,
+            priority,
+            requestedItems,
+            requestSummary,
+        } = req.body;
 
         // Validate required fields
-        if (!parentId || !childId || !childName || childAge == null || !testType) {
+        if (!parentId || !childId || !childName || childAge == null) {
             return res.status(400).json({
                 success: false,
-                message: 'parentId, childId, childName, childAge, and testType are required'
+                message: 'parentId, childId, childName, and childAge are required'
             });
         }
 
-        // Validate testType
-        const { TEST_TYPES } = require('../models/LabTestRequest');
-        if (!TEST_TYPES.includes(testType)) {
+        const {
+            TEST_TYPES,
+            REQUEST_ITEM_CATEGORIES,
+        } = require('../models/LabTestRequest');
+
+        const hasItems = Array.isArray(requestedItems) && requestedItems.length > 0;
+        const hasLegacyType = typeof testType === 'string' && testType.trim().length > 0;
+
+        if (!hasItems && !hasLegacyType) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid test type. Must be one of: ${TEST_TYPES.join(', ')}`
+                message: 'Provide either requestedItems (preferred) or testType (legacy)',
             });
         }
+
+        // Validate legacy testType if present
+        if (hasLegacyType && !TEST_TYPES.includes(testType)) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid test type. Must be one of: ${TEST_TYPES.join(', ')}`,
+            });
+        }
+
+        // Validate requestedItems if present
+        let normalizedItems = [];
+        if (hasItems) {
+            normalizedItems = requestedItems.map((it) => ({
+                category: String(it.category || '').trim(),
+                code: String(it.code || '').trim(),
+                name: String(it.name || '').trim(),
+                whenIndicatedOnly: it.whenIndicatedOnly !== false,
+                typicalForASDWorkup: !!it.typicalForASDWorkup,
+                indications: Array.isArray(it.indications) ? it.indications.map(String).filter(Boolean).slice(0, 10) : [],
+                notes: String(it.notes || '').trim(),
+            }));
+
+            const bad = normalizedItems.find((it) => !it.name || !REQUEST_ITEM_CATEGORIES.includes(it.category));
+            if (bad) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid requestedItems: each item requires a valid category and name`,
+                });
+            }
+        }
+
+        const computedSummary = (() => {
+            if (typeof requestSummary === 'string' && requestSummary.trim()) return requestSummary.trim().slice(0, 180);
+            if (normalizedItems.length === 0) return '';
+            const names = normalizedItems.map((i) => i.name).slice(0, 3);
+            const more = normalizedItems.length > 3 ? ` +${normalizedItems.length - 3} more` : '';
+            return `${names.join(', ')}${more}`;
+        })();
+
+        const computedLegacyType = (() => {
+            if (hasLegacyType) return testType;
+            if (normalizedItems.length === 0) return 'Other';
+            // Map categories to existing TEST_TYPES for legacy list UIs
+            const cat = normalizedItems[0].category;
+            if (cat === 'Genetics') return 'Genetic';
+            if (cat === 'Imaging') return 'Imaging';
+            if (cat === 'Neurology') return 'EEG';
+            if (cat === 'Laboratory') return 'Blood';
+            if (cat === 'Developmental' || cat === 'Psychiatry') return 'Behavioral';
+            return 'Other';
+        })();
 
         // Verify parent exists and has this child
         const parent = await User.findOne({ _id: parentId, role: 'parent' });
@@ -556,6 +676,27 @@ exports.createTestRequest = async (req, res) => {
             });
         }
 
+        let resolvedCaseId = null;
+        if (caseId) {
+            if (!mongoose.Types.ObjectId.isValid(caseId)) {
+                return res.status(400).json({ success: false, message: 'Invalid caseId' });
+            }
+            const caseDoc = await ChildCase.findOne({
+                _id: caseId,
+                clinicianId: req.user._id,
+            }).lean();
+            if (!caseDoc) {
+                return res.status(404).json({ success: false, message: 'Case not found for this clinician' });
+            }
+            if (String(caseDoc.parentId) !== String(parentId) || String(caseDoc.childId) !== String(childId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'caseId does not match the selected parent and child',
+                });
+            }
+            resolvedCaseId = caseDoc._id;
+        }
+
         // Create the test request
         const testRequest = await LabTestRequest.create({
             childId,
@@ -563,9 +704,16 @@ exports.createTestRequest = async (req, res) => {
             childAge: Number(childAge),
             parentId,
             clinicianId: req.user._id,
-            testType,
+            testType: computedLegacyType,
+            requestPurpose: ['ASD_DIAGNOSTIC_WORKUP', 'CO_OCCURRING_CONDITIONS', 'OTHER'].includes(requestPurpose)
+                ? requestPurpose
+                : 'ASD_DIAGNOSTIC_WORKUP',
+            priority: ['ROUTINE', 'URGENT'].includes(priority) ? priority : 'ROUTINE',
+            requestedItems: normalizedItems,
+            requestSummary: computedSummary,
             notes: notes || '',
-            status: 'PENDING'
+            status: 'PENDING',
+            ...(resolvedCaseId ? { caseId: resolvedCaseId } : {}),
         });
 
         // Audit log
@@ -584,7 +732,7 @@ exports.createTestRequest = async (req, res) => {
                 await sendEmail({
                     to: parent.email,
                     subject: 'New Lab Test Requested – AutismCare',
-                    text: `Your clinician has requested a ${testType} lab test for your child ${childName}. The lab will process this shortly.`
+                    text: `Your clinician has requested diagnostic investigations for your child ${childName}. The lab/team will process this shortly.`
                 });
             }
         } catch (emailErr) {

@@ -30,6 +30,8 @@ const NOTIFICATION_TYPES = {
     THERAPIST_GOAL_REVIEW_DUE: 'THERAPIST_GOAL_REVIEW_DUE',
     PARENT_SESSION_MISSED: 'PARENT_SESSION_MISSED',
     PARENT_SCHEDULE_CREATED: 'PARENT_SCHEDULE_CREATED',
+    /** Case-scoped thread: parent, therapist, and assigned clinician */
+    CASE_MESSAGE: 'case_message',
 };
 
 const NotificationSchema = new Schema({

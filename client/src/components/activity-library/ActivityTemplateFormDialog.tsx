@@ -128,7 +128,7 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
       modal
     >
       <DialogContent
-        className="max-h-[90vh] overflow-y-auto border-slate-200 bg-white sm:max-w-lg"
+        className="max-h-[90vh] overflow-y-auto border bg-card sm:max-w-lg"
         /** Keep dropdowns usable; dialog still closes via overlay/Escape/Cancel */
         onPointerDownOutside={(e) => {
           const el = e.target as HTMLElement | null;
@@ -140,10 +140,10 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
         }}
       >
         <DialogHeader>
-          <DialogTitle className="text-sky-900">{editing ? 'Edit activity' : 'New activity'}</DialogTitle>
+          <DialogTitle className="text-blue-900">{editing ? 'Edit activity' : 'New activity'}</DialogTitle>
         </DialogHeader>
         {error ? (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+          <div className="rounded-md border bg-muted px-3 py-2 text-sm text-destructive">{error}</div>
         ) : null}
         <div className="grid gap-4 py-2">
           <div className="space-y-1">
@@ -151,14 +151,14 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
             <Input
               value={form.name}
               onChange={(e) => patch({ name: e.target.value })}
-              className="border-slate-200 bg-white"
+              className="border bg-card"
               autoFocus
             />
           </div>
           <div className="space-y-1">
             <Label>Domain</Label>
             <Select value={form.domain} onValueChange={(v) => patch({ domain: v as FormState['domain'] })}>
-              <SelectTrigger className="border-slate-200 bg-white">
+              <SelectTrigger className="border bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent
@@ -180,7 +180,7 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
               rows={5}
               value={form.instructions}
               onChange={(e) => patch({ instructions: e.target.value })}
-              className="border-slate-200 bg-white"
+              className="border bg-card"
               placeholder="How to run the activity — what to do, cues, and success criteria"
             />
           </div>
@@ -190,7 +190,7 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
               rows={2}
               value={form.materials}
               onChange={(e) => patch({ materials: e.target.value })}
-              className="border-slate-200 bg-white"
+              className="border bg-card"
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -200,13 +200,13 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
                 value={form.frequency}
                 onChange={(e) => patch({ frequency: e.target.value })}
                 placeholder="e.g. daily, 3x/week"
-                className="border-slate-200 bg-white"
+                className="border bg-card"
               />
             </div>
             <div className="space-y-1">
               <Label>Difficulty</Label>
               <Select value={form.difficulty} onValueChange={(v) => patch({ difficulty: v as FormState['difficulty'] })}>
-                <SelectTrigger className="border-slate-200 bg-white">
+                <SelectTrigger className="border bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent
@@ -223,29 +223,29 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
               </Select>
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border bg-background/60 px-3 py-2">
             <Label className="cursor-pointer">Parent involvement</Label>
             <Switch checked={form.parentInvolvement} onCheckedChange={(v) => patch({ parentInvolvement: v })} />
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50/40">
+          <div className="rounded-lg border bg-background/40">
             <Button
               type="button"
               variant="ghost"
-              className="h-auto w-full justify-start px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-100/80"
+              className="h-auto w-full justify-start px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-muted/80"
               onClick={() => setBoot((b) => ({ ...b, optionalOpen: !b.optionalOpen }))}
             >
               {optionalOpen ? '▼' : '▶'} Optional structured fields
-              <span className="ml-2 text-xs font-normal text-slate-500">(objective, procedure, notes)</span>
+              <span className="ml-2 text-xs font-normal text-muted-foreground">(objective, procedure, notes)</span>
             </Button>
             {optionalOpen ? (
-              <div className="grid gap-4 border-t border-slate-200 p-3 pt-3">
+              <div className="grid gap-4 border-t border p-3 pt-3">
                 <div className="space-y-1">
                   <Label>Objective</Label>
                   <Textarea
                     rows={2}
                     value={form.objective}
                     onChange={(e) => patch({ objective: e.target.value })}
-                    className="border-slate-200 bg-white"
+                    className="border bg-card"
                     placeholder="What the child should achieve"
                   />
                 </div>
@@ -255,7 +255,7 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
                     rows={3}
                     value={form.procedure}
                     onChange={(e) => patch({ procedure: e.target.value })}
-                    className="border-slate-200 bg-white"
+                    className="border bg-card"
                     placeholder="Step-by-step details"
                   />
                 </div>
@@ -265,7 +265,7 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
                     rows={2}
                     value={form.notes}
                     onChange={(e) => patch({ notes: e.target.value })}
-                    className="border-slate-200 bg-white"
+                    className="border bg-card"
                   />
                 </div>
               </div>
@@ -276,7 +276,7 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="button" className="bg-sky-600 hover:bg-sky-700" onClick={() => void handleSave()} disabled={saving}>
+          <Button type="button" className="bg-blue-600 hover:bg-blue-700" onClick={() => void handleSave()} disabled={saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Save activity
           </Button>

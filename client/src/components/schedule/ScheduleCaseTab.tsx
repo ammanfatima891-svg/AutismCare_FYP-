@@ -37,10 +37,10 @@ type SlotRow = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  scheduled: 'border-slate-200 bg-slate-100 text-slate-800',
-  completed: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  missed: 'border-red-200 bg-red-50 text-red-900',
-  rescheduled: 'border-amber-200 bg-amber-50 text-amber-950',
+  scheduled: 'border bg-muted text-foreground',
+  completed: 'border-blue-200 bg-blue-50 text-blue-900',
+  missed: 'border bg-muted text-destructive',
+  rescheduled: 'border-yellow-200 bg-yellow-50 text-yellow-900',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -116,7 +116,7 @@ function SessionSlotsTable({
 }) {
   if (slots.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-sky-200 bg-white px-4 py-8 text-center text-sm text-slate-600">
+      <p className="rounded-lg border-dashed border-blue-200 bg-card px-4 py-8 text-center text-sm text-muted-foreground">
         {emptyHint ??
           'No session slots loaded. Submit the schedule form to generate slots for the selected range.'}
       </p>
@@ -124,10 +124,10 @@ function SessionSlotsTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-100">
+    <div className="overflow-x-auto rounded-lg border">
       <table className="w-full min-w-[560px] text-left text-sm">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50 text-slate-600">
+          <tr className="border-b border bg-background text-muted-foreground">
             <th className="px-3 py-2 font-medium">Date</th>
             <th className="px-3 py-2 font-medium">Time</th>
             <th className="px-3 py-2 font-medium">Duration</th>
@@ -137,10 +137,10 @@ function SessionSlotsTable({
         </thead>
         <tbody>
           {slots.map((row) => (
-            <tr key={row._id} className="border-b border-slate-50">
-              <td className="px-3 py-2.5 text-slate-900">{formatDay(row.date)}</td>
-              <td className="px-3 py-2.5 text-slate-800">{row.time}</td>
-              <td className="px-3 py-2.5 text-slate-700">{row.duration} min</td>
+            <tr key={row._id} className="border-b border">
+              <td className="px-3 py-2.5 text-foreground">{formatDay(row.date)}</td>
+              <td className="px-3 py-2.5 text-foreground">{row.time}</td>
+              <td className="px-3 py-2.5 text-foreground">{row.duration} min</td>
               <td className="px-3 py-2.5">
                 <Badge
                   variant="outline"
@@ -155,7 +155,7 @@ function SessionSlotsTable({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 border-emerald-200 text-emerald-900 hover:bg-emerald-50"
+                    className="h-8 border-blue-200 text-blue-900 hover:bg-blue-50"
                     disabled={slotBusy === row._id || slotStatusKey(row.status) !== 'scheduled'}
                     onClick={() => void onPatch(row._id, 'completed')}
                   >
@@ -165,7 +165,7 @@ function SessionSlotsTable({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 border-red-200 text-red-900 hover:bg-red-50"
+                    className="h-8 border text-destructive hover:bg-muted"
                     disabled={slotBusy === row._id || slotStatusKey(row.status) !== 'scheduled'}
                     onClick={() => void onPatch(row._id, 'missed')}
                   >
@@ -175,7 +175,7 @@ function SessionSlotsTable({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 border-amber-200 text-amber-950 hover:bg-amber-50"
+                    className="h-8 border-yellow-200 text-yellow-900 hover:bg-yellow-50"
                     disabled={slotBusy === row._id || slotStatusKey(row.status) !== 'scheduled'}
                     onClick={() => void onPatch(row._id, 'rescheduled')}
                   >
@@ -192,10 +192,10 @@ function SessionSlotsTable({
 }
 
 const createScheduleBtnClass =
-  'border border-sky-400 bg-sky-100 font-semibold text-black shadow-sm hover:bg-sky-200 focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-60';
+  'border-blue-400 bg-blue-100 font-semibold text-black shadow-sm hover:bg-blue-200 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60';
 
 const cardShellClass =
-  'w-full rounded-xl border border-sky-100 bg-white shadow-sm';
+  'w-full rounded-xl border-blue-100 bg-card shadow-sm';
 
 export function ScheduleCaseTab({ caseId }: Props) {
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
@@ -318,8 +318,8 @@ export function ScheduleCaseTab({ caseId }: Props) {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className={`flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between ${cardShellClass}`}>
         <div>
-          <h2 className="text-lg font-semibold text-sky-950">Therapy schedule</h2>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+          <h2 className="text-lg font-semibold text-blue-950">Therapy schedule</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Set recurring therapy times for this case. Generated slots appear below and can be marked when sessions occur.
           </p>
         </div>
@@ -337,18 +337,18 @@ export function ScheduleCaseTab({ caseId }: Props) {
       {createFlowOpen && (
         <>
           <Card className={cardShellClass}>
-            <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-sky-950">Schedule form</CardTitle>
+            <CardHeader className="border-b border">
+              <CardTitle className="text-base font-semibold text-blue-950">Schedule form</CardTitle>
               <CardDescription>
                 Choose days, session time, duration, and the date range. Submit to POST /api/schedules.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
               <div className="space-y-2">
-                <Label className="text-slate-800">Days</Label>
-                <div className="flex flex-wrap gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                <Label className="text-foreground">Days</Label>
+                <div className="flex flex-wrap gap-3 rounded-lg border bg-background/50 p-3">
                   {DAY_OPTIONS.map((d) => (
-                    <label key={d.id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+                    <label key={d.id} className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                       <Checkbox checked={!!form.days[d.id]} onCheckedChange={() => toggleDay(d.id)} />
                       {d.label}
                     </label>
@@ -357,21 +357,21 @@ export function ScheduleCaseTab({ caseId }: Props) {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-slate-800">Time</Label>
+                  <Label className="text-foreground">Time</Label>
                   <Input
                     type="time"
-                    className="border-slate-200"
+                    className="border"
                     value={form.time}
                     onChange={(e) => setForm((p) => ({ ...p, time: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-slate-800">Duration (minutes)</Label>
+                  <Label className="text-foreground">Duration (minutes)</Label>
                   <Input
                     type="number"
                     min={1}
                     step={1}
-                    className="border-slate-200"
+                    className="border"
                     value={form.duration}
                     onChange={(e) => setForm((p) => ({ ...p, duration: e.target.value }))}
                   />
@@ -379,31 +379,31 @@ export function ScheduleCaseTab({ caseId }: Props) {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-slate-800">Start date</Label>
+                  <Label className="text-foreground">Start date</Label>
                   <Input
                     type="date"
-                    className="border-slate-200"
+                    className="border"
                     value={form.startDate}
                     onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-slate-800">End date</Label>
+                  <Label className="text-foreground">End date</Label>
                   <Input
                     type="date"
-                    className="border-slate-200"
+                    className="border"
                     value={form.endDate}
                     onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex flex-col gap-3 border-t border pt-6 sm:flex-row sm:items-center sm:justify-end">
                 <Button type="button" variant="outline" onClick={() => setCreateFlowOpen(false)} disabled={saving}>
                   Cancel
                 </Button>
                 <Button
                   type="button"
-                  className="min-w-[160px] bg-sky-700 font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+                  className="min-w-[160px] bg-blue-700 font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
                   disabled={saving}
                   onClick={() => void handleSubmitSchedule()}
                 >
@@ -421,14 +421,14 @@ export function ScheduleCaseTab({ caseId }: Props) {
           </Card>
 
           <Card className={cardShellClass}>
-            <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-sky-950">Schedule view</CardTitle>
+            <CardHeader className="border-b border">
+              <CardTitle className="text-base font-semibold text-blue-950">Schedule view</CardTitle>
               <CardDescription>Live preview of this schedule before you submit.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="rounded-lg border border-sky-100 bg-sky-50/40 px-4 py-4">
-                <p className="text-lg font-semibold text-sky-950">{previewHeadline}</p>
-                <p className="mt-1 text-sm text-slate-700">
+              <div className="rounded-lg border-blue-100 bg-blue-50/40 px-4 py-4">
+                <p className="text-lg font-semibold text-blue-950">{previewHeadline}</p>
+                <p className="mt-1 text-sm text-foreground">
                   Duration {form.duration || '—'} min · {dateRangeLabel(form.startDate, form.endDate)}
                 </p>
               </div>
@@ -436,8 +436,8 @@ export function ScheduleCaseTab({ caseId }: Props) {
           </Card>
 
           <Card className={cardShellClass}>
-            <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-sky-950">Session slots</CardTitle>
+            <CardHeader className="border-b border">
+              <CardTitle className="text-base font-semibold text-blue-950">Session slots</CardTitle>
               <CardDescription>
                 {slots.length === 0
                   ? 'No slots yet. After you submit the form above, generated slots will appear here and below.'
@@ -458,7 +458,7 @@ export function ScheduleCaseTab({ caseId }: Props) {
             >
               {saving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-sky-800" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-800" />
                   <span className="text-black">Submitting…</span>
                 </>
               ) : (
@@ -472,19 +472,19 @@ export function ScheduleCaseTab({ caseId }: Props) {
       {loading && !createFlowOpen ? (
         <Card className={cardShellClass}>
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16">
-            <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
-            <p className="text-sm text-slate-600">Loading schedule data…</p>
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+            <p className="text-sm text-muted-foreground">Loading schedule data…</p>
           </CardContent>
         </Card>
       ) : hasNoData && !createFlowOpen ? (
-        <Card className={`${cardShellClass} border-dashed border-sky-200 bg-sky-50/40`}>
+        <Card className={`${cardShellClass} border-dashed border-blue-200 bg-blue-50/40`}>
           <CardContent className="flex flex-col items-center justify-center gap-4 py-14 text-center">
-            <div className="rounded-full bg-sky-100 p-4">
-              <CalendarPlus className="h-10 w-10 text-sky-700" />
+            <div className="rounded-full bg-blue-100 p-4">
+              <CalendarPlus className="h-10 w-10 text-blue-700" />
             </div>
             <div className="max-w-md space-y-2">
-              <p className="text-base font-medium text-sky-950">No therapy schedule yet</p>
-              <p className="text-sm text-slate-600">
+              <p className="text-base font-medium text-blue-950">No therapy schedule yet</p>
+              <p className="text-sm text-muted-foreground">
                 Create a recurring schedule to generate session slots for this case.
               </p>
             </div>
@@ -496,24 +496,24 @@ export function ScheduleCaseTab({ caseId }: Props) {
       ) : !createFlowOpen ? (
         <>
           <Card className={cardShellClass}>
-            <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-sky-950">Schedule view</CardTitle>
+            <CardHeader className="border-b border">
+              <CardTitle className="text-base font-semibold text-blue-950">Schedule view</CardTitle>
               <CardDescription>Active recurrence rules (days, time, duration, date range).</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               {schedules.length === 0 ? (
-                <p className="text-sm text-slate-500">No saved rules yet.</p>
+                <p className="text-sm text-muted-foreground">No saved rules yet.</p>
               ) : (
                 <ul className="space-y-3">
                   {schedules.map((s) => (
                     <li
                       key={String(s._id)}
-                      className="rounded-lg border border-sky-100 bg-sky-50/30 px-4 py-3 text-sm text-slate-800"
+                      className="rounded-lg border-blue-100 bg-blue-50/30 px-4 py-3 text-sm text-foreground"
                     >
-                      <p className="text-lg font-semibold text-sky-950">
+                      <p className="text-lg font-semibold text-blue-950">
                         {(s.days || []).join(', ')} — {formatTimeDisplay(String(s.time || ''))}
                       </p>
-                      <p className="mt-1 text-slate-700">
+                      <p className="mt-1 text-foreground">
                         {s.duration != null ? `${s.duration} min` : '—'} ·{' '}
                         {dateRangeLabel(String(s.startDate || '').slice(0, 10), String(s.endDate || '').slice(0, 10))}
                       </p>
@@ -525,8 +525,8 @@ export function ScheduleCaseTab({ caseId }: Props) {
           </Card>
 
           <Card className={cardShellClass}>
-            <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-sky-950">Session slots</CardTitle>
+            <CardHeader className="border-b border">
+              <CardTitle className="text-base font-semibold text-blue-950">Session slots</CardTitle>
               <CardDescription>Dates and times from your schedules.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">

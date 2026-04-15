@@ -32,10 +32,10 @@ type Props = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: 'border-slate-200 bg-slate-100 text-slate-800',
-  submitted: 'border-sky-200 bg-sky-50 text-sky-900',
-  reviewed: 'border-amber-200 bg-amber-50 text-amber-950',
-  completed: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+  pending: 'border bg-muted text-foreground',
+  submitted: 'border-border bg-secondary/50 text-primary',
+  reviewed: 'border-border bg-accent/10 text-accent-foreground',
+  completed: 'border-border bg-secondary text-primary',
 };
 
 function resolveActivity(a: AssignmentRow): ActivityRef | null {
@@ -112,10 +112,10 @@ export function AssignedActivityCaseTab({ caseId, data, onRefresh }: Props) {
 
   return (
     <div className="space-y-6">
-      <Card className="border border-slate-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Assigned Activity</CardTitle>
-          <CardDescription className="text-slate-600">
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b border">
+          <CardTitle className="text-base font-semibold text-foreground">Assigned Activity</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Activities you have assigned to this child from your library. To add or manage assignments, use the{' '}
             <strong>Home assignments</strong> tab.
           </CardDescription>
@@ -123,19 +123,19 @@ export function AssignedActivityCaseTab({ caseId, data, onRefresh }: Props) {
         <CardContent className="pt-6">
           {loading && rows.length === 0 ? (
             <div className="flex justify-center py-16">
-              <Loader2 className="h-9 w-9 animate-spin text-sky-600" />
+              <Loader2 className="h-9 w-9 animate-spin text-primary" />
             </div>
           ) : rows.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center">
-              <p className="text-sm text-slate-700">No activities assigned to this child yet.</p>
-              <p className="mt-2 text-xs text-slate-500">
+            <div className="rounded-xl border-dashed border bg-muted/80 px-6 py-12 text-center">
+              <p className="text-sm text-foreground">No activities assigned to this child yet.</p>
+              <p className="mt-2 text-xs text-muted-foreground">
                 Assign from the <strong>Home assignments</strong> tab, or from the therapist dashboard home assignments
                 page.
               </p>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-4 border-slate-200"
+                className="mt-4 border"
                 onClick={() => {
                   void (async () => {
                     await onRefresh();
@@ -150,7 +150,7 @@ export function AssignedActivityCaseTab({ caseId, data, onRefresh }: Props) {
             <ul className="space-y-4">
               {loading ? (
                 <li className="flex justify-end py-1">
-                  <Loader2 className="h-5 w-5 animate-spin text-sky-600" aria-hidden />
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
                 </li>
               ) : null}
               {rows.map((a) => {
@@ -163,17 +163,17 @@ export function AssignedActivityCaseTab({ caseId, data, onRefresh }: Props) {
                 return (
                   <li
                     key={String(a._id)}
-                    className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm ring-1 ring-slate-100/80"
+                    className="rounded-xl border bg-card p-5 shadow-sm ring-1 shadow-sm"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-1 gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-sky-100">
-                          <BookOpen className="h-5 w-5 text-sky-700" />
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                          <BookOpen className="h-5 w-5 text-primary" />
                         </div>
                         <div className="min-w-0 space-y-1">
-                          <p className="font-semibold leading-snug text-slate-900">{name}</p>
+                          <p className="font-semibold leading-snug text-foreground">{name}</p>
                           {domain ? (
-                            <p className="text-xs font-medium uppercase tracking-wide text-sky-800/90">{domain}</p>
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{domain}</p>
                           ) : null}
                         </div>
                       </div>
@@ -182,9 +182,9 @@ export function AssignedActivityCaseTab({ caseId, data, onRefresh }: Props) {
                       </Badge>
                     </div>
                     {instructions ? (
-                      <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{instructions}</p>
+                      <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{instructions}</p>
                     ) : (
-                      <p className="mt-4 text-sm italic text-slate-500">No instructions provided.</p>
+                      <p className="mt-4 text-sm italic text-muted-foreground">No instructions provided.</p>
                     )}
                   </li>
                 );

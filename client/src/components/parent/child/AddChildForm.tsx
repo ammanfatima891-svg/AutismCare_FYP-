@@ -80,9 +80,9 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
 
   return (
     <div className="max-w-3xl">
-      <Card className="border-2 border-pink-200">
-        <CardHeader className="bg-gradient-to-r from-pink-50 to-purple-50">
-          <CardTitle className="flex items-center gap-2 text-pink-600">
+      <Card className="border-2">
+        <CardHeader className="bg-gradient-to-r from-yellow-50 to-blue-50">
+          <CardTitle className="flex items-center gap-2 text-primary">
             <Baby className="w-6 h-6" />
             Add New Child Profile
           </CardTitle>
@@ -94,7 +94,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Personal Information */}
             <div className="space-y-4">
-              <h3 className="text-pink-600 pb-2 border-b border-pink-200">Personal Information</h3>
+              <h3 className="text-primary pb-2 border-b border">Personal Information</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -106,7 +106,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
                     className="mt-1"
                   />
                   {errors.firstName && (
-                    <p className="text-red-600 text-sm mt-1">First name is required</p>
+                    <p className="text-destructive text-sm mt-1">First name is required</p>
                   )}
                 </div>
 
@@ -119,7 +119,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
                     className="mt-1"
                   />
                   {errors.lastName && (
-                    <p className="text-red-600 text-sm mt-1">Last name is required</p>
+                    <p className="text-destructive text-sm mt-1">Last name is required</p>
                   )}
                 </div>
               </div>
@@ -152,7 +152,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
                     {...register('pretermWeeks', { valueAsNumber: true })}
                     className="mt-1"
                   />
-                  <p className="text-sm text-gray-500 mt-1">Weeks born before due date (for ASQ-3 calculations)</p>
+                  <p className="text-sm text-muted-foreground mt-1">Weeks born before due date (for ASQ-3 calculations)</p>
                 </div>
 
                 <div>
@@ -177,7 +177,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
 
             {/* Medical Information */}
             <div className="space-y-4">
-              <h3 className="text-pink-600 pb-2 border-b border-pink-200">Medical Information</h3>
+              <h3 className="text-primary pb-2 border-b border">Medical Information</h3>
 
               <div>
                 <Label htmlFor="medicalHistory">Medical History</Label>
@@ -214,7 +214,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
 
             {/* Emergency Contact */}
             <div className="space-y-4">
-              <h3 className="text-pink-600 pb-2 border-b border-pink-200">Emergency Contact</h3>
+              <h3 className="text-primary pb-2 border-b border">Emergency Contact</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -226,7 +226,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
                     className="mt-1"
                   />
                   {errors.emergencyContact && (
-                    <p className="text-red-600 text-sm mt-1">Emergency contact is required</p>
+                    <p className="text-destructive text-sm mt-1">Emergency contact is required</p>
                   )}
                 </div>
 
@@ -240,7 +240,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
                     className="mt-1"
                   />
                   {errors.emergencyPhone && (
-                    <p className="text-red-600 text-sm mt-1">Emergency phone is required</p>
+                    <p className="text-destructive text-sm mt-1">Emergency phone is required</p>
                   )}
                 </div>
               </div>
@@ -250,7 +250,7 @@ export function AddChildForm({ onSuccess }: AddChildFormProps) {
             <div className="flex gap-3 pt-4">
               <Button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+                className="flex-1 rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (

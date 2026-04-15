@@ -1,13 +1,15 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const Questionnaire = require("../models/Questionnaire");
 const Submission = require("../models/Submission");
-const { User } = require("../models/User");
+const { User, ROLES } = require("../models/User");
 const { scoreMCHATFromDB } = require("../utils/MchatScoring");
 const { scoreASQ } = require("../utils/ASQscoring");
-const { getASQCutoff } = require("../utils/asqCutoffs");
+const ASQ_CUTOFFS = require("../utils/asqCutoffs");
 const { getASQInterval } = require("../utils/ASQinterval");
 const sendEmailWithAttachments = require("../utils/email").sendEmailWithAttachments;
+const { appendScreeningReportBody } = require("../utils/screeningReportPdf");
 
-// Build PDF buffer for a submission (for email or download)
+// Build PDF buffer for a submission (for email or download) — ASQ-3 body matches domain-based parent PDF
 function buildSubmissionPdfBuffer(submission, child) {
   return new Promise((resolve, reject) => {
     const PDFDocument = require("pdfkit");
@@ -17,7 +19,6 @@ function buildSubmissionPdfBuffer(submission, child) {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const riskLevel = submission.result === "Pass" ? "low" : submission.result === "Monitor" ? "medium" : "high";
     const firstName = (child && child.firstName) || "Child";
     const lastName = (child && child.lastName) || "";
     const dateOfBirth = child && child.dateOfBirth ? new Date(child.dateOfBirth).toLocaleDateString() : "—";
@@ -37,39 +38,10 @@ function buildSubmissionPdfBuffer(submission, child) {
     doc.text(`Screening date: ${new Date(submission.createdAt).toLocaleDateString()}`);
     doc.moveDown(1);
 
-    doc.fontSize(14).text("Results");
-    doc.moveDown(0.5);
-    doc.fontSize(12).text(`Result: ${submission.result}`);
-    doc.text(`Risk level: ${riskLevel}`);
-    if (submission.resultDescription) {
-      doc.moveDown(0.5);
-      doc.text(submission.resultDescription, { width: 500, align: "left" });
-    }
+    appendScreeningReportBody(doc, submission);
+
     doc.moveDown(1);
-
-    if (submission.scores && submission.scores.totalScore !== undefined) {
-      doc.fontSize(14).text("Scores");
-      doc.moveDown(0.5);
-      doc.fontSize(12).text(`Total score: ${submission.scores.totalScore}${submission.questionnaireType === "MCHAT-R" ? "/20" : ""}`);
-      if (submission.scores.elevatedItems && submission.scores.elevatedItems.length > 0) {
-        doc.text("Elevated likelihood items: " + submission.scores.elevatedItems.join(", "));
-      }
-      if (submission.scores.domainScores) {
-        doc.moveDown(0.5);
-        Object.entries(submission.scores.domainScores).forEach(([domain, score]) => {
-          doc.text(`  ${domain}: ${score}`);
-        });
-      }
-      if (submission.scores.domainStatuses) {
-        doc.text("Domain statuses:");
-        Object.entries(submission.scores.domainStatuses).forEach(([domain, status]) => {
-          doc.text(`  ${domain}: ${status}`);
-        });
-      }
-      doc.moveDown(1);
-    }
-
-    doc.fontSize(9).fillColor("gray").text("AutismCare · Screening Report · Confidential · " + new Date().toLocaleDateString(), { align: "center" });
+    doc.fontSize(9).fillColor("gray").text("AutismCare · Screening Report · Confidential · " + getCurrentTime().toLocaleDateString(), { align: "center" });
     doc.end();
   });
 }
@@ -79,6 +51,39 @@ exports.calculateScreening = async (req, res) => {
   try {
     const { childId, questionnaireType, responses, dob, weeksPreterm, intervalMonths } = req.body;
     const userId = req.user.id;
+
+    if (!childId) {
+      return res.status(400).json({ success: false, message: 'childId is required' });
+    }
+
+    if (questionnaireType !== 'MCHAT-R' && questionnaireType !== 'ASQ-3') {
+      return res.status(400).json({ success: false, message: 'questionnaireType must be MCHAT-R or ASQ-3' });
+    }
+
+    if (!Array.isArray(responses) || responses.length === 0) {
+      return res.status(400).json({ success: false, message: 'responses must be a non-empty array' });
+    }
+
+    const parent = await User.findById(userId);
+    if (!parent) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const child = parent.children && parent.children.find((c) => c._id && c._id.toString() === childId);
+    if (!child) {
+      return res.status(404).json({ success: false, message: 'Child not found' });
+    }
+
+    if (questionnaireType === 'ASQ-3') {
+      const interval = Number(intervalMonths);
+      if (!Number.isFinite(interval) || interval <= 0) {
+        return res.status(400).json({ success: false, message: 'intervalMonths is required for ASQ-3' });
+      }
+      if (!ASQ_CUTOFFS[interval]) {
+        return res.status(400).json({ success: false, message: `Unsupported ASQ-3 interval: ${interval}` });
+      }
+    }
+
     console.log('calculateScreening called with:', { childId, questionnaireType, responses: responses.length, dob, weeksPreterm, intervalMonths });
 
     let scores = {};
@@ -99,6 +104,9 @@ exports.calculateScreening = async (req, res) => {
       riskLevel = scores.result === "Pass" ? "low" : scores.result === "Monitor" ? "medium" : "high";
     } else if (questionnaireType === "ASQ-3") {
       const questionnaire = await Questionnaire.findOne({ name: "ASQ-3" });
+      if (!questionnaire) {
+        return res.status(404).json({ success: false, message: "ASQ-3 questionnaire not found" });
+      }
       scores = scoreASQ(questionnaire.questions, responses, intervalMonths);
       result = scores.resultLabel;
       resultDescription = scores.resultDescription;
@@ -125,11 +133,9 @@ exports.calculateScreening = async (req, res) => {
     let reportEmailed = false;
     let reportEmailError = null;
     try {
-      const parent = await User.findById(userId);
       if (!parent || !parent.email) {
         reportEmailError = "No email address on file for this account.";
       } else {
-        const child = parent.children && parent.children.find((c) => c._id && c._id.toString() === childId);
         const pdfBuffer = await buildSubmissionPdfBuffer(submission, child);
         const first = (child && child.firstName) || "";
         const last = (child && child.lastName) || "";
@@ -181,7 +187,7 @@ exports.getQuestionnaireByType = async (req, res) => {
     let query = { name: type };
 
     if (dob && type === "ASQ-3") {
-      const ageDays = Math.floor((Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24));
+      const ageDays = Math.floor((getCurrentTimeMs() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24));
       query.minAgeDays = { $lte: ageDays };
       query.maxAgeDays = { $gte: ageDays };
     }
@@ -208,7 +214,7 @@ exports.getQuestionnaireByType = async (req, res) => {
   }
 };
 
-// Get available questionnaires
+// Get available questionnaires (optionally for one child via ?childId=)
 exports.getAvailableQuestionnaires = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -221,18 +227,46 @@ exports.getAvailableQuestionnaires = async (req, res) => {
       });
     }
 
+    const rawChildId = req.query.childId;
+    let childrenToScan = user.children || [];
+    if (rawChildId) {
+      const match = childrenToScan.filter(
+        (c) => c && c._id && String(c._id) === String(rawChildId)
+      );
+      if (match.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Child not found",
+        });
+      }
+      childrenToScan = match;
+    }
+
     const availableQuestionnaires = [];
 
-    // For each child, check available questionnaires based on age
-    for (const child of user.children) {
-      const ageDays = Math.floor((Date.now() - new Date(child.dob).getTime()) / (1000 * 60 * 60 * 24));
+    const pushQuestionnaire = (entry) => {
+      const dup = availableQuestionnaires.some(
+        (q) =>
+          String(q.childId) === String(entry.childId) &&
+          q.type === entry.type &&
+          (entry.type !== "ASQ-3" || q.intervalMonths === entry.intervalMonths)
+      );
+      if (!dup) availableQuestionnaires.push(entry);
+    };
+
+    for (const child of childrenToScan) {
+      const ageDays = Math.floor(
+        (getCurrentTimeMs() - new Date(child.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24)
+      );
 
       // MCHAT-R available for 16-30 months
       if (ageDays >= 480 && ageDays <= 900) {
-        availableQuestionnaires.push({
+        pushQuestionnaire({
           type: "MCHAT-R",
+          name: "M-CHAT-R™",
+          description: "Modified Checklist for Autism in Toddlers",
           childId: child._id,
-          childName: child.name,
+          childName: `${child.firstName || ""} ${child.lastName || ""}`.trim() || child.name,
         });
       }
 
@@ -242,11 +276,13 @@ exports.getAvailableQuestionnaires = async (req, res) => {
         const minDays = interval * 30 - 15;
         const maxDays = interval * 30 + 15;
         if (ageDays >= minDays && ageDays <= maxDays) {
-          availableQuestionnaires.push({
+          pushQuestionnaire({
             type: "ASQ-3",
             intervalMonths: interval,
+            name: "ASQ-3™",
+            description: "Ages & Stages Questionnaire",
             childId: child._id,
-            childName: child.name,
+            childName: `${child.firstName || ""} ${child.lastName || ""}`.trim() || child.name,
           });
         }
       }
@@ -297,7 +333,7 @@ exports.getScreeningHistory = async (req, res) => {
   }
 };
 
-// Get submission by ID
+// Get submission by ID (parents: own children only; clinicians/admins: any)
 exports.getSubmissionById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -309,6 +345,25 @@ exports.getSubmissionById = async (req, res) => {
         success: false,
         message: "Submission not found",
       });
+    }
+
+    const role = String(req.user?.role ?? req.jwtRole ?? "").trim().toLowerCase();
+    if (role === ROLES.PARENT) {
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+      const childIds = (user.children || []).map((c) => String(c._id));
+      const sid = submission.childId ? String(submission.childId) : "";
+      if (!sid || !childIds.includes(sid)) {
+        return res.status(403).json({
+          success: false,
+          message: "Permission denied",
+        });
+      }
     }
 
     res.status(200).json({
@@ -512,7 +567,7 @@ exports.getScreeningStats = async (req, res) => {
     const totalScreenings = await Submission.countDocuments({ childId: { $in: childIds } });
 
     // Get screenings completed this month
-    const now = new Date();
+    const now = getCurrentTime();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisMonth = await Submission.countDocuments({
       childId: { $in: childIds },
@@ -568,10 +623,7 @@ exports.downloadSubmissionReport = async (req, res) => {
       });
     }
 
-    // Derive risk level from result (not stored on Submission)
-    const riskLevel = submission.result === 'Pass' ? 'low' : submission.result === 'Monitor' ? 'medium' : 'high';
-
-    // Generate PDF report with branding
+    // Generate PDF report with branding (same body as email attachment)
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 50 });
 
@@ -595,39 +647,10 @@ exports.downloadSubmissionReport = async (req, res) => {
     doc.text(`Screening date: ${new Date(submission.createdAt).toLocaleDateString()}`);
     doc.moveDown(1);
 
-    doc.fontSize(14).text('Results');
-    doc.moveDown(0.5);
-    doc.fontSize(12).text(`Result: ${submission.result}`);
-    doc.text(`Risk level: ${riskLevel}`);
-    if (submission.resultDescription) {
-      doc.moveDown(0.5);
-      doc.text(submission.resultDescription, { width: 500, align: 'left' });
-    }
+    appendScreeningReportBody(doc, submission);
+
     doc.moveDown(1);
-
-    if (submission.scores && submission.scores.totalScore !== undefined) {
-      doc.fontSize(14).text('Scores');
-      doc.moveDown(0.5);
-      doc.fontSize(12).text(`Total score: ${submission.scores.totalScore}${submission.questionnaireType === 'MCHAT-R' ? '/20' : ''}`);
-      if (submission.scores.elevatedItems && submission.scores.elevatedItems.length > 0) {
-        doc.text('Elevated likelihood items: ' + submission.scores.elevatedItems.join(', '));
-      }
-      if (submission.scores.domainScores) {
-        doc.moveDown(0.5);
-        Object.entries(submission.scores.domainScores).forEach(([domain, score]) => {
-          doc.text(`  ${domain}: ${score}`);
-        });
-      }
-      if (submission.scores.domainStatuses) {
-        doc.text('Domain statuses:');
-        Object.entries(submission.scores.domainStatuses).forEach(([domain, status]) => {
-          doc.text(`  ${domain}: ${status}`);
-        });
-      }
-      doc.moveDown(1);
-    }
-
-    doc.fontSize(9).fillColor('gray').text('AutismCare · Screening Report · Confidential · ' + new Date().toLocaleDateString(), { align: 'center' });
+    doc.fontSize(9).fillColor('gray').text('AutismCare · Screening Report · Confidential · ' + getCurrentTime().toLocaleDateString(), { align: 'center' });
     doc.end();
 
   } catch (error) {

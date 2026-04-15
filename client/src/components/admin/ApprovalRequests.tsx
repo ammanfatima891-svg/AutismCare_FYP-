@@ -26,8 +26,8 @@ interface PendingUser {
 }
 
 const roleConfig = {
-  clinician: { icon: Stethoscope, label: "Clinician", color: "bg-blue-100 text-blue-800" },
-  therapist: { icon: Users, label: "Therapist", color: "bg-green-100 text-green-800" }
+  clinician: { icon: Stethoscope, label: "Clinician", color: "bg-secondary/70 text-primary" },
+  therapist: { icon: Users, label: "Therapist", color: "bg-secondary text-primary" }
 };
 
 export default function ApprovalRequests() {
@@ -74,7 +74,7 @@ export default function ApprovalRequests() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -82,8 +82,8 @@ export default function ApprovalRequests() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Clock className="h-6 w-6 text-blue-600" />
-        <h2 className="text-2xl font-bold text-gray-900">Pending Approvals</h2>
+        <Clock className="h-6 w-6 text-primary" />
+        <h2 className="text-2xl font-bold text-foreground">Pending Approvals</h2>
         <Badge variant="secondary" className="ml-auto">
           {pendingUsers.length} pending
         </Badge>
@@ -92,9 +92,9 @@ export default function ApprovalRequests() {
       {pendingUsers.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">All caught up!</h3>
-            <p className="text-gray-500 text-center">
+            <CheckCircle className="h-12 w-12 text-primary mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">All caught up!</h3>
+            <p className="text-muted-foreground text-center">
               No pending professional approvals at this time.
             </p>
           </CardContent>
@@ -110,15 +110,15 @@ export default function ApprovalRequests() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Icon className="h-5 w-5 text-gray-600" />
+                      <Icon className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <CardTitle className="text-lg">
                           {user.firstName} {user.lastName}
                         </CardTitle>
-                        <p className="text-sm text-gray-600">{user.email}</p>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
-                    <Badge className={config?.color || "bg-gray-100 text-gray-800"}>
+                    <Badge className={config?.color || "bg-muted text-foreground"}>
                       {config?.label || user.role}
                     </Badge>
                   </div>
@@ -128,28 +128,28 @@ export default function ApprovalRequests() {
                   <div className="space-y-3">
                     {user.specialization && (
                       <div>
-                        <span className="text-sm font-medium text-gray-700">Specialization:</span>
-                        <span className="text-sm text-gray-600 ml-2">{user.specialization}</span>
+                        <span className="text-sm font-medium text-foreground">Specialization:</span>
+                        <span className="text-sm text-muted-foreground ml-2">{user.specialization}</span>
                       </div>
                     )}
 
                     {user.licenseNumber && (
                       <div>
-                        <span className="text-sm font-medium text-gray-700">License Number:</span>
-                        <span className="text-sm text-gray-600 ml-2">{user.licenseNumber}</span>
+                        <span className="text-sm font-medium text-foreground">License Number:</span>
+                        <span className="text-sm text-muted-foreground ml-2">{user.licenseNumber}</span>
                       </div>
                     )}
 
                     {user.documents && user.documents.length > 0 && (
                       <div>
-                        <span className="text-sm font-medium text-gray-700">Documents:</span>
+                        <span className="text-sm font-medium text-foreground">Documents:</span>
                         <div className="mt-2 space-y-2">
                           {user.documents.map((doc, index) => (
-                            <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
-                              <User className="h-4 w-4 text-gray-500" />
+                            <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                              <User className="h-4 w-4 text-muted-foreground" />
                               <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-900">{doc.name}</p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-sm font-medium text-foreground">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">
                                   {doc.type} • Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}
                                 </p>
                               </div>
@@ -168,8 +168,8 @@ export default function ApprovalRequests() {
                     )}
 
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Applied:</span>
-                      <span className="text-sm text-gray-600 ml-2">
+                      <span className="text-sm font-medium text-foreground">Applied:</span>
+                      <span className="text-sm text-muted-foreground ml-2">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </span>
                     </div>
@@ -178,7 +178,7 @@ export default function ApprovalRequests() {
                       <Button
                         onClick={() => handleApproval(user._id, "active")}
                         disabled={processing === user._id}
-                        className="bg-green-600 hover:bg-green-700"
+                        variant="default"
                         size="sm"
                       >
                         {processing === user._id ? (

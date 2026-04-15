@@ -31,7 +31,7 @@ export function ChildProfile() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-purple-600">Child Profile</h2>
+        <h2 className="text-2xl font-bold text-primary">Child Profile</h2>
         
       </div>
 

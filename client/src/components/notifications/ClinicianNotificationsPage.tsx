@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, Loader2, RefreshCw, CheckCheck, AlertCircle, Trash2 } from 'lucide-react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Loader2, RefreshCw, CheckCheck, AlertCircle, Trash2, MessageSquare } from 'lucide-react';
 import { notificationAPI } from '../../services/api';
+import { AuthContext } from '../../context/AuthContext';
+import { getCaseMessageConversationId, navigateToCaseMessageInbox } from '../../utils/caseMessageNotificationNav';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -20,6 +23,8 @@ function formatTime(dateString: string) {
 }
 
 export function ClinicianNotificationsPage() {
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +92,7 @@ export function ClinicianNotificationsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-blue-700 mb-1">Notifications</h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             {unreadCount > 0
               ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
               : 'All caught up'}
@@ -116,14 +121,14 @@ export function ClinicianNotificationsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
+        <div className="rounded-lg border bg-muted px-4 py-3 text-sm text-destructive flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
 
-      <Card className="border-slate-200 shadow-sm bg-white">
-        <CardHeader className="border-b border-slate-100 bg-blue-50/40">
+      <Card className="border shadow-sm bg-card">
+        <CardHeader className="border-b border bg-blue-50/40">
           <CardTitle className="text-base text-blue-900 flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Event Alerts
@@ -136,7 +141,7 @@ export function ClinicianNotificationsPage() {
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
           ) : list.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="rounded-lg border-dashed border bg-background p-4 text-sm text-muted-foreground">
               No notifications.
             </div>
           ) : (
@@ -144,24 +149,40 @@ export function ClinicianNotificationsPage() {
               {list.map((n) => (
                 <div
                   key={n._id}
-                  className={`rounded-lg border p-4 ${n.isRead ? 'bg-white border-slate-200' : 'bg-blue-50 border-blue-200'}`}
+                  className={`rounded-lg border p-4 ${n.isRead ? 'bg-card border' : 'bg-blue-50 border-blue-200'}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{n.title}</p>
+                        <p className="text-sm font-semibold text-foreground">{n.title}</p>
                         {!n.isRead && <Badge className="bg-blue-100 text-blue-800">Unread</Badge>}
                       </div>
-                      <p className="text-sm text-slate-700 mt-1">{n.message}</p>
-                      <p className="text-xs text-slate-500 mt-2">{formatTime(n.createdAt)}</p>
+                      <p className="text-sm text-foreground mt-1">{n.message}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{formatTime(n.createdAt)}</p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                      {getCaseMessageConversationId(n) ? (
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={() => {
+                            const cid = getCaseMessageConversationId(n);
+                            if (cid) {
+                              void markRead(n._id);
+                              navigateToCaseMessageInbox(navigate, user?.role, cid);
+                            }
+                          }}
+                        >
+                          <MessageSquare className="mr-1 h-4 w-4" />
+                          Open thread
+                        </Button>
+                      ) : null}
                       {!n.isRead && (
                         <Button size="sm" variant="outline" onClick={() => markRead(n._id)}>
                           Mark read
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" className="text-red-600" onClick={() => removeOne(n._id)}>
+                      <Button size="sm" variant="outline" className="text-destructive" onClick={() => removeOne(n._id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

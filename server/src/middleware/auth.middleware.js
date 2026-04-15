@@ -52,8 +52,13 @@ exports.restrictTo = (...roles) => {
   return (req, res, next) => {
     const userRole = String(req.user?.role ?? req.jwtRole ?? '').trim().toLowerCase();
     if (!allowed.includes(userRole)) {
-      return res.status(403).json({ message: 'Permission denied' });
+      return res.status(403).json({ success: false, message: 'Permission denied', errorCode: 'RBAC_FORBIDDEN' });
     }
     next();
   };
 };
+
+// Canonical middleware names used by the system rules.
+const { requireRole, requireOwnership } = require('./rbac.middleware');
+exports.requireRole = requireRole;
+exports.requireOwnership = requireOwnership;

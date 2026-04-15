@@ -1,8 +1,6 @@
-import { Baby, Calendar, ClipboardCheck, Eye, TrendingUp, Edit, User } from 'lucide-react';
+import { Baby, Calendar, ClipboardCheck, Eye, Edit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
-import { Badge } from '../../ui/badge';
-import { Progress } from '../../ui/progress';
 import { useEffect, useState } from 'react';
 import { childAPI } from '../../../api';
 import { getAgeDisplayString } from '../../../utils/ageUtils';
@@ -10,11 +8,12 @@ import { motion } from 'framer-motion';
 
 interface ChildListProps {
   onViewChild: (childId: number) => void;
+  onEditChild: (childId: number) => void;
+  /** Opens screening questionnaires (parent dashboard section). */
+  onQuickScreen?: () => void;
 }
 
-
-
-export function ChildList({ onViewChild }: ChildListProps) {
+export function ChildList({ onViewChild, onEditChild, onQuickScreen }: ChildListProps) {
   const [children, setChildren] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,24 +49,24 @@ export function ChildList({ onViewChild }: ChildListProps) {
           whileTap={{ scale: 0.98 }}
         >
           <Card
-            className="hover:shadow-2xl transition-all duration-300 cursor-pointer border-2 hover:border-pink-400 bg-gradient-to-br from-white to-pink-50/30 group"
+            className="group cursor-pointer border-2 border-border bg-card transition-all duration-300 hover:border-primary/40 hover:shadow-xl"
             onClick={() => onViewChild(child.id)}
           >
-            <CardHeader className="bg-gradient-to-r from-pink-50 to-purple-50 group-hover:from-pink-100 group-hover:to-purple-100 transition-all duration-300">
+            <CardHeader className="ds-card-header-strip border-0 transition-all duration-300">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
                   <motion.div
-                    className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-purple-400 flex items-center justify-center text-white text-2xl font-bold shadow-lg"
+                    className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground shadow-lg"
                     whileHover={{ scale: 1.1, rotate: 5 }}
                     transition={{ type: "spring", stiffness: 400, damping: 10 }}
                   >
                     {child.firstName[0]}
                   </motion.div>
                   <div>
-                    <CardTitle className="text-pink-600 group-hover:text-pink-700 transition-colors">
+                    <CardTitle className="text-primary group-hover:text-primary transition-colors">
                       {child.firstName} {child.lastName}
                     </CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                       {getAgeDisplayString(child.dateOfBirth)} • {child.gender}
                     </p>
                   </div>
@@ -79,7 +78,7 @@ export function ChildList({ onViewChild }: ChildListProps) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-pink-600 hover:text-pink-700 hover:bg-pink-100 transition-all duration-200"
+                    className="text-primary hover:text-primary hover:bg-muted transition-all duration-200"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewChild(child.id);
@@ -91,47 +90,42 @@ export function ChildList({ onViewChild }: ChildListProps) {
                 </motion.div>
               </div>
             </CardHeader>
-            <CardContent className="pt-6">
-              {/* Date of Birth */}
-              <motion.div
-                className="flex items-center gap-3 text-sm p-3 rounded-lg bg-white/50 hover:bg-white/80 transition-colors"
-                whileHover={{ x: 5 }}
-              >
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-600">Born:</span>
-                <span className="text-gray-900 font-medium">{new Date(child.dateOfBirth).toLocaleDateString()}</span>
-              </motion.div>
+            <CardContent className="space-y-4 pt-6">
+              {/* Primary actions — always visible (hover-only hid these on touch / no-hover). */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1 min-w-[7rem] text-xs font-medium shadow-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onQuickScreen?.();
+                  }}
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5 mr-1.5" />
+                  Quick screen
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 min-w-[7rem] text-xs font-medium border-primary/25 hover:bg-primary/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditChild(child.id);
+                  }}
+                >
+                  <Edit className="w-3.5 h-3.5 mr-1.5" />
+                  Edit profile
+                </Button>
+              </div>
 
-              {/* Interactive Actions */}
               <motion.div
-                className="mt-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                initial={{ opacity: 0 }}
-                whileHover={{ opacity: 1 }}
+                className="flex items-center gap-3 text-sm p-3 rounded-lg bg-muted/80 border border-border/60"
+                whileHover={{ x: 2 }}
               >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 text-xs border-pink-200 hover:border-pink-300 hover:bg-pink-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Could add quick screening action here
-                  }}
-                >
-                  <ClipboardCheck className="w-3 h-3 mr-1" />
-                  Quick Screen
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 text-xs border-purple-200 hover:border-purple-300 hover:bg-purple-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Could add edit profile action here
-                  }}
-                >
-                  <Edit className="w-3 h-3 mr-1" />
-                  Edit
-                </Button>
+                <Calendar className="w-4 h-4 shrink-0 text-muted-foreground" />
+                <span className="text-muted-foreground">Born:</span>
+                <span className="text-foreground font-medium">{new Date(child.dateOfBirth).toLocaleDateString()}</span>
               </motion.div>
             </CardContent>
           </Card>
@@ -141,9 +135,9 @@ export function ChildList({ onViewChild }: ChildListProps) {
       {/* Empty State */}
       {children.length === 0 && (
         <div className="col-span-2 text-center py-12">
-          <Baby className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-gray-600 mb-2">No children added yet</h3>
-          <p className="text-gray-500">Click the "Add Child" button to create your first child profile</p>
+          <Baby className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-muted-foreground mb-2">No children added yet</h3>
+          <p className="text-muted-foreground">Click the "Add Child" button to create your first child profile</p>
         </div>
       )}
     </div>

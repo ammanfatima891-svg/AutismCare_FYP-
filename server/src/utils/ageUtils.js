@@ -1,10 +1,11 @@
+const { getCurrentTime, getCurrentTimeMs } = require('./time.js');
 /**
  * Calculate age in months from date of birth
  * @param {Date} dateOfBirth - The date of birth
  * @returns {number} Age in months
  */
 function calculateAgeInMonths(dateOfBirth) {
-  const today = new Date();
+  const today = getCurrentTime();
   const birthDate = new Date(dateOfBirth);
 
   let years = today.getFullYear() - birthDate.getFullYear();
@@ -78,7 +79,7 @@ function isEligibleForMCHAT(dateOfBirth) {
  * @returns {number} Adjusted age in days
  */
 function calculateAdjustedAgeInDays(dateOfBirth, weeksPreterm = 0) {
-  const today = new Date();
+  const today = getCurrentTime();
   const birthDate = new Date(dateOfBirth);
 
   const diffTime = today - birthDate;

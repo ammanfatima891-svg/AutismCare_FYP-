@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -87,21 +88,21 @@ export function UserManagementTable({ onEditUser }: UserManagementTableProps) {
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'active': return 'bg-secondary text-primary';
+      case 'pending': return 'bg-accent/10 text-accent-foreground';
+      case 'rejected': return 'bg-muted text-destructive';
+      default: return 'bg-muted text-foreground';
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'bg-purple-100 text-purple-800';
-      case 'clinician': return 'bg-blue-100 text-blue-800';
-      case 'therapist': return 'bg-green-100 text-green-800';
-      case 'parent': return 'bg-orange-100 text-orange-800';
-      case 'lab': return 'bg-indigo-100 text-indigo-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'admin': return 'bg-muted text-foreground';
+      case 'clinician': return 'bg-secondary/70 text-primary';
+      case 'therapist': return 'bg-secondary text-primary';
+      case 'parent': return 'bg-accent/10 text-accent-foreground';
+      case 'lab': return 'bg-secondary/70 text-primary';
+      default: return 'bg-muted text-foreground';
     }
   };
 
@@ -112,7 +113,7 @@ export function UserManagementTable({ onEditUser }: UserManagementTableProps) {
   if (error) {
     return (
       <div className="text-center">
-        <div className="text-red-600 mb-4">{error}</div>
+        <div className="text-destructive mb-4">{error}</div>
         <Button onClick={fetchUsers}>Try Again</Button>
       </div>
     );
@@ -127,7 +128,7 @@ export function UserManagementTable({ onEditUser }: UserManagementTableProps) {
         <CardContent className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search users..."
                 value={searchTerm}
@@ -204,7 +205,7 @@ export function UserManagementTable({ onEditUser }: UserManagementTableProps) {
                             <Button
                               size="sm"
                               onClick={() => handleStatusUpdate(user._id, 'active')}
-                              className="bg-green-600 hover:bg-green-700"
+                              variant="default"
                             >
                               <CheckCircle className="h-4 w-4" />
                             </Button>

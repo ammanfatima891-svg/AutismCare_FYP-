@@ -48,7 +48,7 @@ export function ContentManagementForm({ onSuccess, onCancel }: ContentManagement
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Content Management</CardTitle>
-        <p className="text-sm text-gray-600">Add or edit educational content, resources, or announcements</p>
+        <p className="text-sm text-muted-foreground">Add or edit educational content, resources, or announcements</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -114,7 +114,7 @@ export function ContentManagementForm({ onSuccess, onCancel }: ContentManagement
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="text-destructive text-sm">{error}</div>
           )}
 
           <div className="flex gap-4">

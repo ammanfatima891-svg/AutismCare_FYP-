@@ -1,1 +1,25 @@
 node_modules/
+
+# Environment / secrets
+.env
+.env.*
+
+# Build outputs
+client/dist/
+server/dist/
+
+# Uploads & runtime-generated files
+server/uploads/
+server/src/uploads/
+
+# Test artifacts
+client/test-results/
+client/playwright-report/
+server/coverage/
+client/coverage/
+
+# Logs
+*.log
+
+# ML weights (GitHub max ~100MB per file; obtain locally — see server/ml/README.md)
+server/ml/models/*.h5

@@ -92,7 +92,7 @@ export function TherapistClientsList({ onSelectClient }: TherapistClientsListPro
   if (error) {
     return (
       <div className="text-center">
-        <div className="text-red-600 mb-4">{error}</div>
+        <div className="text-destructive mb-4">{error}</div>
         <Button onClick={fetchClients}>Try Again</Button>
       </div>
     );
@@ -103,7 +103,7 @@ export function TherapistClientsList({ onSelectClient }: TherapistClientsListPro
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">My Clients</h2>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search clients..."
             value={searchTerm}
@@ -116,7 +116,7 @@ export function TherapistClientsList({ onSelectClient }: TherapistClientsListPro
       {filteredClients.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               {searchTerm ? 'No clients found matching your search.' : 'No clients assigned yet.'}
             </p>
           </CardContent>
@@ -138,19 +138,19 @@ export function TherapistClientsList({ onSelectClient }: TherapistClientsListPro
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-500" />
+                    <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
                       Clinical Notes: {client.child.clinicalNotes?.length || 0}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
                       Recommendations: {client.recommendations?.length || 0}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-500" />
+                    <User className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
                       Lab Reports: {client.child.labReports?.length || 0}
                     </span>
@@ -160,10 +160,10 @@ export function TherapistClientsList({ onSelectClient }: TherapistClientsListPro
                 {client.child.clinicalNotes && client.child.clinicalNotes.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-2">Latest Clinical Note:</p>
-                    <p className="text-sm text-gray-600 line-clamp-2">
+                    <p className="text-sm text-muted-foreground line-clamp-2">
                       {client.child.clinicalNotes[client.child.clinicalNotes.length - 1].note}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {new Date(client.child.clinicalNotes[client.child.clinicalNotes.length - 1].addedAt).toLocaleDateString()}
                     </p>
                   </div>

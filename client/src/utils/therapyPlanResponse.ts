@@ -28,9 +28,18 @@ export function therapyPlanFromApiResponse(data: unknown): Record<string, unknow
 /** Backend may send an array or (legacy) a map-like object. */
 export function normalizeShortTermGoalsList(
   raw: unknown
-): { _id?: string; title?: string; domain?: string; status?: string }[] {
-  if (Array.isArray(raw)) return raw.filter(Boolean) as { _id?: string; title?: string; domain?: string; status?: string }[];
-  if (raw && typeof raw === 'object') return Object.values(raw as object).filter(Boolean) as { _id?: string; title?: string; domain?: string; status?: string }[];
+): {
+  _id?: string;
+  goalKey?: string;
+  title?: string;
+  domain?: string;
+  status?: string;
+  measurement?: { type?: string; unit?: string };
+  masteryRule?: { threshold?: number; window?: number; minSessions?: number; ruleType?: string };
+}[] {
+  if (Array.isArray(raw)) return raw.filter(Boolean) as ReturnType<typeof normalizeShortTermGoalsList>;
+  if (raw && typeof raw === 'object')
+    return Object.values(raw as object).filter(Boolean) as ReturnType<typeof normalizeShortTermGoalsList>;
   return [];
 }
 
@@ -41,5 +50,6 @@ export function normalizeShortTermGoalsList(
 export function isActiveGoalStatus(status: unknown): boolean {
   const s = String(status ?? '').trim().toLowerCase();
   if (!s) return true;
+  if (s === 'retired' || s === 'onhold') return false;
   return s === 'active' || s === 'achieved' || s === 'modified';
 }

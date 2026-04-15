@@ -1,0 +1,26 @@
+# Render Blueprint: API only. Frontend goes on Vercel (see client/vercel.json).
+# After deploy: set Vercel build env VITE_API_BASE_URL=https://<this-service>.onrender.com/api
+# and set CLIENT_URL on Render to your Vercel URL for CORS.
+services:
+  - type: web
+    name: asd-management-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run start:ci
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_URL
+        sync: false
+      - key: SERVER_URL
+        sync: false

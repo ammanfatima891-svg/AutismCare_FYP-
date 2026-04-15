@@ -43,25 +43,25 @@ export function ReportFilters({
   loadingCases: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border/90 bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
         <div className="min-w-[200px] flex-1">
-          <label className="mb-1.5 block text-xs font-medium text-slate-500">Search</label>
+          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Search</label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search by child name or report type"
-              className="h-10 rounded-xl border-slate-200 bg-white pl-9"
+              className="h-10 rounded-xl border bg-card pl-9"
             />
           </div>
         </div>
 
         <div className="min-w-[160px] flex-1">
-          <label className="mb-1.5 block text-xs font-medium text-slate-500">Report type</label>
+          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Report type</label>
           <Select value={reportType} onValueChange={onReportTypeChange}>
-            <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white">
+            <SelectTrigger className="h-10 rounded-xl border bg-card">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -75,9 +75,9 @@ export function ReportFilters({
         </div>
 
         <div className="min-w-[180px] flex-1">
-          <label className="mb-1.5 block text-xs font-medium text-slate-500">Child</label>
+          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Child</label>
           <Select value={caseId} onValueChange={onCaseIdChange}>
-            <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white">
+            <SelectTrigger className="h-10 rounded-xl border bg-card">
               <SelectValue placeholder={loadingCases ? 'Loading…' : 'All children'} />
             </SelectTrigger>
             <SelectContent>
@@ -93,21 +93,21 @@ export function ReportFilters({
 
         <div className="grid min-w-0 grid-cols-2 gap-2 sm:max-w-xs">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-500">From</label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">From</label>
             <Input
               type="date"
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
-              className="h-10 rounded-xl border-slate-200 bg-white"
+              className="h-10 rounded-xl border bg-card"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-500">To</label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">To</label>
             <Input
               type="date"
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
-              className="h-10 rounded-xl border-slate-200 bg-white"
+              className="h-10 rounded-xl border bg-card"
             />
           </div>
         </div>
@@ -116,7 +116,7 @@ export function ReportFilters({
           <Button
             type="button"
             variant="outline"
-            className="h-10 rounded-xl border-slate-200 text-slate-700"
+            className="h-10 rounded-xl border text-foreground"
             onClick={onReset}
           >
             Reset filters

@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -133,21 +134,21 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold text-green-600 mb-2">Upload Test Reports</h2>
-                <p className="text-gray-600">Upload completed test results and reports</p>
+                <h2 className="text-2xl font-bold text-primary mb-2">Upload Test Reports</h2>
+                <p className="text-muted-foreground">Upload completed test results and reports</p>
             </div>
 
             {uploadSuccess && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <p className="text-green-800">Report uploaded and order completed successfully!</p>
+                <div className="bg-primary/20 border rounded-lg p-4 flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-primary" />
+                    <p className="text-primary">Report uploaded and order completed successfully!</p>
                 </div>
             )}
 
             {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                    <p className="text-red-800">{error}</p>
+                <div className="bg-muted border rounded-lg p-4 flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    <p className="text-destructive">{error}</p>
                 </div>
             )}
 
@@ -156,15 +157,15 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-blue-600" />
+                            <FileText className="h-5 w-5 text-primary" />
                             Select Test Order
                         </CardTitle>
                         <CardDescription>Choose an in-progress order to upload results</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {orders.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">
-                                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                            <div className="text-center py-8 text-muted-foreground">
+                                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                                 <p>No in-progress orders available</p>
                                 <Button
                                     variant="link"
@@ -180,17 +181,17 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
                                     <div
                                         key={order._id}
                                         className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedOrder?._id === order._id
-                                            ? 'border-green-500 bg-green-50'
-                                            : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                                            ? 'border-primary bg-primary/20'
+                                            : 'border hover:border hover:bg-muted'
                                             }`}
                                         onClick={() => setSelectedOrder(order)}
                                     >
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="font-medium text-gray-900">{order.childName}</p>
-                                                <p className="text-sm text-gray-600">{order.testName}</p>
+                                                <p className="font-medium text-foreground">{order.childName}</p>
+                                                <p className="text-sm text-muted-foreground">{order.testName}</p>
                                             </div>
-                                            <Badge className="bg-blue-100 text-blue-800 capitalize">
+                                            <Badge className="bg-secondary/70 text-primary capitalize">
                                                 {order.testType}
                                             </Badge>
                                         </div>
@@ -205,7 +206,7 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Upload className="h-5 w-5 text-green-600" />
+                            <Upload className="h-5 w-5 text-primary" />
                             Upload Report
                         </CardTitle>
                         <CardDescription>
@@ -217,25 +218,25 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
                     </CardHeader>
                     <CardContent>
                         {!selectedOrder ? (
-                            <div className="text-center py-8 text-gray-500">
-                                <Upload className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                            <div className="text-center py-8 text-muted-foreground">
+                                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                                 <p>Select an order to upload report</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 {/* File Upload */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-foreground mb-2">
                                         Report File (PDF or Image)
                                     </label>
                                     {!file ? (
                                         <div
-                                            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-green-400 transition-colors"
+                                            className="cursor-pointer rounded-lg border-2 border-dashed border-primary p-8 text-center transition-colors hover:border-primary hover:bg-primary/10"
                                             onClick={() => fileInputRef.current?.click()}
                                         >
-                                            <Upload className="h-10 w-10 mx-auto mb-3 text-gray-400" />
-                                            <p className="text-gray-600">Click to upload or drag and drop</p>
-                                            <p className="text-sm text-gray-500 mt-1">PDF, JPEG, or PNG (max 25MB)</p>
+                                            <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                                            <p className="text-muted-foreground">Click to upload or drag and drop</p>
+                                            <p className="text-sm text-muted-foreground mt-1">PDF, JPEG, or PNG (max 25MB)</p>
                                             <input
                                                 ref={fileInputRef}
                                                 type="file"
@@ -245,23 +246,23 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
                                             />
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                                        <div className="flex items-center gap-3 p-4 bg-primary/20 rounded-lg border">
                                             {file.type.startsWith('image/') ? (
-                                                <ImageIcon className="h-8 w-8 text-green-600" />
+                                                <ImageIcon className="h-8 w-8 text-primary" />
                                             ) : (
-                                                <FileText className="h-8 w-8 text-green-600" />
+                                                <FileText className="h-8 w-8 text-primary" />
                                             )}
                                             <div className="flex-1">
-                                                <p className="font-medium text-gray-900">{file.name}</p>
-                                                <p className="text-sm text-gray-600">
+                                                <p className="font-medium text-foreground">{file.name}</p>
+                                                <p className="text-sm text-muted-foreground">
                                                     {(file.size / 1024 / 1024).toFixed(2)} MB
                                                 </p>
                                             </div>
                                             <button
                                                 onClick={removeFile}
-                                                className="p-1 hover:bg-green-100 rounded"
+                                                className="rounded p-1 hover:bg-muted"
                                             >
-                                                <X className="h-5 w-5 text-gray-500" />
+                                                <X className="h-5 w-5 text-muted-foreground" />
                                             </button>
                                         </div>
                                     )}
@@ -269,35 +270,35 @@ export function LabReportUpload({ selectedOrderId, onNavigate }: LabReportUpload
 
                                 {/* Results */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-foreground mb-2">
                                         Test Results Summary
                                     </label>
                                     <textarea
                                         value={results}
                                         onChange={(e) => setResults(e.target.value)}
                                         placeholder="Enter brief summary of test results..."
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus-visible:ring-ring/50 resize-none"
                                         rows={3}
                                     />
                                 </div>
 
                                 {/* Notes */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-foreground mb-2">
                                         Additional Notes (Optional)
                                     </label>
                                     <textarea
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
                                         placeholder="Any additional notes for the clinician..."
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus-visible:ring-ring/50 resize-none"
                                         rows={2}
                                     />
                                 </div>
 
                                 {/* Submit Button */}
                                 <Button
-                                    className="w-full bg-green-600 hover:bg-green-700"
+                                    className="w-full bg-primary hover:bg-primary/90"
                                     disabled={!file || uploading}
                                     onClick={handleUpload}
                                 >

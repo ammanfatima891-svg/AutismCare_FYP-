@@ -29,15 +29,15 @@ const therapistTypes = [
 const priorities = ['high', 'medium', 'low'];
 
 const priorityBadgeClass: Record<string, string> = {
-  high: 'bg-red-100 text-red-800 border-red-200',
-  medium: 'bg-orange-100 text-orange-800 border-orange-200',
-  low: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  high: 'bg-muted text-destructive border',
+  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  low: 'bg-blue-100 text-blue-800 border-blue-200',
 };
 
 const statusBadgeClass: Record<string, string> = {
-  pending: 'bg-slate-100 text-slate-700 border-slate-300',
+  pending: 'bg-muted text-foreground border',
   accepted: 'bg-blue-100 text-blue-800 border-blue-200',
-  'in-progress': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  'in-progress': 'bg-blue-100 text-blue-800 border-blue-200',
 };
 
 export function ReferralTab({ caseId }: ReferralTabProps) {
@@ -98,8 +98,8 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
 
   return (
     <div className="space-y-6">
-      <Card className="border-slate-200 shadow-sm bg-white">
-        <CardHeader className="border-b border-slate-100 bg-blue-50/40">
+      <Card className="border shadow-sm bg-card">
+        <CardHeader className="border-b border bg-blue-50/40">
           <CardTitle className="text-base text-blue-900">Create Referral</CardTitle>
           <CardDescription>
             Assign this case to a therapist pathway after clinical evaluation.
@@ -107,12 +107,12 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
           {!finalEvaluationExists && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-lg border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
               Finalize clinical evaluation first
             </div>
           )}
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
+            <div className="rounded-lg border bg-muted px-4 py-3 text-sm text-destructive flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
             </div>
@@ -174,8 +174,8 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 shadow-sm bg-white">
-        <CardHeader className="border-b border-slate-100 bg-blue-50/40">
+      <Card className="border shadow-sm bg-card">
+        <CardHeader className="border-b border bg-blue-50/40">
           <CardTitle className="text-base text-blue-900">Referral History</CardTitle>
           <CardDescription>All referrals linked to this case</CardDescription>
         </CardHeader>
@@ -185,7 +185,7 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
               <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
             </div>
           ) : items.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="rounded-lg border-dashed border bg-background p-4 text-sm text-muted-foreground">
               No referrals yet.
             </div>
           ) : (
@@ -193,14 +193,14 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
               {items.map((item) => (
                 <div
                   key={item._id}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                  className="rounded-lg border bg-card px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">{item.therapistType}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="font-medium text-foreground">{item.therapistType}</p>
+                    <p className="text-xs text-muted-foreground">
                       {new Date(item.createdAt).toLocaleString()}
                     </p>
-                    {item.notes ? <p className="text-sm text-slate-700 mt-1">{item.notes}</p> : null}
+                    {item.notes ? <p className="text-sm text-foreground mt-1">{item.notes}</p> : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className={priorityBadgeClass[item.priority] || ''}>

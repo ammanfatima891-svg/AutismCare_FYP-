@@ -12,7 +12,7 @@ export function ProgressCaseTab({ caseId, data }: Props) {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-muted-foreground">
         Session-based metrics for this case. Goals and domains come from the assigned therapy plan; trends use session
         logs and home assignments.
       </p>

@@ -1,9 +1,10 @@
 const express = require('express');
-const { protect } = require('../middleware/auth.middleware');
+const { protect, requireRole } = require('../middleware/auth.middleware');
 const messageController = require('../controllers/messageController');
 
 const router = express.Router();
 router.use(protect);
+router.use(requireRole('parent', 'therapist', 'clinician', 'admin'));
 
 router.get('/conversations', messageController.listConversations);
 router.get('/conversations/:caseId', messageController.getOrCreateConversation);

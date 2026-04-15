@@ -17,8 +17,8 @@ export function TherapyPlansCaseTab({ caseId, data, onRefresh }: Props) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        Build or update the therapy plan for this case. Short-term goals include <strong>domain</strong> and{' '}
+      <p className="text-sm text-muted-foreground">
+        Build or update the therapy plan for this case. Short‑term goals include <strong>domain</strong> and{' '}
         <strong>status</strong> for clinician progress analytics.
       </p>
       <TherapyPlanBuilder caseId={caseId} plan={plan} onSaved={() => void onRefresh()} />

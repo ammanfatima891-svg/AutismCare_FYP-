@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
-const { getDashboardStats } = require('../controllers/therapist.controller');
+const {
+  getDashboardStats,
+  addTherapistRecommendation,
+} = require('../controllers/therapist.controller');
 const {
   getTherapistDashboard,
   getTherapistDashboardSummary,
@@ -26,6 +29,9 @@ router.get('/dashboard', getTherapistDashboard);
 
 // Extended therapist referral flow (keeps existing /api/referrals routes intact)
 router.patch('/referrals/:id/start-therapy', startReferral);
+
+// Therapist recommendation notes by child (resolved to active therapy case)
+router.post('/recommendations', addTherapistRecommendation);
 
 // Therapy assignments linked by caseId
 router.post('/cases/:caseId/assignments', createHomeAssignment);

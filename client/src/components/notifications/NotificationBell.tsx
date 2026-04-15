@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { notificationAPI } from '../../services/api';
 import { Button } from '../ui/button';
 import { cn } from '../ui/utils';
+import { AuthContext } from '../../context/AuthContext';
+import {
+  CASE_MESSAGE_NOTIFICATION_TYPE,
+  getCaseMessageConversationId,
+  navigateToCaseMessageInbox,
+} from '../../utils/caseMessageNotificationNav';
 
 interface NotificationBellProps {
   onViewAll?: () => void;
@@ -24,6 +31,8 @@ function formatTime(dateString: string) {
 }
 
 export function NotificationBell({ onViewAll, variant = 'default' }: NotificationBellProps) {
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
@@ -91,7 +100,7 @@ export function NotificationBell({ onViewAll, variant = 'default' }: Notificatio
         type="button"
         className={cn(
           'relative rounded-full p-2 transition-colors',
-          clinical ? 'text-sky-800 hover:bg-sky-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-sky-400/40' : 'text-gray-600 hover:bg-gray-100'
+          clinical ? 'text-blue-800 hover:bg-blue-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-blue-400/40' : 'text-muted-foreground hover:bg-muted'
         )}
         onClick={() => setOpen((v) => !v)}
         aria-label="Notifications"
@@ -101,8 +110,10 @@ export function NotificationBell({ onViewAll, variant = 'default' }: Notificatio
         {unreadCount > 0 && (
           <span
             className={cn(
-              'absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white',
-              clinical ? 'bg-rose-600' : 'bg-red-500'
+              'absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border-2 border-background px-1 text-[10px] font-semibold tabular-nums text-primary-foreground shadow-sm',
+              clinical
+                ? 'bg-primary ring-1 ring-primary/25'
+                : 'bg-primary ring-1 ring-primary/20 dark:ring-primary/30'
             )}
           >
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -113,23 +124,23 @@ export function NotificationBell({ onViewAll, variant = 'default' }: Notificatio
       {open && (
         <div
           className={cn(
-            'absolute right-0 z-50 mt-2 w-[min(100vw-2rem,360px)] overflow-hidden rounded-xl border bg-white shadow-xl',
-            clinical ? 'border-sky-100 ring-1 ring-slate-200/60' : 'border-slate-200 shadow-lg'
+            'absolute right-0 z-50 mt-2 w-[min(100vw-2rem,360px)] overflow-hidden rounded-xl border bg-card shadow-xl',
+            clinical ? 'border-blue-100 shadow-sm' : 'border shadow-lg'
           )}
         >
           <div
             className={cn(
               'flex items-center justify-between border-b px-4 py-3',
-              clinical ? 'border-sky-100/80 bg-sky-50/60' : 'border-slate-100'
+              clinical ? 'border-blue-100/80 bg-blue-50/60' : 'border'
             )}
           >
-            <p className="text-sm font-semibold text-slate-900">Notifications</p>
+            <p className="text-sm font-semibold text-foreground">Notifications</p>
             {unreadItems.length > 0 ? (
               <button
                 type="button"
                 className={cn(
                   'text-xs font-medium',
-                  clinical ? 'text-sky-800 hover:text-sky-950' : 'text-blue-600 hover:text-blue-700'
+                  clinical ? 'text-blue-800 hover:text-blue-950' : 'text-blue-600 hover:text-blue-700'
                 )}
                 onClick={markAll}
               >
@@ -140,38 +151,45 @@ export function NotificationBell({ onViewAll, variant = 'default' }: Notificatio
 
           <div className="max-h-[320px] overflow-auto">
             {loading ? (
-              <p className="px-4 py-6 text-sm text-slate-500">Loading...</p>
+              <p className="px-4 py-6 text-sm text-muted-foreground">Loading...</p>
             ) : items.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-slate-500">No notifications yet.</p>
+              <p className="px-4 py-6 text-sm text-muted-foreground">No notifications yet.</p>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-border">
                 {items.map((n) => (
                   <button
                     key={n._id}
                     type="button"
                     className={cn(
-                      'w-full px-4 py-3 text-left transition-colors hover:bg-slate-50',
-                      n.isRead ? 'bg-white' : clinical ? 'bg-sky-50/70' : 'bg-blue-50/60'
+                      'w-full px-4 py-3 text-left transition-colors hover:bg-background',
+                      n.isRead ? 'bg-card' : clinical ? 'bg-blue-50/70' : 'bg-blue-50/60'
                     )}
                     onClick={() => {
-                      if (!n.isRead) markRead(n._id);
+                      if (!n.isRead) void markRead(n._id);
+                      const cid = getCaseMessageConversationId(n);
+                      if (cid) {
+                        setOpen(false);
+                        navigateToCaseMessageInbox(navigate, user?.role, cid);
+                      }
                     }}
                   >
-                    <p className="text-xs uppercase tracking-wide text-slate-500">{n.type}</p>
-                    <p className="text-sm font-medium text-slate-900">{n.title}</p>
-                    <p className="line-clamp-2 text-sm text-slate-600">{n.message}</p>
-                    <p className="mt-1 text-xs text-slate-400">{formatTime(n.createdAt)}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {n.type === CASE_MESSAGE_NOTIFICATION_TYPE ? 'Case message' : n.type}
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{n.title}</p>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">{n.message}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatTime(n.createdAt)}</p>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          <div className={cn('border-t p-3', clinical ? 'border-sky-100 bg-slate-50/40' : 'border-slate-100')}>
+          <div className={cn('border-t p-3', clinical ? 'border-blue-100 bg-background/40' : 'border')}>
             <Button
               variant="outline"
               size="sm"
-              className={cn('w-full', clinical && 'border-slate-200 bg-white hover:bg-sky-50/80')}
+              className={cn('w-full', clinical && 'border bg-card hover:bg-blue-50/80')}
               onClick={() => {
                 setOpen(false);
                 onViewAll?.();

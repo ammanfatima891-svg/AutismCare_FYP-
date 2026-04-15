@@ -9,21 +9,29 @@ import {
   Upload, 
   Sparkles, 
   CheckCircle, 
-  AlertCircle,
   Info,
   RotateCcw,
   Baby
 } from 'lucide-react';
-import { ImageWithFallback } from '../../figma/ImageWithFallback';
 import { toast } from 'sonner';
+import { facialScreeningAPI } from '../../../api';
 
 interface FacialScreeningProps {
   child: any;
   onComplete: (results: any) => void;
 }
 
+/** Maps API label (e.g. autistic / non_autistic) to parent-facing ASD vs Non-ASD. */
+function mapFacialClassification(label: unknown, prob: number, thr: number): 'ASD' | 'Non-ASD' {
+  const s = String(label ?? '').toLowerCase();
+  if (s === 'non_autistic' || s.includes('non-asd') || s === 'nonasd') return 'Non-ASD';
+  if (s === 'autistic' || s.includes('asd')) return 'ASD';
+  return prob >= thr ? 'ASD' : 'Non-ASD';
+}
+
 export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [showGuidelines, setShowGuidelines] = useState(true);
@@ -37,17 +45,15 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSelectedImage(e.target?.result as string);
-        setShowGuidelines(false);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      setSelectedFile(file);
+      setSelectedImage(url);
+      setShowGuidelines(false);
     }
   };
 
-  const handleAnalyze = () => {
-    if (!selectedImage) {
+  const handleAnalyze = async () => {
+    if (!selectedFile || !selectedImage) {
       toast.error('Please upload an image first');
       return;
     }
@@ -55,44 +61,91 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
     setIsAnalyzing(true);
     setAnalysisProgress(0);
 
-    // Simulate AI analysis with progress
-    const interval = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            const results = {
-              type: 'Facial Analysis',
-              child: child,
-              date: new Date().toISOString(),
-              image: selectedImage,
-              features: {
-                eyeContact: { score: 75, status: 'moderate', description: 'Moderate eye gaze patterns detected' },
-                facialSymmetry: { score: 85, status: 'normal', description: 'Typical facial symmetry observed' },
-                facialExpressions: { score: 60, status: 'atypical', description: 'Limited range of expressions noted' },
-                socialEngagement: { score: 70, status: 'moderate', description: 'Some signs of social awareness' },
-              },
-              overallScore: 72.5,
-              riskLevel: 'medium',
-              confidence: 87,
-              recommendations: [
-                'Follow-up assessment with developmental specialist recommended',
-                'Monitor social interaction patterns',
-                'Consider speech and language evaluation',
-              ],
-            };
-            onComplete(results);
-            setIsAnalyzing(false);
-          }, 500);
-          return 100;
-        }
-        return prev + 5;
-      });
+    const interval = window.setInterval(() => {
+      setAnalysisProgress((prev) => (prev >= 90 ? prev : prev + 5));
     }, 150);
+
+    try {
+      const form = new FormData();
+      form.append('image', selectedFile);
+
+      const res = await facialScreeningAPI.predict(form);
+      const { probability, threshold, label, blurredImageUrl } = res.data || {};
+
+      const prob = typeof probability === 'number' ? probability : 0.5;
+      const thr = typeof threshold === 'number' ? threshold : 0.5;
+      const classification = mapFacialClassification(label, prob, thr);
+
+      const riskLevel =
+        prob >= thr + 0.2 ? 'high' : prob >= thr + 0.05 ? 'medium' : 'low';
+
+      const confidence = Math.max(
+        50,
+        Math.min(99, Math.round(Math.abs(prob - thr) * 200))
+      );
+
+      const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api\/?$/, '');
+      const blurredSrc =
+        typeof blurredImageUrl === 'string' && blurredImageUrl.startsWith('/uploads')
+          ? `${apiBase}${blurredImageUrl}`
+          : selectedImage;
+
+      const results = {
+        type: 'Facial Analysis',
+        child,
+        date: new Date().toISOString(),
+        image: blurredSrc, // show blurred image in UI (privacy)
+        model: 'inception_v3',
+        classification,
+        prediction: { probability: prob, threshold: thr, label },
+        features: {
+          overall: {
+            score: Math.round(prob * 100),
+            status: riskLevel,
+            description: 'Model probability-based screening result',
+          },
+        },
+        overallScore: Math.round(prob * 100),
+        riskLevel,
+        confidence,
+        recommendations:
+          riskLevel === 'high'
+            ? [
+                'Recommend follow-up with a developmental specialist.',
+                'Combine results with standardized questionnaires (M-CHAT-R, ASQ-3).',
+              ]
+            : riskLevel === 'medium'
+              ? [
+                  'Consider follow-up assessment and monitor development over time.',
+                  'Combine results with standardized questionnaires (M-CHAT-R, ASQ-3).',
+                ]
+              : [
+                  'If you still have concerns, complete a standardized questionnaire (M-CHAT-R, ASQ-3).',
+                  'Discuss any developmental concerns with your clinician.',
+                ],
+      };
+
+      setAnalysisProgress(100);
+      onComplete(results);
+    } catch (e: any) {
+      console.error(e);
+      const data = e?.response?.data;
+      const base = data?.message || e?.message || 'Facial screening failed.';
+      const tail = data?.error ? ` (${data.error})` : '';
+      const d = data?.details?.detail;
+      const fastApi =
+        typeof d === 'string' ? d : Array.isArray(d) ? d.map((x: any) => x?.msg || x).join(' ') : '';
+      toast.error(fastApi ? `${base} ${fastApi}` : `${base}${tail}`);
+    } finally {
+      window.clearInterval(interval);
+      setIsAnalyzing(false);
+    }
   };
 
   const handleReset = () => {
+    if (selectedImage) URL.revokeObjectURL(selectedImage);
     setSelectedImage(null);
+    setSelectedFile(null);
     setShowGuidelines(true);
     setIsAnalyzing(false);
     setAnalysisProgress(0);
@@ -101,22 +154,22 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="border-2 border-purple-200">
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+      <Card className="border-2">
+        <CardHeader className="ds-card-header-strip border-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <Camera className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Camera className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-purple-600">Facial Screening</CardTitle>
+                <CardTitle className="text-primary">Facial Screening</CardTitle>
                 <CardDescription className="flex items-center gap-2 mt-1">
                   <Baby className="w-4 h-4" />
                   {child?.firstName} {child?.lastName}
                 </CardDescription>
               </div>
             </div>
-            <Badge className="bg-purple-600">
+            <Badge className="bg-primary">
               <Sparkles className="w-3 h-3 mr-1" />
               AI-Powered
             </Badge>
@@ -145,7 +198,7 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
       {!isAnalyzing && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-purple-600">Upload Photo</CardTitle>
+            <CardTitle className="text-primary">Upload Photo</CardTitle>
             <CardDescription>
               Upload a clear photo of your child's face for AI analysis
             </CardDescription>
@@ -154,14 +207,14 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
             {!selectedImage ? (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-purple-300 rounded-lg p-12 text-center hover:border-purple-500 hover:bg-purple-50 transition-all cursor-pointer"
+                className="border-2 border-dashed border rounded-lg p-12 text-center hover:border-primary hover:bg-muted transition-all cursor-pointer"
               >
-                <Upload className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-                <h3 className="text-purple-600 mb-2">Click to Upload Photo</h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-primary mb-2">Click to Upload Photo</h3>
+                <p className="text-sm text-muted-foreground mb-4">
                   or drag and drop your image here
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Supports: JPG, PNG, HEIC (Max 10MB)
                 </p>
                 <input
@@ -174,14 +227,14 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative rounded-lg overflow-hidden border-2 border-purple-200">
+                <div className="relative rounded-lg overflow-hidden border-2">
                   <img
                     src={selectedImage}
                     alt="Child's photo"
-                    className="w-full h-auto max-h-96 object-contain bg-gray-50"
+                    className="w-full h-auto max-h-96 object-contain bg-muted"
                   />
                   <div className="absolute top-3 right-3 flex gap-2">
-                    <Badge className="bg-green-600">
+                    <Badge className="bg-primary">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Photo Uploaded
                     </Badge>
@@ -199,7 +252,7 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
                   </Button>
                   <Button
                     onClick={handleAnalyze}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    className="flex-1 rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
                     Start AI Analysis
@@ -213,49 +266,49 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
 
       {/* Analysis Progress */}
       {isAnalyzing && (
-        <Card className="border-2 border-purple-200">
+        <Card className="border-2">
           <CardContent className="pt-12 pb-12">
             <div className="text-center space-y-6">
               <div className="relative w-24 h-24 mx-auto">
-                <div className="absolute inset-0 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Sparkles className="w-10 h-10 text-purple-600" />
+                  <Sparkles className="w-10 h-10 text-primary" />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-purple-600">Analyzing Facial Features...</h3>
-                <p className="text-gray-600">
+                <h3 className="text-primary">Analyzing Facial Features...</h3>
+                <p className="text-muted-foreground">
                   Our AI is processing the image and analyzing developmental markers
                 </p>
 
                 <div className="max-w-md mx-auto space-y-2">
                   <Progress value={analysisProgress} className="h-3" />
-                  <p className="text-sm text-gray-500">{analysisProgress}% Complete</p>
+                  <p className="text-sm text-muted-foreground">{analysisProgress}% Complete</p>
                 </div>
 
-                <div className="flex flex-col gap-2 text-sm text-gray-600 mt-6">
+                <div className="flex flex-col gap-2 text-sm text-muted-foreground mt-6">
                   {analysisProgress > 20 && (
                     <div className="flex items-center gap-2 justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <CheckCircle className="w-4 h-4 text-primary" />
                       <span>Facial detection complete</span>
                     </div>
                   )}
                   {analysisProgress > 40 && (
                     <div className="flex items-center gap-2 justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <CheckCircle className="w-4 h-4 text-primary" />
                       <span>Analyzing eye contact patterns</span>
                     </div>
                   )}
                   {analysisProgress > 60 && (
                     <div className="flex items-center gap-2 justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <CheckCircle className="w-4 h-4 text-primary" />
                       <span>Evaluating facial expressions</span>
                     </div>
                   )}
                   {analysisProgress > 80 && (
                     <div className="flex items-center gap-2 justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <CheckCircle className="w-4 h-4 text-primary" />
                       <span>Generating recommendations</span>
                     </div>
                   )}

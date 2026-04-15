@@ -93,34 +93,34 @@ export function ParentTherapyReports() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
       <div>
-        <h2 className="text-2xl font-semibold text-slate-900">Therapy reports</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <h2 className="text-2xl font-semibold text-foreground">Therapy reports</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Parent-friendly summaries your therapist generated. Read-only.
         </p>
       </div>
 
-      <Card className="border-slate-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100 bg-sky-50/50">
-          <CardTitle className="flex items-center gap-2 text-base text-sky-900">
-            <FileText className="h-5 w-5 text-sky-600" />
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b border bg-blue-50/50">
+          <CardTitle className="flex items-center gap-2 text-base text-blue-900">
+            <FileText className="h-5 w-5 text-blue-600" />
             Your child&apos;s report
           </CardTitle>
           <CardDescription>Select a child case, then open a parent report.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
           {error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+            <div className="rounded-lg border bg-muted px-3 py-2 text-sm text-destructive">{error}</div>
           ) : null}
 
           {loadingCases ? (
-            <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           ) : cases.length === 0 ? (
-            <p className="text-sm text-slate-500">No child cases linked to your account.</p>
+            <p className="text-sm text-muted-foreground">No child cases linked to your account.</p>
           ) : (
             <div className="max-w-md">
-              <label className="text-sm font-medium text-slate-700">Child case</label>
+              <label className="text-sm font-medium text-foreground">Child case</label>
               <Select value={caseId} onValueChange={(v) => setCaseId(v)}>
-                <SelectTrigger className="mt-1 bg-white">
+                <SelectTrigger className="mt-1 bg-card">
                   <SelectValue placeholder="Choose case" />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,9 +144,9 @@ export function ParentTherapyReports() {
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
             <div>
               {loadingList ? (
-                <p className="text-sm text-slate-500">Loading reports…</p>
+                <p className="text-sm text-muted-foreground">Loading reports…</p>
               ) : list.length === 0 ? (
-                <p className="text-sm text-slate-500">No parent reports yet for this case.</p>
+                <p className="text-sm text-muted-foreground">No parent reports yet for this case.</p>
               ) : (
                 <Select
                   value={selectedId || undefined}
@@ -154,7 +154,7 @@ export function ParentTherapyReports() {
                     void loadDetail(v);
                   }}
                 >
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-card">
                     <SelectValue placeholder="Select a report" />
                   </SelectTrigger>
                   <SelectContent>
@@ -167,15 +167,15 @@ export function ParentTherapyReports() {
                 </Select>
               )}
             </div>
-            <div className="min-h-[200px] rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="min-h-[200px] rounded-lg border bg-card p-3 shadow-sm">
               {loadingDetail ? (
                 <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                 </div>
               ) : detail ? (
                 <ReportDocumentView reportType="parent" payload={detail.data} />
               ) : (
-                <p className="py-8 text-center text-sm text-slate-500">Select a report to read.</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">Select a report to read.</p>
               )}
             </div>
           </div>

@@ -1,130 +1,120 @@
 const mongoose = require('mongoose');
-const TherapyPlan = require('../models/TherapyPlan');
-const SessionLog = require('../models/SessionLog');
 const { ChildCase } = require('../models/ChildCase');
-const { parseResponseScore } = require('../utils/sessionResponseScore');
+const { computeProgressEngineForCase } = require('../services/progressEngine');
+const SessionLog = require('../models/SessionLog');
+const TherapyPlan = require('../models/TherapyPlan');
+const { parseResponseScore, parseScale1to5 } = require('../utils/sessionResponseScore');
 
-const SUPPORTED_DOMAINS = ['Speech', 'Occupational Therapy', 'Behavioral', 'Sensory', 'AAC', 'PECS'];
-
-function normalizeText(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+function mean(nums) {
+  const arr = Array.isArray(nums) ? nums.filter((n) => n != null && Number.isFinite(Number(n))).map(Number) : [];
+  if (!arr.length) return null;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-function inferDomainFromText(text) {
-  const v = normalizeText(text);
-  if (!v) return null;
-  if (v.includes('speech') || v.includes('language') || v.includes('communication')) return 'Speech';
-  if (v.includes('occupational') || v.includes('ot') || v.includes('fine motor') || v.includes('daily living')) return 'Occupational Therapy';
-  if (v.includes('behavior') || v.includes('behaviour') || v.includes('aba')) return 'Behavioral';
-  if (v.includes('sensory')) return 'Sensory';
-  if (v.includes('aac') || v.includes('augmentative')) return 'AAC';
-  if (v.includes('pecs') || v.includes('picture exchange')) return 'PECS';
+function toFive(x) {
+  const n = Number(x);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 5) return n;
+  if (n <= 100) return (n / 100) * 5;
   return null;
 }
 
-function normalizePlanDomains(domains) {
-  const list = Array.isArray(domains) ? domains : [];
-  const mapped = list
-    .map((d) => {
-      const s = String(d || '').trim();
-      if (s === 'OT') return 'Occupational Therapy';
-      if (s === 'Behavioral (ABA)') return 'Behavioral';
-      return inferDomainFromText(d) || s;
-    })
-    .filter(Boolean);
-  const supported = mapped.filter((d) => SUPPORTED_DOMAINS.includes(d));
-  return [...new Set(supported)];
+function rowToFive(row) {
+  const r = row && typeof row === 'object' ? row : {};
+  if (r.score != null) return toFive(r.score);
+  if (r.rating != null) return toFive(r.rating);
+  // accuracy_trials
+  if (r.trials != null && r.correct != null) {
+    const trials = Number(r.trials);
+    const correct = Number(r.correct);
+    if (Number.isFinite(trials) && trials > 0 && Number.isFinite(correct) && correct >= 0) {
+      return toFive((correct / trials) * 100);
+    }
+  }
+  return null;
 }
 
-/** Map short-term goal domain from plan builder to analytics bucket keys. */
-function mapShortTermDomainToAnalytics(domainRaw) {
-  const d = String(domainRaw || '').trim();
-  if (d === 'OT') return 'Occupational Therapy';
-  if (d === 'Behavioral (ABA)') return 'Behavioral';
-  if (SUPPORTED_DOMAINS.includes(d)) return d;
-  return inferDomainFromText(d) || d;
-}
+async function buildPerSessionTrend(caseId) {
+  const sessions = await SessionLog.find({ caseId, status: 'completed' })
+    .select('sessionDate goalData status noteState')
+    .sort({ sessionDate: 1 })
+    .lean();
 
-function getGoalStatus(goal) {
-  const rawStatus = normalizeText(goal?.status);
-  if (rawStatus === 'achieved' || rawStatus === 'completed' || rawStatus === 'done') return 'achieved';
-  return 'active';
-}
-
-function groupTrendDataByDate(sessions) {
-  const byDate = new Map();
+  const points = [];
   for (const s of sessions) {
-    const score = parseResponseScore(s.childResponse);
-    if (score == null) continue;
-    const dateKey = new Date(s.sessionDate).toISOString().slice(0, 10);
-    const bucket = byDate.get(dateKey) || { sum: 0, count: 0 };
-    bucket.sum += score;
-    bucket.count += 1;
-    byDate.set(dateKey, bucket);
+    const rows = Array.isArray(s.goalData) ? s.goalData : [];
+    const rowScores = rows.map((r) => rowToFive(r)).filter((v) => v != null);
+    const sessionScoreFive = rowScores.length ? mean(rowScores) : null;
+    if (sessionScoreFive == null) continue;
+    const d = s.sessionDate ? new Date(s.sessionDate) : null;
+    if (!d || Number.isNaN(d.getTime())) continue;
+    const day = d.toISOString().slice(0, 10);
+    points.push({ date: day, value: Number((sessionScoreFive * 20).toFixed(2)) });
   }
-  return Array.from(byDate.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, bucket]) => ({
-      date,
-      value: Number((bucket.sum / bucket.count).toFixed(2)),
-    }));
+  // Keep the most recent 12 points (UI-friendly).
+  return points.slice(-12);
 }
 
-/**
- * Goals used for completion %: prefer structured shortTermGoals; else legacy non-long-term goals.
- */
-function enrichGoalsWithDomain(plan) {
-  const planDomains = normalizePlanDomains(plan?.domains);
-  const shortTerm = Array.isArray(plan?.shortTermGoals) ? plan.shortTermGoals : [];
-  const legacy = Array.isArray(plan?.goals) ? plan.goals : [];
+function legacySessionPct(session) {
+  const scale = parseScale1to5(session.childResponse);
+  if (scale != null) return (scale / 5) * 100;
+  const s = parseResponseScore(session.childResponse);
+  return s != null ? s : null;
+}
 
-  if (shortTerm.length > 0) {
-    return shortTerm.map((g) => ({
-      ...g,
-      _derivedDomain: mapShortTermDomainToAnalytics(g.domain),
-      _derivedStatus: getGoalStatus(g),
-    }));
+function normalizeLegacyDomainLabel(label) {
+  const d = String(label || '').trim();
+  if (!d) return '';
+  if (d.toLowerCase() === 'ot') return 'Occupational Therapy';
+  if (d.toLowerCase() === 'occupational therapy') return 'Occupational Therapy';
+  return d;
+}
+
+async function buildDomainTrendFromPlan(caseId, requestedDomainLabel) {
+  const domainLabel = normalizeLegacyDomainLabel(requestedDomainLabel);
+  if (!domainLabel) return [];
+
+  const plan = await TherapyPlan.findOne({ caseId }).sort({ updatedAt: -1 }).lean();
+  if (!plan) return [];
+
+  const goals = Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [];
+  const goalTitleToDomain = new Map(
+    goals.map((g) => [String(g?.title || '').trim(), normalizeLegacyDomainLabel(g?.domain)]).filter(([k]) => k)
+  );
+
+  const activities = Array.isArray(plan.activities) ? plan.activities : [];
+  const activityToDomain = new Map();
+  for (const a of activities) {
+    const title = String(a?.title || '').trim();
+    const linkedGoal = String(a?.linkedGoal || '').trim();
+    if (!title || !linkedGoal) continue;
+    const d = goalTitleToDomain.get(linkedGoal);
+    if (d) activityToDomain.set(title, d);
   }
 
-  return legacy
-    .filter((goal) => goal.type !== 'long-term')
-    .map((goal) => {
-      const explicitDomain = inferDomainFromText(goal?.domain);
-      const guessedDomain =
-        explicitDomain ||
-        inferDomainFromText(goal?.title) ||
-        inferDomainFromText(goal?.description) ||
-        (planDomains.length === 1 ? planDomains[0] : null);
-      return {
-        ...goal,
-        _derivedDomain: guessedDomain,
-        _derivedStatus: getGoalStatus(goal),
-      };
-    });
+  const sessions = await SessionLog.find({ caseId, status: 'completed' })
+    .select('sessionDate goalsTargeted childResponse')
+    .sort({ sessionDate: 1 })
+    .lean();
+
+  const points = [];
+  for (const s of sessions) {
+    const targeted = Array.isArray(s.goalsTargeted) ? s.goalsTargeted : [];
+    const hit = targeted.some((t) => normalizeLegacyDomainLabel(activityToDomain.get(String(t || '').trim())) === domainLabel);
+    if (!hit) continue;
+    const pct = legacySessionPct(s);
+    if (pct == null) continue;
+    const d = s.sessionDate ? new Date(s.sessionDate) : null;
+    if (!d || Number.isNaN(d.getTime())) continue;
+    const day = d.toISOString().slice(0, 10);
+    points.push({ date: day, value: Number(pct) });
+  }
+  return points;
 }
 
 async function assertClinicianCaseOwnership(caseId, clinicianId) {
   if (!mongoose.Types.ObjectId.isValid(caseId)) return null;
   return ChildCase.findOne({ _id: caseId, clinicianId }).lean();
-}
-
-function buildDomainProgress(domains, goals) {
-  return domains.map((domain) => {
-    const domainGoals = goals.filter((g) => g._derivedDomain === domain);
-    const totalGoals = domainGoals.length;
-    const achievedGoals = domainGoals.filter((g) => g._derivedStatus === 'achieved').length;
-    const progressPercent = totalGoals > 0 ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0;
-
-    return {
-      domain,
-      totalGoals,
-      achievedGoals,
-      progressPercent,
-    };
-  });
 }
 
 /**
@@ -135,37 +125,57 @@ exports.computeCaseProgressOverview = async function computeCaseProgressOverview
   if (!mongoose.Types.ObjectId.isValid(caseId)) {
     return { success: false, error: 'invalid_case' };
   }
+  const result = await computeProgressEngineForCase(caseId, { useCache: true });
+  if (!result.success) {
+    return { success: false, error: 'engine_failed', message: result.message || 'Failed to compute progress' };
+  }
 
-  const [plan, sessions] = await Promise.all([
-    TherapyPlan.findOne({ caseId }).lean(),
-    SessionLog.find({ caseId }).sort({ sessionDate: 1 }).lean(),
-  ]);
-
-  if (!plan && sessions.length === 0) {
+  const engine = result.data || null;
+  if (!engine) {
     return {
       success: true,
       data: {
         overallProgressPercent: 0,
         totalGoals: 0,
         achievedGoals: 0,
-        domains: SUPPORTED_DOMAINS.map((domain) => ({
-          domain,
-          totalGoals: 0,
-          achievedGoals: 0,
-          progressPercent: 0,
-        })),
+        domains: [],
         trendData: [],
+        progressEngine: null,
       },
       message: 'No progress data available',
     };
   }
 
-  const enrichedGoals = enrichGoalsWithDomain(plan);
-  const totalGoals = enrichedGoals.length;
-  const achievedGoals = enrichedGoals.filter((g) => g._derivedStatus === 'achieved').length;
-  const overallProgressPercent = totalGoals > 0 ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0;
-  const domains = buildDomainProgress(SUPPORTED_DOMAINS, enrichedGoals);
-  const trendData = groupTrendDataByDate(sessions);
+  const goals = Array.isArray(engine.goals) ? engine.goals : [];
+  const totalGoals = goals.length;
+  const achievedGoals = goals.filter((g) => g && (g.mastery === true || String(g.masteryStatus || '') === 'mastered')).length;
+  // Deterministic high-level progress: % of goals achieved.
+  // (Engine score is useful but can drift with weighting changes; keep UI/test stable.)
+  const overallProgressPercent = totalGoals ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0;
+
+  // Domain view expected by clinician dashboards/tests: use legacy plan domain buckets (Speech/OT/etc).
+  const domainMap = new Map();
+  for (const g of goals) {
+    if (!g) continue;
+    const legacy = String(g.legacyDomain || '').trim();
+    const name = legacy || String(g.domain || '').trim() || 'General';
+    if (!domainMap.has(name)) domainMap.set(name, { domain: name, totalGoals: 0, achievedGoals: 0 });
+    const row = domainMap.get(name);
+    row.totalGoals += 1;
+    if (g.mastery === true || String(g.masteryStatus || '') === 'mastered') row.achievedGoals += 1;
+  }
+  const domains = Array.from(domainMap.values()).map((d) => ({
+    ...d,
+    progressPercent: d.totalGoals ? Number(((d.achievedGoals / d.totalGoals) * 100).toFixed(2)) : 0,
+  }));
+
+  // Trend chart: use engine series (keyed by YYYY-MM-DD).
+  const trendData = (Array.isArray(engine.weeklyTrend) ? engine.weeklyTrend : [])
+    .filter((w) => w && w.week)
+    .map((w) => ({
+      date: String(w.week),
+      value: w.y != null ? Number((Number(w.y) * 20).toFixed(2)) : null,
+    }));
 
   return {
     success: true,
@@ -175,7 +185,9 @@ exports.computeCaseProgressOverview = async function computeCaseProgressOverview
       achievedGoals,
       domains,
       trendData,
+      progressEngine: engine,
     },
+    ...(result.cached ? { cached: true } : {}),
   };
 };
 
@@ -208,44 +220,46 @@ exports.getDomainProgress = async (req, res) => {
     const clinicianId = req.user._id;
     const owned = await assertClinicianCaseOwnership(caseId, clinicianId);
     if (!owned) return res.status(404).json({ success: false, message: 'Case not found' });
+    const result = await exports.computeCaseProgressOverview(caseId);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message || 'Invalid case id' });
+    }
 
-    const domain = inferDomainFromText(requestedDomain) || String(requestedDomain || '').trim();
-    if (!SUPPORTED_DOMAINS.includes(domain)) {
+    const domain = String(requestedDomain || '').trim().toLowerCase();
+    const goals = Array.isArray(result.data?.progressEngine?.goals) ? result.data.progressEngine.goals : [];
+
+    // Support legacy aliases: "OT" => "Occupational Therapy"
+    const requested = domain === 'ot' ? 'occupational therapy' : domain;
+    const supported = [...new Set(goals.map((g) => String(g?.legacyDomain || '').trim()).filter(Boolean))];
+    const matchName =
+      supported.find((d) => d.toLowerCase() === requested) ||
+      supported.find((d) => d.toLowerCase() === domain) ||
+      null;
+
+    if (!matchName) {
       return res.status(400).json({
         success: false,
-        message: `Unsupported domain. Use one of: ${SUPPORTED_DOMAINS.join(', ')}`,
+        message: `Unsupported domain. Use one of: ${supported.join(', ')}`,
       });
     }
 
-    const [plan, sessions] = await Promise.all([
-      TherapyPlan.findOne({ caseId }).lean(),
-      SessionLog.find({ caseId }).sort({ sessionDate: 1 }).lean(),
-    ]);
-
-    const enrichedGoals = enrichGoalsWithDomain(plan);
-    const domainGoals = enrichedGoals.filter((g) => g._derivedDomain === domain);
-    const totalGoals = domainGoals.length;
-    const achievedGoals = domainGoals.filter((g) => g._derivedStatus === 'achieved').length;
-    const progressPercent = totalGoals > 0 ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0;
-
-    const domainSessions = sessions.filter((s) => {
-      const combined = [
-        ...(Array.isArray(s.goalsTargeted) ? s.goalsTargeted : []),
-        ...(Array.isArray(s.activitiesUsed) ? s.activitiesUsed : []),
-      ].join(' ');
-      return inferDomainFromText(combined) === domain;
-    });
-
-    const trendData = groupTrendDataByDate(domainSessions);
+    const totalGoals = goals.filter((g) => g && String(g.legacyDomain || '').toLowerCase() === matchName.toLowerCase()).length;
+    const achievedGoals = goals.filter(
+      (g) =>
+        g &&
+        String(g.legacyDomain || '').toLowerCase() === matchName.toLowerCase() &&
+        (g.mastery === true || String(g.masteryStatus || '') === 'mastered')
+    ).length;
 
     return res.status(200).json({
       success: true,
       data: {
-        domain,
-        progressPercent,
+        domain: matchName,
+        progressPercent: totalGoals ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0,
         totalGoals,
         achievedGoals,
-        trendData,
+        // Trend points relevant to this domain (derived from plan activities + session goalsTargeted).
+        trendData: await buildDomainTrendFromPlan(caseId, matchName),
       },
     });
   } catch (error) {
@@ -261,34 +275,24 @@ exports.getSessionInsights = async (req, res) => {
     const clinicianId = req.user._id;
     const owned = await assertClinicianCaseOwnership(caseId, clinicianId);
     if (!owned) return res.status(404).json({ success: false, message: 'Case not found' });
-
-    const sessions = await SessionLog.find({ caseId }).sort({ sessionDate: -1 }).lean();
-    const totalSessions = sessions.length;
-    const scored = sessions
-      .map((s) => parseResponseScore(s.childResponse))
-      .filter((v) => typeof v === 'number');
-
-    const averageResponseScore = scored.length
-      ? Number((scored.reduce((sum, v) => sum + v, 0) / scored.length).toFixed(2))
-      : 0;
-
-    const lastSessionDate = totalSessions ? sessions[0].sessionDate : null;
-    const recentActivity = sessions.slice(0, 5).map((s) => ({
-      sessionDate: s.sessionDate,
-      duration: s.duration || 0,
-      goalsTargeted: Array.isArray(s.goalsTargeted) ? s.goalsTargeted : [],
-      childResponse: s.childResponse || '',
-      responseScore: parseResponseScore(s.childResponse),
-      notes: s.notes || '',
-    }));
+    const result = await exports.computeCaseProgressOverview(caseId);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message || 'Invalid case id' });
+    }
+    const engine = result.data?.progressEngine || null;
+    const insights = Array.isArray(engine?.sessionInsights) ? engine.sessionInsights : [];
+    const totalSessions = Number(engine?._meta?.sessionsCounted || 0);
+    const lastSessionDate = insights.length ? insights[insights.length - 1].sessionDate : null;
 
     return res.status(200).json({
       success: true,
       data: {
         totalSessions,
-        averageResponseScore,
+        // Convert 0–5 engine score avg to 0–100 for clinician UI consistency.
+        averageResponseScore:
+          engine?._meta?.therapyScoreAvg != null ? Number((Number(engine._meta.therapyScoreAvg) * 20).toFixed(2)) : 0,
         lastSessionDate,
-        recentActivity,
+        recentActivity: insights.slice(-5).reverse(),
       },
       message: totalSessions ? undefined : 'No sessions available',
     });

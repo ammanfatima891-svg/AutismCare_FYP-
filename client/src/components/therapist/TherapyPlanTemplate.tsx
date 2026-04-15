@@ -159,8 +159,8 @@ export function TherapyPlanTemplate() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-purple-600">{template.name}</h2>
-      <p className="text-gray-700">{template.description}</p>
+      <h2 className="text-2xl font-bold text-primary">{template.name}</h2>
+      <p className="text-foreground">{template.description}</p>
 
       {/* Child Info */}
       <motion.div
@@ -218,8 +218,8 @@ export function TherapyPlanTemplate() {
             {activities.map((act, idx) => (
               <div key={idx} className="flex flex-col gap-2 border-b pb-2">
                 <span className="font-semibold">{act.name} ({act.type})</span>
-                <span className="text-gray-600 text-sm">Frequency: {act.frequency}</span>
-                <span className="text-gray-600 text-sm">Instructions: {act.instructions}</span>
+                <span className="text-muted-foreground text-sm">Frequency: {act.frequency}</span>
+                <span className="text-muted-foreground text-sm">Instructions: {act.instructions}</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -236,7 +236,7 @@ export function TherapyPlanTemplate() {
         </Card>
       </motion.div>
 
-      <Button className="bg-purple-600 hover:bg-purple-700 w-full" onClick={handleSubmit}>
+      <Button className="w-full" variant="default" onClick={handleSubmit}>
         Create Therapy Plan
       </Button>
     </div>

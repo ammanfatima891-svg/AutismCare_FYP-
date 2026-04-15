@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 /**
  * Shared analytics aggregation for a case (SessionLog + TherapyPlan + HomeAssignment).
  * Used by GET /api/analytics/:caseId and therapy report generation — keep outputs in sync.
@@ -223,7 +224,7 @@ function buildCaseAnalyticsSnapshot({ plan, sessions, assignments }) {
     },
   };
 
-  const now = new Date();
+  const now = getCurrentTime();
   const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   let latestReview = null;
   for (const g of goals) {
@@ -248,7 +249,45 @@ function buildCaseAnalyticsSnapshot({ plan, sessions, assignments }) {
   };
 }
 
+const { buildStakeholderAnalyticsBlock } = require('./caseAnalyticsV2');
+const { buildProgressEnginePayload } = require('./progressEngine');
+
+/**
+ * Legacy chart fields + stakeholder KPI block + unified progress engine payload.
+ * @param {{ plan: object|null, sessions: object[], assignments: object[] }} params
+ * @param {object} [precomputedEngine] — optional; if omitted, engine is built from the same inputs.
+ */
+function buildUnifiedCaseAnalytics(params, precomputedEngine = null) {
+  const legacy = buildCaseAnalyticsSnapshot(params);
+  const stakeholder = buildStakeholderAnalyticsBlock(params);
+  const cid =
+    params.plan?.caseId ||
+    params.sessions?.[0]?.caseId ||
+    params.assignments?.[0]?.caseId ||
+    '';
+  const progressEngine =
+    precomputedEngine ||
+    buildProgressEnginePayload({
+      caseId: String(cid),
+      plan: params.plan,
+      sessions: params.sessions,
+      assignments: params.assignments || [],
+    });
+  const enginePct =
+    progressEngine.overallScore != null
+      ? Number(((progressEngine.overallScore / 5) * 100).toFixed(2))
+      : null;
+  return {
+    schemaVersion: 2,
+    ...legacy,
+    ...(enginePct != null ? { overallProgress: enginePct } : {}),
+    ...stakeholder,
+    progressEngine,
+  };
+}
+
 module.exports = {
   buildCaseAnalyticsSnapshot,
+  buildUnifiedCaseAnalytics,
   DOMAIN_BUCKETS,
 };

@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import API from '../../api';
+import { therapistAPI } from '../../api';
 
 interface TherapyRecommendationFormProps {
   childId: string;
@@ -28,9 +28,12 @@ export function TherapyRecommendationForm({ childId, onSuccess, onCancel }: Ther
     setError('');
 
     try {
-      await API.post('/appointment/therapist/recommendation', {
+      await therapistAPI.addTherapistRecommendation({
         childId,
-        recommendation: `${therapyType}: ${recommendation.trim()}${frequency ? `. Frequency: ${frequency}` : ''}${duration ? `. Duration: ${duration}` : ''}.`
+        recommendation: recommendation.trim(),
+        therapyType,
+        frequency,
+        duration,
       });
       onSuccess?.();
     } catch (err: any) {
@@ -114,7 +117,7 @@ export function TherapyRecommendationForm({ childId, onSuccess, onCancel }: Ther
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="text-destructive text-sm">{error}</div>
           )}
 
           <div className="flex gap-4">

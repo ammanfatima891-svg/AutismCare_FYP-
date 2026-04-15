@@ -7,13 +7,13 @@ const {
   acceptReferral,
   startReferral,
 } = require('../controllers/referralController');
-const { protect, restrictTo } = require('../middleware/auth.middleware');
+const { protect, restrictTo, requireOwnership } = require('../middleware/auth.middleware');
 
 router.use(protect);
 
 // Clinician endpoints
 router.post('/', restrictTo('clinician'), createReferral);
-router.get('/case/:caseId', restrictTo('clinician'), getReferralsByCase);
+router.get('/case/:caseId', restrictTo('clinician'), requireOwnership({ caseIdParam: 'caseId' }), getReferralsByCase);
 
 // Therapist endpoints
 router.get('/assigned', restrictTo('therapist'), getAssignedReferrals);

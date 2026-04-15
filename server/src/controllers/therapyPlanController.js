@@ -1,9 +1,15 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const TherapyPlan = require('../models/TherapyPlan');
 const TherapyCase = require('../models/TherapyCase');
 const { ChildCase } = require('../models/ChildCase');
 const { User } = require('../models/User');
 const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
+const { recordAuditEvent } = require('../utils/auditLog');
+const { mergeShortTermGoalsPreservingLockedBaselines } = require('../utils/planBaselineLock');
+const { invalidateProgressEngineCache } = require('../services/progressEngine');
+const { THERAPY_STATUS } = require('../constants/workflowEnums');
 
 const THERAPY_DOMAIN_OPTIONS = TherapyPlan.THERAPY_DOMAIN_OPTIONS;
 const SHORT_TERM_GOAL_STATUS = TherapyPlan.SHORT_TERM_GOAL_STATUS;
@@ -24,16 +30,51 @@ function resolvePlanStatus(body, existingStatus = 'draft') {
   return existingStatus;
 }
 
+function defaultMasteryRule(input) {
+  const mr = input && typeof input === 'object' ? input : {};
+  const ruleType =
+    mr.ruleType === 'threshold_consecutive_sessions' ? 'threshold_consecutive_sessions' : 'threshold_out_of_n_sessions';
+  const threshold = Number(mr.threshold);
+  const window = Number(mr.window);
+  const minSessions = Number(mr.minSessions);
+  return {
+    ruleType,
+    threshold: Number.isFinite(threshold) && threshold >= 0 ? threshold : 80,
+    window: Number.isFinite(window) && window > 0 ? window : 5,
+    minSessions: Number.isFinite(minSessions) && minSessions > 0 ? minSessions : 3,
+  };
+}
+
 function normalizeShortTermGoals(raw) {
   if (!Array.isArray(raw)) return [];
+  const MT = TherapyPlan.MEASUREMENT_TYPES || ['rating_1_5'];
   return raw
     .filter((g) => g && String(g.title || '').trim())
     .map((g) => ({
+      goalId: String(g.goalId || '').trim(),
+      goalKey: String(g.goalKey || '').trim() || crypto.randomUUID(),
       title: String(g.title).trim(),
       measurableCriteria: String(g.measurableCriteria || '').trim(),
+      masteryCriteria: String(g.masteryCriteria || '').trim(),
       reviewDate: g.reviewDate ? new Date(g.reviewDate) : null,
       status: SHORT_TERM_GOAL_STATUS.includes(g.status) ? g.status : 'Active',
       domain: isValidDomain(g.domain) ? g.domain : 'Speech',
+      measurement: {
+        type: MT.includes(g.measurement?.type || g.measurementType)
+          ? g.measurement?.type || g.measurementType
+          : 'rating_1_5',
+        unit: String(g.measurement?.unit || '').trim(),
+      },
+      baseline: {
+        value: g.baseline?.value != null && Number.isFinite(Number(g.baseline.value)) ? Number(g.baseline.value) : null,
+        date: g.baseline?.date ? new Date(g.baseline.date) : null,
+        notes: String(g.baseline?.notes || '').trim(),
+      },
+      target: {
+        value: g.target?.value != null && Number.isFinite(Number(g.target.value)) ? Number(g.target.value) : null,
+        notes: String(g.target?.notes || '').trim(),
+      },
+      masteryRule: defaultMasteryRule(g.masteryRule),
     }));
 }
 
@@ -91,7 +132,7 @@ function applyStatusToDoc(planDoc, status) {
 }
 
 async function assertActiveTherapyCase(caseId, therapistId) {
-  return TherapyCase.findOne({ caseId, therapistId, status: 'active' }).lean();
+  return TherapyCase.findOne({ caseId, therapistId, status: THERAPY_STATUS.ACTIVE }).lean();
 }
 
 function childNameFromParentChildren(parent, childId) {
@@ -159,7 +200,13 @@ exports.listTherapyPlansForTherapist = async (req, res) => {
       return res.status(200).json({
         success: true,
         data: [],
-        meta: { domainOptions: THERAPY_DOMAIN_OPTIONS, shortTermStatuses: SHORT_TERM_GOAL_STATUS },
+        meta: {
+        domainOptions: THERAPY_DOMAIN_OPTIONS,
+        shortTermStatuses: SHORT_TERM_GOAL_STATUS,
+        measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
+        masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
+        planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
+      },
       });
     }
 
@@ -175,7 +222,13 @@ exports.listTherapyPlansForTherapist = async (req, res) => {
     return res.status(200).json({
       success: true,
       data,
-      meta: { domainOptions: THERAPY_DOMAIN_OPTIONS, shortTermStatuses: SHORT_TERM_GOAL_STATUS },
+      meta: {
+        domainOptions: THERAPY_DOMAIN_OPTIONS,
+        shortTermStatuses: SHORT_TERM_GOAL_STATUS,
+        measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
+        masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
+        planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
+      },
     });
   } catch (error) {
     console.error('listTherapyPlansForTherapist:', error);
@@ -237,11 +290,16 @@ exports.duplicateTherapyPlan = async (req, res) => {
     if (Array.isArray(src.shortTermGoals)) {
       src.shortTermGoals = src.shortTermGoals.map((g) => {
         const { _id, ...rest } = g;
-        return rest;
+        return { ...rest, goalKey: rest.goalKey || crypto.randomUUID() };
       });
     }
 
     const created = await TherapyPlan.create(src);
+    try {
+      invalidateProgressEngineCache(targetCaseId);
+    } catch (_) {
+      /* ignore */
+    }
     return res.status(201).json({ success: true, data: created });
   } catch (error) {
     console.error('duplicateTherapyPlan:', error);
@@ -310,11 +368,16 @@ exports.duplicateTherapyPlanPost = async (req, res) => {
     if (Array.isArray(src.shortTermGoals)) {
       src.shortTermGoals = src.shortTermGoals.map((g) => {
         const { _id, ...rest } = g;
-        return rest;
+        return { ...rest, goalKey: rest.goalKey || crypto.randomUUID() };
       });
     }
 
     const created = await TherapyPlan.create(src);
+    try {
+      invalidateProgressEngineCache(caseId);
+    } catch (_) {
+      /* ignore */
+    }
     const createdObj = created.toObject();
 
     const parent = await User.findById(caseDoc.parentId).select('children').lean();
@@ -410,6 +473,26 @@ exports.createTherapyPlan = async (req, res) => {
       draft: status === 'draft',
     });
 
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: therapistId,
+        action: 'therapy_plan_created',
+        entityType: 'TherapyPlan',
+        entityId: plan._id,
+        caseId,
+        summary: `status=${String(plan.status)} planVersion=${Number(plan.planVersion || 1)}`,
+      });
+    } catch (e) {
+      console.error('audit therapy_plan_created:', e);
+    }
+
+    try {
+      invalidateProgressEngineCache(caseId);
+    } catch (_) {
+      /* ignore */
+    }
+
     return res.status(201).json({ success: true, data: plan });
   } catch (error) {
     console.error('createTherapyPlan:', error);
@@ -440,7 +523,13 @@ exports.getTherapyPlanByCase = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: plan || null,
-      meta: { domainOptions: THERAPY_DOMAIN_OPTIONS, shortTermStatuses: SHORT_TERM_GOAL_STATUS },
+      meta: {
+        domainOptions: THERAPY_DOMAIN_OPTIONS,
+        shortTermStatuses: SHORT_TERM_GOAL_STATUS,
+        measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
+        masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
+        planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
+      },
     });
   } catch (error) {
     console.error('getTherapyPlanByCase:', error);
@@ -587,8 +676,27 @@ exports.assignTherapyPlan = async (req, res) => {
     }
 
     await plan.save();
+    try {
+      invalidateProgressEngineCache(caseId);
+    } catch (_) {
+      /* ignore */
+    }
 
     const planLean = await TherapyPlan.findById(plan._id).lean();
+
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: therapistId,
+        action: 'therapy_plan_assigned',
+        entityType: 'TherapyPlan',
+        entityId: plan._id,
+        caseId,
+        summary: `assignedChildId=${String(childId)}`,
+      });
+    } catch (e) {
+      console.error('audit therapy_plan_assigned:', e);
+    }
     const cases = await ChildCase.find({ _id: caseId }).lean();
     const caseMap = new Map(cases.map((c) => [String(c._id), c]));
     const parentIds = [...new Set(cases.map((c) => String(c.parentId)))];
@@ -631,68 +739,185 @@ exports.updateTherapyPlan = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid plan id' });
     }
 
-    const plan = await TherapyPlan.findOne({ _id: id, therapistId });
-    if (!plan) {
-      return res.status(404).json({ success: false, message: 'Therapy plan not found' });
-    }
-
     const {
       domains,
       longTermGoal,
       shortTermGoals,
       activities,
       goals,
+      publishRevision,
     } = req.body || {};
 
-    const existingStatus =
-      plan.status === 'final' || plan.status === 'draft'
-        ? plan.status
-        : plan.draft
-          ? 'draft'
-          : 'final';
-    const nextStatus = resolvePlanStatus(req.body, existingStatus);
-    const mergedDomains =
-      domains !== undefined
-        ? Array.isArray(domains)
-          ? domains.filter((d) => THERAPY_DOMAIN_OPTIONS.includes(d))
-          : []
-        : plan.domains;
-    const mergedLong =
-      longTermGoal !== undefined
-        ? {
-            title: String(longTermGoal.title ?? plan.longTermGoal?.title ?? '').trim(),
-            description: String(longTermGoal.description ?? plan.longTermGoal?.description ?? '').trim(),
-            timeline: String(longTermGoal.timeline ?? plan.longTermGoal?.timeline ?? '').trim(),
-          }
-        : plan.longTermGoal || { title: '', description: '', timeline: '' };
-    const mergedShort =
-      shortTermGoals !== undefined ? normalizeShortTermGoals(shortTermGoals) : plan.shortTermGoals;
-    const mergedActivities =
-      activities !== undefined ? normalizeActivities(activities) : plan.activities;
+    // Retry once for optimistic concurrency conflicts during near-simultaneous updates.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const plan = await TherapyPlan.findOne({ _id: id, therapistId });
+      if (!plan) {
+        return res.status(404).json({ success: false, message: 'Therapy plan not found' });
+      }
 
-    if (nextStatus === 'final') {
-      const v = validateFinalPlan({
-        domains: mergedDomains,
-        longTermGoal: mergedLong,
-        shortTermGoals: mergedShort,
-      });
-      if (!v.ok) return res.status(400).json({ success: false, message: v.message });
+      const existingStatus =
+        plan.status === 'final' || plan.status === 'draft'
+          ? plan.status
+          : plan.draft
+            ? 'draft'
+            : 'final';
+      const nextStatus = resolvePlanStatus(req.body, existingStatus);
+      const mergedDomains =
+        domains !== undefined
+          ? Array.isArray(domains)
+            ? domains.filter((d) => THERAPY_DOMAIN_OPTIONS.includes(d))
+            : []
+          : plan.domains;
+      const mergedLong =
+        longTermGoal !== undefined
+          ? {
+              title: String(longTermGoal.title ?? plan.longTermGoal?.title ?? '').trim(),
+              description: String(longTermGoal.description ?? plan.longTermGoal?.description ?? '').trim(),
+              timeline: String(longTermGoal.timeline ?? plan.longTermGoal?.timeline ?? '').trim(),
+            }
+          : plan.longTermGoal || { title: '', description: '', timeline: '' };
+      let mergedShort =
+        shortTermGoals !== undefined ? normalizeShortTermGoals(shortTermGoals) : plan.shortTermGoals;
+      if (shortTermGoals !== undefined && plan.baselineLocked) {
+        mergedShort = mergeShortTermGoalsPreservingLockedBaselines(plan, mergedShort);
+      }
+      const mergedActivities =
+        activities !== undefined ? normalizeActivities(activities) : plan.activities;
+
+      if (nextStatus === 'final') {
+        const v = validateFinalPlan({
+          domains: mergedDomains,
+          longTermGoal: mergedLong,
+          shortTermGoals: mergedShort,
+        });
+        if (!v.ok) return res.status(400).json({ success: false, message: v.message });
+      }
+
+      if (domains !== undefined) plan.domains = mergedDomains;
+      if (longTermGoal !== undefined) plan.longTermGoal = mergedLong;
+      if (shortTermGoals !== undefined) plan.shortTermGoals = mergedShort;
+      if (activities !== undefined) plan.activities = mergedActivities;
+      if (goals !== undefined) {
+        plan.goals = Array.isArray(goals) ? goals : [];
+      }
+
+      applyStatusToDoc(plan, nextStatus);
+
+      if (publishRevision) {
+        plan.planVersion = Number(plan.planVersion || 1) + 1;
+        plan.approval = {
+          status: 'none',
+          requestedAt: null,
+          approvedAt: null,
+          approvedBy: undefined,
+          rejectionReason: '',
+        };
+      }
+
+      try {
+        await plan.save();
+        try {
+          invalidateProgressEngineCache(plan.caseId);
+        } catch (_) {
+          /* ignore */
+        }
+
+        try {
+          await recordAuditEvent({
+            req,
+            actorId: therapistId,
+            action: 'therapy_plan_changed',
+            entityType: 'TherapyPlan',
+            entityId: plan._id,
+            caseId: plan.caseId,
+            summary: publishRevision ? `planVersion=${plan.planVersion} published` : 'Therapy plan updated',
+          });
+        } catch (e) {
+          console.error('audit therapy_plan_changed:', e);
+        }
+
+        if (publishRevision) {
+          await recordAuditEvent({
+            req,
+            actorId: therapistId,
+            action: 'therapy_plan_revision_published',
+            entityType: 'TherapyPlan',
+            entityId: plan._id,
+            caseId: plan.caseId,
+            summary: `planVersion=${plan.planVersion}`,
+          });
+        }
+        return res.status(200).json({ success: true, data: plan.toObject() });
+      } catch (saveError) {
+        if (saveError?.name === 'VersionError' && attempt === 0) {
+          continue;
+        }
+        throw saveError;
+      }
     }
 
-    if (domains !== undefined) plan.domains = mergedDomains;
-    if (longTermGoal !== undefined) plan.longTermGoal = mergedLong;
-    if (shortTermGoals !== undefined) plan.shortTermGoals = mergedShort;
-    if (activities !== undefined) plan.activities = mergedActivities;
-    if (goals !== undefined) {
-      plan.goals = Array.isArray(goals) ? goals : [];
-    }
-
-    applyStatusToDoc(plan, nextStatus);
-
-    await plan.save();
-    return res.status(200).json({ success: true, data: plan.toObject() });
+    return res.status(409).json({ success: false, message: 'Plan was updated concurrently. Please retry.' });
   } catch (error) {
     console.error('updateTherapyPlan:', error);
     return res.status(500).json({ success: false, message: 'Failed to update therapy plan' });
+  }
+};
+
+/**
+ * POST /api/therapy-plan/submit-for-approval/:planId
+ * Therapist requests clinician (supervisory) sign-off on the plan document.
+ */
+exports.submitTherapyPlanForApproval = async (req, res) => {
+  try {
+    const therapistId = req.user._id;
+    const { planId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(planId)) {
+      return res.status(400).json({ success: false, message: 'Invalid planId' });
+    }
+
+    const plan = await TherapyPlan.findOne({ _id: planId, therapistId });
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Therapy plan not found' });
+    }
+
+    const access = await assertTherapistCaseAccess(req, plan.caseId, therapistId);
+    if (!access.ok) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const st = String(plan.approval?.status || 'none');
+    if (st === 'pending') {
+      return res.status(409).json({ success: false, message: 'Plan is already pending approval' });
+    }
+
+    plan.approval = {
+      status: 'pending',
+      requestedAt: getCurrentTime(),
+      approvedAt: null,
+      approvedBy: undefined,
+      rejectionReason: '',
+    };
+    await plan.save();
+    try {
+      invalidateProgressEngineCache(plan.caseId);
+    } catch (_) {
+      /* ignore */
+    }
+
+    await recordAuditEvent({
+      req,
+      actorId: therapistId,
+      action: 'therapy_plan_submit_for_approval',
+      entityType: 'TherapyPlan',
+      entityId: plan._id,
+      caseId: plan.caseId,
+      summary: 'Therapy plan submitted for clinician approval',
+    });
+
+    return res.status(200).json({ success: true, data: plan.toObject() });
+  } catch (error) {
+    console.error('submitTherapyPlanForApproval:', error);
+    return res.status(500).json({ success: false, message: 'Failed to submit plan for approval' });
   }
 };

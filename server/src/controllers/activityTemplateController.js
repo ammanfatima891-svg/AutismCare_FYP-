@@ -22,9 +22,14 @@ exports.listTemplates = async (req, res) => {
     applyDomainFilter(q, domain);
     applySearchFilter(q, search);
 
-    /** Lean payload for pickers (full docs were freezing the client when listing hundreds of templates). */
+    /**
+     * Include fields needed for the Activity Library grid (objective, procedure, difficulty).
+     * Still `.select()` explicit paths to avoid oversized lean docs if the schema grows.
+     */
     const list = await Activity.find(q)
-      .select('_id name domain materials isTemplate createdBy')
+      .select(
+        '_id name domain materials difficulty frequency objective procedure instructions notes parentInvolvement isTemplate createdBy'
+      )
       .sort({ domain: 1, name: 1 })
       .lean();
     const data = list.map((row) => ({
@@ -32,6 +37,13 @@ exports.listTemplates = async (req, res) => {
       name: row.name,
       domain: row.domain,
       materials: row.materials,
+      difficulty: row.difficulty,
+      frequency: row.frequency,
+      objective: row.objective,
+      procedure: row.procedure,
+      instructions: row.instructions,
+      notes: row.notes,
+      parentInvolvement: row.parentInvolvement,
       isPlatformTemplate: row.createdBy == null,
     }));
     return res.status(200).json({

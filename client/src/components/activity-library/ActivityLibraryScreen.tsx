@@ -47,14 +47,17 @@ function previewText(s: string | undefined, max = 120) {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
-function activitySummary(a: { objective?: string; instructions?: string; procedure?: string }) {
-  return String(a.instructions || a.objective || a.procedure || '').trim();
+/** Objective column: prefer explicit objective; fall back to legacy `instructions` only (not procedure). */
+function objectivePreview(a: { objective?: string; instructions?: string }) {
+  const o = String(a.objective || '').trim();
+  if (o) return o;
+  return String(a.instructions || '').trim();
 }
 
 function ProcedureContent({ procedure }: { procedure?: string }) {
   const raw = String(procedure || '').trim();
   if (!raw) {
-    return <p className="text-sm text-slate-500">—</p>;
+    return <p className="text-sm text-muted-foreground">—</p>;
   }
   const lines = raw
     .split(/\n/)
@@ -62,7 +65,7 @@ function ProcedureContent({ procedure }: { procedure?: string }) {
     .filter(Boolean);
   if (lines.length > 1) {
     return (
-      <ol className="mt-1.5 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700 marker:text-slate-500">
+      <ol className="mt-1.5 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-foreground marker:text-muted-foreground">
         {lines.slice(0, 8).map((line, i) => (
           <li key={i} className="pl-0.5">
             {line.replace(/^\d+[\).\s]+/, '').trim()}
@@ -71,7 +74,7 @@ function ProcedureContent({ procedure }: { procedure?: string }) {
       </ol>
     );
   }
-  return <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{previewText(raw, 320)}</p>;
+  return <p className="mt-1.5 text-sm leading-relaxed text-foreground">{previewText(raw, 320)}</p>;
 }
 
 function isPlatformTemplate(a: ActivityTemplate) {
@@ -97,6 +100,7 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
   const [assignTarget, setAssignTarget] = useState<'home' | 'plan'>('home');
   const [assignDue, setAssignDue] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search), 350);
@@ -113,7 +117,10 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
       const body = axiosRes.data as { data?: ActivityTemplate[] } | undefined;
       const list = Array.isArray(body?.data) ? body.data : [];
       setItems(list);
+      setLoadError(null);
     } catch {
+      const msg = 'Could not load activities. Check your connection and try again.';
+      setLoadError(msg);
       toast.error('Failed to load activities');
       setItems([]);
     } finally {
@@ -208,22 +215,22 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
     <div className="space-y-8">
       {/* Page header — matches primary screens (Therapy Plans, Sessions) */}
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Activity Library</h1>
-        <p className="text-base text-slate-600">Browse, search, and manage therapy activities.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">Activity Library</h1>
+        <p className="text-base text-muted-foreground">Browse, search, and manage therapy activities.</p>
       </header>
 
       {/* Toolbar */}
-      <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+      <div className="rounded-xl border/90 bg-card p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
           <div className="min-w-0 flex-1 space-y-3">
             <Label className="sr-only">Search activities</Label>
-            <div className="flex h-11 w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 shadow-sm transition-all focus-within:border-slate-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-slate-900/10">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+            <div className="flex h-11 w-full min-w-0 items-center gap-3 rounded-lg border bg-background/50 px-3.5 shadow-sm transition-all focus-within:border focus-within:bg-card focus-within:ring-2 focus-within:ring-ring/30">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <Input
                 type="search"
                 autoComplete="off"
                 aria-label="Search activities"
-                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm shadow-none placeholder:text-slate-400 focus-visible:ring-0"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
                 placeholder="Search activities by name, objective, or materials…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -234,11 +241,11 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="w-full sm:max-w-[220px]">
-                <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Domain
                 </Label>
                 <Select value={domainFilter} onValueChange={setDomainFilter}>
-                  <SelectTrigger className="h-11 border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300">
+                  <SelectTrigger className="h-11 border bg-card shadow-sm transition-colors hover:border">
                     <SelectValue placeholder="All domains" />
                   </SelectTrigger>
                   <SelectContent>
@@ -256,7 +263,8 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
           <Button
             type="button"
             id="activity-library-new-template"
-            className="h-11 shrink-0 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98] lg:min-w-[180px]"
+            variant="primary"
+            className="h-11 shrink-0 rounded-lg px-5 text-sm font-semibold shadow-sm transition-all active:scale-[0.98] lg:min-w-[180px]"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -269,14 +277,26 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
         </div>
       </div>
 
+      {loadError && !loading ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm text-foreground">{loadError}</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0 border-destructive/40" onClick={() => void load()}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+          <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-14 text-center sm:px-10">
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-900">No activities found.</span>{' '}
+        <div className="rounded-xl border-dashed border bg-muted/80 px-6 py-14 text-center sm:px-10">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">No activities found.</span>{' '}
             {hasActiveFilters
               ? 'Try adjusting search or domain, or create a new activity.'
               : 'Create an activity to use in therapy plans, sessions, and home assignments.'}
@@ -284,7 +304,7 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button
               type="button"
-              className="rounded-lg bg-slate-900 px-6 font-semibold text-white shadow-sm hover:bg-slate-800"
+              className="rounded-lg bg-primary px-6 font-semibold text-white shadow-sm hover:bg-blue-800"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -295,79 +315,90 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
               New Activity
             </Button>
             {hasActiveFilters ? (
-              <Button type="button" variant="outline" className="border-slate-300" onClick={clearFilters}>
+              <Button type="button" variant="outline" className="border" onClick={clearFilters}>
                 Clear filters
               </Button>
             ) : null}
           </div>
         </div>
       ) : (
-        <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {items.map((a) => (
+        <ul className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {items.map((a) => {
+            const objText = objectivePreview(a);
+            const showInstructionsFallback = !String(a.objective || '').trim() && String(a.instructions || '').trim();
+            return (
             <li
               key={a._id}
-              className="group flex min-h-[320px] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              className="group flex min-h-[280px] flex-col overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-border/60 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                <h2 className="min-w-0 flex-1 text-lg font-semibold leading-snug tracking-tight text-slate-900">
-                  {a.name}
-                </h2>
-                <Badge
-                  variant="secondary"
-                  className="shrink-0 rounded-md border-0 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800"
-                >
-                  {a.difficulty || 'Medium'}
-                </Badge>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {isPlatformTemplate(a) ? (
+              <div className="border-b border-border/80 bg-muted/30 px-5 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="min-w-0 flex-1 text-lg font-semibold leading-snug tracking-tight text-foreground">
+                    {a.name}
+                  </h2>
+                  <Badge
+                    variant="secondary"
+                    className="shrink-0 rounded-md border border-border/60 bg-background px-2.5 py-0.5 text-xs font-medium text-foreground"
+                  >
+                    {a.difficulty || 'Medium'}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {isPlatformTemplate(a) ? (
+                    <Badge
+                      variant="outline"
+                      className="rounded-md border bg-card text-xs font-medium text-foreground"
+                    >
+                      Platform
+                    </Badge>
+                  ) : null}
                   <Badge
                     variant="outline"
-                    className="rounded-md border-slate-200 bg-white text-xs font-medium text-slate-700"
+                    className="rounded-md border bg-background text-xs font-medium text-foreground"
                   >
-                    Platform
+                    {domainLabel(a.domain)}
                   </Badge>
-                ) : null}
-                <Badge
-                  variant="outline"
-                  className="rounded-md border-slate-200 bg-slate-50 text-xs font-medium text-slate-800"
-                >
-                  {domainLabel(a.domain)}
-                </Badge>
+                </div>
               </div>
 
-              <div className="mt-4 min-h-0 flex-1 space-y-4 text-sm">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Objective</p>
-                  <p className="mt-1.5 leading-relaxed text-slate-800">{previewText(a.objective || activitySummary(a), 220)}</p>
+              <div className="flex min-h-0 flex-1 flex-col gap-0 px-5 pb-5 pt-4">
+                <div className="space-y-4 text-sm">
+                  <div className="rounded-lg bg-muted/20 p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Objective</p>
+                    {showInstructionsFallback ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">Showing instructions (no separate objective)</p>
+                    ) : null}
+                    <p className="mt-1.5 leading-relaxed text-foreground">{objText ? previewText(objText, 220) : '—'}</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/20 p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Procedure</p>
+                    <div className="mt-1 text-foreground">
+                      <ProcedureContent procedure={a.procedure} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Materials</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-foreground">
+                      {a.materials ? previewText(a.materials, 240) : '—'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Procedure</p>
-                  <ProcedureContent procedure={a.procedure} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Materials required</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
-                    {a.materials ? previewText(a.materials, 240) : '—'}
+
+                {a.frequency ? (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground/80">Suggested frequency: </span>
+                    {a.frequency}
                   </p>
-                </div>
+                ) : null}
               </div>
 
-              {a.frequency ? (
-                <p className="mt-3 text-xs text-slate-500">
-                  <span className="font-medium text-slate-600">Suggested frequency: </span>
-                  {a.frequency}
-                </p>
-              ) : null}
-
-              <div className="mt-auto border-t border-slate-100 pt-4">
+              <div className="mt-auto border-t border-border/80 bg-muted/10 px-5 py-4">
                 <div className="grid grid-cols-3 gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-10 min-w-0 w-full border-slate-300 bg-white px-2 font-bold text-slate-800 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50 sm:px-3"
+                    className="h-10 min-w-0 w-full border bg-card px-2 font-bold text-foreground shadow-sm transition-all hover:border hover:bg-background active:scale-[0.98] disabled:opacity-50 sm:px-3"
                     disabled={isPlatformTemplate(a)}
                     title={isPlatformTemplate(a) ? 'Platform templates cannot be edited — clone to customize' : undefined}
                     onClick={() => {
@@ -382,7 +413,7 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-10 min-w-0 w-full border-slate-300 bg-white px-2 font-medium text-slate-800 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] sm:px-3"
+                    className="h-10 min-w-0 w-full border bg-card px-2 font-medium text-foreground shadow-sm transition-all hover:border hover:bg-background active:scale-[0.98] sm:px-3"
                     onClick={() => void handleClone(a)}
                   >
                     <Copy className="mr-1.5 h-3.5 w-3.5" aria-hidden />
@@ -391,7 +422,8 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
                   <Button
                     type="button"
                     size="sm"
-                    className="h-10 min-w-0 w-full border border-slate-300 bg-white px-2 font-bold text-black shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 sm:px-3"
+                    variant="accent"
+                    className="h-10 min-w-0 w-full px-2 font-bold shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 sm:px-3"
                     onClick={() => openAssign(a)}
                     disabled={!caseId}
                     title={!caseId ? 'Open a case file to assign' : 'Assign to plan or home'}
@@ -401,7 +433,8 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -415,46 +448,47 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
       ) : null}
 
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="border-slate-200 bg-white sm:max-w-md">
+        <DialogContent className="border bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-slate-900">Assign activity</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-foreground">Assign activity</DialogTitle>
           </DialogHeader>
           {assignActivity ? (
-            <p className="text-sm font-medium text-slate-800">{assignActivity.name}</p>
+            <p className="text-sm font-medium text-foreground">{assignActivity.name}</p>
           ) : null}
           <RadioGroup
             value={assignTarget}
             onValueChange={(v) => setAssignTarget(v as 'home' | 'plan')}
             className="grid gap-3 pt-2"
           >
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-50">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-background has-[:checked]:border has-[:checked]:bg-background">
               <RadioGroupItem value="home" id="assign-home" className="mt-0.5" />
               <div>
-                <span className="text-sm font-medium text-slate-900">Home assignment</span>
-                <p className="text-xs text-slate-600">Parent sees instructions and materials on their dashboard</p>
+                <span className="text-sm font-medium text-foreground">Home assignment</span>
+                <p className="text-xs text-muted-foreground">Parent sees instructions and materials on their dashboard</p>
               </div>
             </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-50">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-background has-[:checked]:border has-[:checked]:bg-background">
               <RadioGroupItem value="plan" id="assign-plan" className="mt-0.5" />
               <div>
-                <span className="text-sm font-medium text-slate-900">Therapy plan</span>
-                <p className="text-xs text-slate-600">Adds this activity to the case therapy plan (requires a plan)</p>
+                <span className="text-sm font-medium text-foreground">Therapy plan</span>
+                <p className="text-xs text-muted-foreground">Adds this activity to the case therapy plan (requires a plan)</p>
               </div>
             </label>
           </RadioGroup>
           {assignTarget === 'home' ? (
             <div className="space-y-1.5 pt-2">
-              <Label className="text-slate-700">Due date</Label>
-              <Input type="date" value={assignDue} onChange={(e) => setAssignDue(e.target.value)} className="border-slate-200" />
+              <Label className="text-foreground">Due date</Label>
+              <Input type="date" value={assignDue} onChange={(e) => setAssignDue(e.target.value)} className="border" />
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" className="border-slate-300" onClick={() => setAssignOpen(false)} disabled={assignSaving}>
+            <Button type="button" variant="outline" className="border" onClick={() => setAssignOpen(false)} disabled={assignSaving}>
               Cancel
             </Button>
             <Button
               type="button"
-              className="bg-slate-900 font-semibold text-white hover:bg-slate-800"
+              variant="primary"
+              className="font-semibold"
               onClick={() => void submitAssign()}
               disabled={assignSaving || (assignTarget === 'home' && !assignDue)}
             >

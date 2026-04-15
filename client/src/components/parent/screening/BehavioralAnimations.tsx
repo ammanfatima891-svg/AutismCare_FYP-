@@ -274,14 +274,14 @@ export function QuestionBehavior({
       />
       {isSpeaking && (
         <motion.div
-          className="flex items-center gap-2 text-sm text-teal-600"
+          className="flex items-center gap-2 text-sm text-blue-600"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
           <motion.div
             animate={{ scale: [1, 1.2, 1] }}
             transition={{ duration: 0.5, repeat: Infinity }}
-            className="w-2 h-2 bg-teal-500 rounded-full"
+            className="w-2 h-2 bg-blue-500 rounded-full"
           />
           <span>Speaking...</span>
         </motion.div>
@@ -303,13 +303,13 @@ export function ProgressIndicator({ current, total, showPercentage = true, class
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="flex justify-between items-center text-sm text-gray-600">
+      <div className="flex justify-between items-center text-sm text-muted-foreground">
         <span>Question {current} of {total}</span>
         {showPercentage && <span>{percentage}% complete</span>}
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+      <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
         <motion.div
-          className="h-full bg-gradient-to-r from-teal-400 to-cyan-500 rounded-full"
+          className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
           transition={{ duration: 0.8, ease: "easeOut" }}
@@ -321,7 +321,7 @@ export function ProgressIndicator({ current, total, showPercentage = true, class
             <motion.div
               key={i}
               className={`w-2 h-2 rounded-full ${
-                i < current ? 'bg-teal-500' : 'bg-gray-300'
+                i < current ? 'bg-blue-500' : 'bg-muted'
               }`}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}

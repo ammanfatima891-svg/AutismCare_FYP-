@@ -127,8 +127,8 @@ export function EducationSection() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
-        <h2 className="text-green-600 mb-2">Learning & Activities</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2 text-foreground">Learning & Activities</h2>
+        <p className="text-muted-foreground">
           Educational resources and therapy activities for your child
         </p>
       </div>
@@ -143,7 +143,7 @@ export function EducationSection() {
         <TabsContent value="library" className="space-y-6">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <Input
               placeholder="Search articles, videos, guides..."
               value={searchQuery}
@@ -154,19 +154,19 @@ export function EducationSection() {
 
           {/* Category Filter */}
           <div className="flex gap-2 flex-wrap">
-            <Badge variant="secondary" className="cursor-pointer hover:bg-green-100">All</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-green-50">Basics</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-green-50">Communication</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-green-50">Activities</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-green-50">Behavior</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-green-50">Social Skills</Badge>
+            <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">All</Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-primary/20">Basics</Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-primary/20">Communication</Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-primary/20">Activities</Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-primary/20">Behavior</Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-primary/20">Social Skills</Badge>
           </div>
 
           {/* Content Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {contentLibrary.map((item) => (
               <Card key={item.id} className="overflow-hidden hover:shadow-xl transition-shadow cursor-pointer group">
-                <div className="relative h-48 overflow-hidden bg-gray-100">
+                <div className="relative h-48 overflow-hidden bg-muted">
                   <ImageWithFallback
                     src={item.image}
                     alt={item.title}
@@ -174,18 +174,18 @@ export function EducationSection() {
                   />
                   {item.type === 'video' && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
-                      <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
-                        <Play className="w-8 h-8 text-green-600 ml-1" />
+                      <div className="w-16 h-16 rounded-full bg-card flex items-center justify-center">
+                        <Play className="w-8 h-8 text-primary ml-1" />
                       </div>
                     </div>
                   )}
-                  <Badge className="absolute top-3 right-3 bg-green-600">
+                  <Badge className="absolute top-3 right-3 bg-primary">
                     {item.category}
                   </Badge>
                 </div>
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-green-600 line-clamp-2">{item.title}</CardTitle>
+                    <CardTitle className="text-primary line-clamp-2">{item.title}</CardTitle>
                     {getTypeIcon(item.type)}
                   </div>
                   <CardDescription className="line-clamp-2">
@@ -194,11 +194,11 @@ export function EducationSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
                       {item.duration}
                     </div>
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Button size="sm" className="bg-primary hover:bg-blue-700">
                       {item.type === 'video' ? 'Watch' : 'Read'}
                     </Button>
                   </div>
@@ -211,7 +211,7 @@ export function EducationSection() {
         {/* Activities Tab */}
         <TabsContent value="activities" className="space-y-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-green-600">Assigned Activities</h3>
+            <h3 className="text-primary">Assigned Activities</h3>
             <div className="flex gap-2">
               <Badge variant="outline">All ({assignedActivities.length})</Badge>
               <Badge className="bg-yellow-500">
@@ -226,7 +226,7 @@ export function EducationSection() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <CardTitle className="text-green-600">{activity.title}</CardTitle>
+                      <CardTitle className="text-primary">{activity.title}</CardTitle>
                       <Badge variant="outline">{activity.category}</Badge>
                     </div>
                     <CardDescription className="space-y-1">
@@ -235,24 +235,24 @@ export function EducationSection() {
                     </CardDescription>
                   </div>
                   <div className="text-right">
-                    <Badge className={activity.status === 'in-progress' ? 'bg-yellow-500' : 'bg-gray-500'}>
+                    <Badge className={activity.status === 'in-progress' ? 'bg-yellow-500' : 'bg-destructive'}>
                       {activity.status === 'in-progress' ? 'In Progress' : 'Not Started'}
                     </Badge>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                       Due: {new Date(activity.dueDate).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-700">{activity.instructions}</p>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-foreground">{activity.instructions}</p>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600">Progress</span>
-                    <span className="text-gray-900">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="text-foreground">
                       {activity.completed}/{activity.total} completed
                     </span>
                   </div>
@@ -260,7 +260,7 @@ export function EducationSection() {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700">
+                  <Button className="flex-1 bg-primary hover:bg-blue-700">
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Mark Complete
                   </Button>

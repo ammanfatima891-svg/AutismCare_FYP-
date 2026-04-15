@@ -6,8 +6,8 @@ export function UnderstandingResults() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Understanding Your Screening Results</h1>
-        <p className="text-lg text-gray-600">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Understanding Your Screening Results</h1>
+        <p className="text-lg text-muted-foreground">
           What your child's screening scores mean and next steps
         </p>
       </div>
@@ -20,7 +20,7 @@ export function UnderstandingResults() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-700 mb-4">
+          <p className="text-foreground mb-4">
             Developmental screenings use standardized questionnaires to assess your child's development in key areas.
             The results help identify potential developmental concerns that may benefit from further evaluation or early intervention.
           </p>
@@ -34,18 +34,18 @@ export function UnderstandingResults() {
       </Card>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border bg-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-800">
+            <CardTitle className="flex items-center gap-2 text-primary">
               <CheckCircle className="h-5 w-5" />
               Typical Development
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-green-700 mb-3">
+            <p className="text-primary mb-3">
               Your child's scores fall within the expected range for their age.
             </p>
-            <ul className="text-sm text-green-600 space-y-1">
+            <ul className="text-sm text-primary space-y-1">
               <li>• Continue regular developmental monitoring</li>
               <li>• Schedule routine well-child visits</li>
               <li>• No immediate concerns identified</li>
@@ -72,18 +72,18 @@ export function UnderstandingResults() {
           </CardContent>
         </Card>
 
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border bg-muted">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-800">
+            <CardTitle className="flex items-center gap-2 text-destructive">
               <TrendingUp className="h-5 w-5" />
               Further Evaluation Recommended
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-700 mb-3">
+            <p className="text-destructive mb-3">
               Results suggest potential developmental concerns.
             </p>
-            <ul className="text-sm text-red-600 space-y-1">
+            <ul className="text-sm text-destructive space-y-1">
               <li>• Consult with developmental specialist</li>
               <li>• Consider comprehensive evaluation</li>
               <li>• Early intervention services may be beneficial</li>
@@ -99,37 +99,37 @@ export function UnderstandingResults() {
         <CardContent>
           <div className="space-y-4">
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">ASQ-3 (Ages & Stages Questionnaires)</h4>
+              <h4 className="font-semibold text-foreground mb-2">ASQ-3 (Ages & Stages Questionnaires)</h4>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Badge variant="outline" className="mb-2">Communication</Badge>
-                  <p className="text-sm text-gray-600">How your child understands and uses language</p>
+                  <p className="text-sm text-muted-foreground">How your child understands and uses language</p>
                 </div>
                 <div>
                   <Badge variant="outline" className="mb-2">Gross Motor</Badge>
-                  <p className="text-sm text-gray-600">Large muscle movements and coordination</p>
+                  <p className="text-sm text-muted-foreground">Large muscle movements and coordination</p>
                 </div>
                 <div>
                   <Badge variant="outline" className="mb-2">Fine Motor</Badge>
-                  <p className="text-sm text-gray-600">Small muscle movements and dexterity</p>
+                  <p className="text-sm text-muted-foreground">Small muscle movements and dexterity</p>
                 </div>
                 <div>
                   <Badge variant="outline" className="mb-2">Problem Solving</Badge>
-                  <p className="text-sm text-gray-600">Thinking and learning skills</p>
+                  <p className="text-sm text-muted-foreground">Thinking and learning skills</p>
                 </div>
                 <div>
                   <Badge variant="outline" className="mb-2">Personal-Social</Badge>
-                  <p className="text-sm text-gray-600">Social and emotional development</p>
+                  <p className="text-sm text-muted-foreground">Social and emotional development</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">M-CHAT-R (Modified Checklist for Autism)</h4>
-              <p className="text-sm text-gray-600 mb-2">
+              <h4 className="font-semibold text-foreground mb-2">M-CHAT-R (Modified Checklist for Autism)</h4>
+              <p className="text-sm text-muted-foreground mb-2">
                 Screens for early signs of autism spectrum disorder by assessing:
               </p>
-              <ul className="text-sm text-gray-600 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Social communication skills</li>
                 <li>• Play and imaginative activities</li>
                 <li>• Repetitive behaviors and restricted interests</li>
@@ -148,8 +148,8 @@ export function UnderstandingResults() {
           <div className="space-y-4">
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">If Results Are Typical</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
+                <h4 className="font-semibold text-foreground mb-2">If Results Are Typical</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Continue age-appropriate activities</li>
                   <li>• Monitor developmental milestones</li>
                   <li>• Schedule regular pediatric check-ups</li>
@@ -158,8 +158,8 @@ export function UnderstandingResults() {
               </div>
 
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">If Further Evaluation Is Recommended</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
+                <h4 className="font-semibold text-foreground mb-2">If Further Evaluation Is Recommended</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Contact your pediatrician for guidance</li>
                   <li>• Request referral to developmental specialist</li>
                   <li>• Consider early intervention services</li>

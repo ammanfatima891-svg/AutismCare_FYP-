@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-const REPORT_TYPES = ['monthly', 'iep', 'clinician', 'parent', 'progress', 'session', 'therapy'];
+const REPORT_TYPES = ['monthly', 'iep', 'clinician', 'parent', 'progress', 'session', 'therapy', 'integrated'];
 
 const ReportSchema = new Schema(
   {
@@ -27,6 +27,12 @@ const ReportSchema = new Schema(
     data: {
       type: Schema.Types.Mixed,
       required: true,
+    },
+    /** Relative web path to generated PDF (e.g. /uploads/reports/{id}.pdf) */
+    pdfRelativePath: {
+      type: String,
+      trim: true,
+      default: '',
     },
   },
   { timestamps: true }

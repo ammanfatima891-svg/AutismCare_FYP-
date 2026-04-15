@@ -84,9 +84,9 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
       .toLowerCase();
 
   const referralStatusBadgeClass: Record<string, string> = {
-    pending: 'border-slate-300 bg-slate-50 text-slate-700',
-    accepted: 'border-sky-200 bg-sky-50 text-sky-900',
-    'in-progress': 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    pending: 'border bg-background text-foreground',
+    accepted: 'border-border bg-secondary/50 text-primary',
+    'in-progress': 'border-border bg-secondary/50 text-primary',
   };
 
   /** Badge: pending = new; accepted = show “Action” if recently updated (client-only recency hint). */
@@ -104,18 +104,18 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
   function assignedCaseCardClass(referralStatus: string) {
     const s = normalizeStatus(referralStatus);
     const base =
-      'h-auto w-full shrink-0 rounded-lg border bg-white transition-all duration-200 ease-out motion-safe:transition-[padding,box-shadow,border-color]';
-    const compact = 'border-slate-200 p-3 shadow-sm';
+      'h-auto w-full shrink-0 rounded-lg border bg-card transition-all duration-200 ease-out motion-safe:transition-[padding,box-shadow,border-color]';
+    const compact = 'border p-3 shadow-sm';
     if (s === 'pending') {
       return cn(
         base,
-        'border-sky-500 p-3.5 shadow-md shadow-sky-200/30 ring-2 ring-sky-400/35 ring-offset-0 bg-sky-50/70'
+        'border-primary p-3.5 shadow-md ring-2 ring-ring/40 ring-offset-0 bg-secondary/40'
       );
     }
     if (s === 'accepted') {
       return cn(
         base,
-        'border-sky-400/95 p-3.5 shadow-md shadow-sky-100/40 ring-1 ring-sky-300/45 bg-sky-50/45'
+        'border-primary/50 p-3.5 shadow-md ring-1 ring-ring/30 bg-secondary/20'
       );
     }
     return cn(base, compact);
@@ -188,46 +188,46 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
       label: 'Active Cases',
       value: loading ? '—' : String(data.activeCases),
       icon: Users,
-      iconWrap: 'bg-sky-100',
-      iconClass: 'text-sky-600',
+      iconWrap: 'bg-secondary',
+      iconClass: 'text-primary',
     },
     {
       key: 'today',
       label: "Today's Sessions",
       value: loading ? '—' : String(data.todaySessions),
       icon: Calendar,
-      iconWrap: 'bg-emerald-100',
-      iconClass: 'text-emerald-600',
+      iconWrap: 'bg-secondary',
+      iconClass: 'text-primary',
     },
     {
       key: 'pending',
       label: 'Pending Reviews',
       value: loading ? '—' : String(data.pendingReviews),
       icon: Clock,
-      iconWrap: 'bg-amber-100',
-      iconClass: 'text-amber-600',
+      iconWrap: 'bg-accent/15',
+      iconClass: 'text-accent',
     },
     {
       key: 'progress',
       label: 'Overall Progress',
       value: loading ? '—' : `${data.overallProgress}%`,
       icon: TrendingUp,
-      iconWrap: 'bg-violet-100',
-      iconClass: 'text-violet-600',
+      iconWrap: 'bg-secondary',
+      iconClass: 'text-primary',
     },
   ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Therapist Dashboard</h2>
-        <p className="mt-2 text-sm text-slate-600 md:text-base">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">Therapist Dashboard</h2>
+        <p className="mt-2 text-sm text-muted-foreground md:text-base">
           Welcome back, {name}! Here&apos;s your therapy overview for today.
         </p>
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+        <div className="rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">{error}</div>
       ) : null}
 
       {/* Summary metrics — always one row (4 equal columns); compact on narrow viewports */}
@@ -237,14 +237,14 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
           return (
             <Card
               key={c.key}
-              className="flex min-h-[92px] flex-col border border-slate-200/90 bg-white shadow-sm sm:min-h-[104px] md:min-h-[112px]"
+              className="flex min-h-[92px] flex-col border/90 bg-card shadow-sm sm:min-h-[104px] md:min-h-[112px]"
             >
               <CardContent className="flex min-w-0 flex-1 flex-row items-center justify-between gap-1.5 p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[10px] font-medium leading-tight text-slate-500 sm:text-[11px] md:text-xs">
+                  <p className="line-clamp-2 text-[10px] font-medium leading-tight text-muted-foreground sm:text-[11px] md:text-xs">
                     {c.label}
                   </p>
-                  <p className="mt-0.5 text-sm font-bold tabular-nums text-slate-900 sm:text-lg md:text-xl">{c.value}</p>
+                  <p className="mt-0.5 text-sm font-bold tabular-nums text-foreground sm:text-lg md:text-xl">{c.value}</p>
                 </div>
                 <div
                   className={cn(
@@ -261,25 +261,25 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
       </div>
 
       {/* Row 2: Assigned Cases (left) + Upcoming Sessions (right) */}
-      <div className="space-y-5 border-t border-slate-200/80 pt-8">
+      <div className="space-y-5 border-t border/80 pt-8">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
-          <Card className="flex h-auto flex-col border border-slate-200/80 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-sky-50/60 px-4 py-3 md:px-6">
-              <CardTitle className="flex items-center justify-between text-base font-semibold text-slate-900">
+          <Card className="flex h-auto flex-col border/80 bg-card shadow-sm">
+            <CardHeader className="border-b border border-border bg-secondary/30 px-4 py-3 md:px-6">
+              <CardTitle className="flex items-center justify-between text-base font-semibold text-foreground">
                 <span>Assigned Cases</span>
-                <Users className="h-4 w-4 text-sky-600" />
+                <Users className="h-4 w-4 text-primary" />
               </CardTitle>
-              <CardDescription className="text-xs text-slate-600">
+              <CardDescription className="text-xs text-muted-foreground">
                 Referrals assigned to you (pending, accepted, or in progress)
               </CardDescription>
             </CardHeader>
             <CardContent className="flex max-h-[min(360px,45vh)] flex-col gap-2 overflow-y-auto px-4 pb-4 pt-4 md:px-6">
               {loading ? (
-                <p className="flex items-center gap-2 text-sm text-slate-500">
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading…
                 </p>
               ) : data.assignedCases.length === 0 ? (
-                <p className="text-sm text-slate-600">No assigned cases yet.</p>
+                <p className="text-sm text-muted-foreground">No assigned cases yet.</p>
               ) : (
                 data.assignedCases.map((c) => {
                   const status = normalizeStatus(c.referralStatus);
@@ -290,14 +290,14 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                   return (
                     <div key={c.referralId} className={assignedCaseCardClass(c.referralStatus)}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="font-medium leading-snug text-slate-900">{c.childName}</p>
+                        <p className="font-medium leading-snug text-foreground">{c.childName}</p>
                         {showBadge ? (
-                          <span className="shrink-0 rounded-full border border-sky-300 bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 shadow-sm">
+                          <span className="shrink-0 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary shadow-sm">
                             {isPending ? 'New' : 'Action'}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 text-xs text-slate-500">Case status: {c.caseStatus}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Case status: {c.caseStatus}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="h-6 shrink-0 px-2 text-xs capitalize">
                           Risk: {c.riskLevel || '—'}
@@ -315,7 +315,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                             size="sm"
                             className={cn(
                               assignedChipBtn,
-                              'border-sky-600 bg-sky-600 text-white hover:bg-sky-700 hover:text-white'
+                              'border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
                             )}
                             onClick={() => acceptReferral(c.referralId)}
                             disabled={actingId === c.referralId}
@@ -331,7 +331,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                               size="sm"
                               className={cn(
                                 assignedChipBtn,
-                                'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white'
+                                'border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
                               )}
                               onClick={() => startTherapy(c.referralId)}
                               disabled={actingId === c.referralId}
@@ -342,7 +342,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                               type="button"
                               variant="outline"
                               size="sm"
-                              className={cn(assignedChipBtn, 'border-slate-200')}
+                              className={cn(assignedChipBtn, 'border')}
                               onClick={() => navigate(`/therapist/case/${caseIdStr}`)}
                             >
                               View Case
@@ -354,7 +354,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                             type="button"
                             variant="outline"
                             size="sm"
-                            className={cn(assignedChipBtn, 'border-slate-200')}
+                            className={cn(assignedChipBtn, 'border')}
                             onClick={() => navigate(`/therapist/case/${caseIdStr}`)}
                           >
                             View Case
@@ -368,31 +368,31 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
             </CardContent>
           </Card>
 
-          <Card className="flex h-auto flex-col border border-slate-200/80 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-sky-50/50 px-4 py-3 md:px-6">
-              <CardTitle className="flex items-center justify-between text-base font-semibold text-slate-900">
+          <Card className="flex h-auto flex-col border/80 bg-card shadow-sm">
+            <CardHeader className="border-b border border-border bg-secondary/20 px-4 py-3 md:px-6">
+              <CardTitle className="flex items-center justify-between text-base font-semibold text-foreground">
                 <span>Upcoming Sessions</span>
-                <Calendar className="h-4 w-4 text-sky-600" />
+                <Calendar className="h-4 w-4 text-primary" />
               </CardTitle>
-              <CardDescription className="text-xs text-slate-600">
+              <CardDescription className="text-xs text-muted-foreground">
                 Next scheduled appointments (today onward)
               </CardDescription>
             </CardHeader>
             <CardContent className="flex max-h-[min(360px,45vh)] flex-col gap-2 overflow-y-auto px-4 pb-4 pt-4 md:px-6">
               {loading ? (
-                <p className="flex items-center gap-2 text-sm text-slate-500">
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading…
                 </p>
               ) : data.upcomingSessions.length === 0 ? (
-                <p className="text-sm text-slate-600">No upcoming sessions.</p>
+                <p className="text-sm text-muted-foreground">No upcoming sessions.</p>
               ) : (
                 data.upcomingSessions.map((s) => (
                   <div
                     key={s.id}
-                    className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 ease-out"
+                    className="rounded-lg border bg-card p-3 shadow-sm transition-all duration-200 ease-out"
                   >
-                    <p className="font-medium text-slate-900">{s.childName}</p>
-                    <p className="text-xs text-slate-600">
+                    <p className="font-medium text-foreground">{s.childName}</p>
+                    <p className="text-xs text-muted-foreground">
                       {new Date(s.date).toLocaleDateString(undefined, {
                         weekday: 'short',
                         month: 'short',
@@ -401,7 +401,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                       })}{' '}
                       {s.time ? `· ${s.time}` : ''}
                     </p>
-                    <p className="text-xs text-slate-500">{s.duration} min</p>
+                    <p className="text-xs text-muted-foreground">{s.duration} min</p>
                   </div>
                 ))
               )}

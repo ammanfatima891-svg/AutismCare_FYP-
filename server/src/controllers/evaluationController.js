@@ -1,9 +1,22 @@
 const mongoose = require('mongoose');
-const { ClinicalEvaluation, EVALUATION_STATUS } = require('../models/ClinicalEvaluation');
+const { ClinicalEvaluation } = require('../models/ClinicalEvaluation');
+const { EVALUATION_STATUS } = require('../constants/workflowEnums');
+const { normalizeEvaluationStatus } = require('../utils/normalizeWorkflowStatus');
 const { ChildCase } = require('../models/ChildCase');
+const Submission = require('../models/Submission');
+const { evaluateDecision } = require('../utils/decisionEngine');
+const { recordAuditEvent } = require('../utils/auditLog');
 
 function sanitizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function sanitizeMixed(value, fallback) {
+  if (value === undefined) return fallback;
+  // Legacy string accepted, new object accepted, other types ignored.
+  if (typeof value === 'string') return value.trim();
+  if (value && typeof value === 'object') return value;
+  return fallback;
 }
 
 function sanitizeConditions(value) {
@@ -13,13 +26,21 @@ function sanitizeConditions(value) {
     .filter(Boolean);
 }
 
+function hasMeaningfulValue(v) {
+  if (v == null) return false;
+  if (typeof v === 'string') return v.trim().length > 0;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.keys(v).length > 0;
+  return true;
+}
+
 function hasAtLeastOneField(payload) {
-  return Boolean(
-    payload.observations ||
-      payload.developmentalSummary ||
-      payload.diagnosis ||
-      payload.recommendations ||
-      (Array.isArray(payload.comorbidConditions) && payload.comorbidConditions.length > 0)
+  return (
+    hasMeaningfulValue(payload.observations) ||
+    hasMeaningfulValue(payload.developmentalSummary) ||
+    hasMeaningfulValue(payload.diagnosis) ||
+    hasMeaningfulValue(payload.recommendations) ||
+    (Array.isArray(payload.comorbidConditions) && payload.comorbidConditions.length > 0)
   );
 }
 
@@ -27,6 +48,78 @@ async function assertCaseOwnership(caseId, clinicianId) {
   if (!mongoose.Types.ObjectId.isValid(caseId)) return null;
   return ChildCase.findOne({ _id: caseId, clinicianId }).select('_id clinicianId').lean();
 }
+
+function summarizeDomainStatuses(domainStatuses) {
+  const src = domainStatuses && typeof domainStatuses === 'object' ? domainStatuses : {};
+  const entries = Object.entries(src);
+  if (!entries.length) return {};
+
+  const out = {};
+  for (const [domain, status] of entries) {
+    const value = String(status || '').toLowerCase();
+    if (!value) continue;
+    if (value.includes('normal')) out[domain] = { label: 'Normal', flag: 'ok' };
+    else if (value.includes('monitor')) out[domain] = { label: 'Need monitoring', flag: 'warn' };
+    else if (value.includes('referral') || value.includes('evaluate')) out[domain] = { label: 'At risk', flag: 'warn' };
+    else out[domain] = { label: String(status), flag: 'info' };
+  }
+  return out;
+}
+
+/**
+ * GET /api/evaluations/:caseId/development-summary
+ * Returns latest ASQ-3 + M-CHAT-R structured summary for this case's child.
+ */
+exports.getDevelopmentSummaryByCase = async (req, res) => {
+  try {
+    const clinicianId = req.user._id;
+    const { caseId } = req.params;
+
+    const ownedCase = await assertCaseOwnership(caseId, clinicianId);
+    if (!ownedCase) {
+      return res.status(404).json({ success: false, message: 'Case not found' });
+    }
+
+    const caseDoc = await ChildCase.findById(caseId).select('childId').lean();
+    const childId = caseDoc?.childId;
+    if (!childId) {
+      return res.status(200).json({ success: true, data: { childId: null, asq3: null, mchat: null } });
+    }
+
+    const [asq3, mchat] = await Promise.all([
+      Submission.findOne({ childId, questionnaireType: 'ASQ-3' }).sort({ createdAt: -1 }).lean(),
+      Submission.findOne({ childId, questionnaireType: 'MCHAT-R' }).sort({ createdAt: -1 }).lean(),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        childId,
+        asq3: asq3
+          ? {
+              id: asq3._id,
+              createdAt: asq3.createdAt,
+              intervalMonths: asq3.intervalMonths ?? null,
+              domainStatuses: summarizeDomainStatuses(asq3?.scores?.domainStatuses),
+              riskLevel: asq3.riskLevel || 'unknown',
+            }
+          : null,
+        mchat: mchat
+          ? {
+              id: mchat._id,
+              createdAt: mchat.createdAt,
+              totalScore: mchat?.scores?.totalScore ?? null,
+              result: mchat.result || null,
+              riskLevel: mchat.riskLevel || 'unknown',
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    console.error('getDevelopmentSummaryByCase:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch developmental summary' });
+  }
+};
 
 /**
  * POST /api/evaluations
@@ -54,15 +147,16 @@ exports.createEvaluation = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Case not found' });
     }
 
-    if (!status || !Object.values(EVALUATION_STATUS).includes(status)) {
-      return res.status(400).json({ success: false, message: 'status must be "draft" or "final"' });
+    const normStatus = normalizeEvaluationStatus(status) || status;
+    if (!normStatus || !Object.values(EVALUATION_STATUS).includes(normStatus)) {
+      return res.status(400).json({ success: false, message: 'status must be DRAFT or FINALIZED' });
     }
 
     const payload = {
-      observations: sanitizeText(observations),
-      developmentalSummary: sanitizeText(developmentalSummary),
-      diagnosis: sanitizeText(diagnosis),
-      recommendations: sanitizeText(recommendations),
+      observations: sanitizeMixed(observations, ''),
+      developmentalSummary: sanitizeMixed(developmentalSummary, ''),
+      diagnosis: sanitizeMixed(diagnosis, ''),
+      recommendations: sanitizeMixed(recommendations, ''),
       comorbidConditions: sanitizeConditions(comorbidConditions),
     };
 
@@ -73,13 +167,31 @@ exports.createEvaluation = async (req, res) => {
       });
     }
 
+    const decision = normStatus === EVALUATION_STATUS.FINALIZED ? evaluateDecision(payload) : undefined;
+
     const created = await ClinicalEvaluation.create({
       caseId,
       clinicianId,
       ...payload,
-      status,
+      ...(decision ? { decision } : {}),
+      status: normStatus,
       sourceEvaluationId: null,
     });
+
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: clinicianId,
+        action: 'evaluation_created',
+        entityType: 'ClinicalEvaluation',
+        entityId: created._id,
+        caseId,
+        summary: `status=${normStatus}`,
+        after: { caseId, clinicianId, status: normStatus },
+      });
+    } catch (e) {
+      console.error('audit evaluation_created:', e);
+    }
 
     return res.status(201).json({
       success: true,
@@ -108,9 +220,9 @@ exports.getEvaluationsByCase = async (req, res) => {
 
     const evaluations = await ClinicalEvaluation.find({ caseId, clinicianId })
       .sort({ createdAt: -1 })
-      .lean();
+      .exec();
 
-    const hasFinalEvaluation = evaluations.some((item) => item.status === EVALUATION_STATUS.FINAL);
+    const hasFinalEvaluation = evaluations.some((item) => item.status === EVALUATION_STATUS.FINALIZED);
 
     return res.status(200).json({
       success: true,
@@ -138,7 +250,7 @@ exports.getEvaluationById = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid evaluation id' });
     }
 
-    const evaluation = await ClinicalEvaluation.findById(id).lean();
+    const evaluation = await ClinicalEvaluation.findById(id).exec();
     if (!evaluation) {
       return res.status(404).json({ success: false, message: 'Evaluation not found' });
     }
@@ -174,8 +286,9 @@ exports.versionEvaluation = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid evaluation id' });
     }
-    if (!status || !Object.values(EVALUATION_STATUS).includes(status)) {
-      return res.status(400).json({ success: false, message: 'status must be "draft" or "final"' });
+    const normStatus = normalizeEvaluationStatus(status) || status;
+    if (!normStatus || !Object.values(EVALUATION_STATUS).includes(normStatus)) {
+      return res.status(400).json({ success: false, message: 'status must be DRAFT or FINALIZED' });
     }
 
     const current = await ClinicalEvaluation.findById(id);
@@ -194,16 +307,16 @@ exports.versionEvaluation = async (req, res) => {
     // Build next version from current + incoming fields.
     const nextPayload = {
       observations:
-        observations !== undefined ? sanitizeText(observations) : sanitizeText(current.observations),
+        observations !== undefined ? sanitizeMixed(observations, current.observations) : current.observations,
       developmentalSummary:
         developmentalSummary !== undefined
-          ? sanitizeText(developmentalSummary)
-          : sanitizeText(current.developmentalSummary),
-      diagnosis: diagnosis !== undefined ? sanitizeText(diagnosis) : sanitizeText(current.diagnosis),
+          ? sanitizeMixed(developmentalSummary, current.developmentalSummary)
+          : current.developmentalSummary,
+      diagnosis: diagnosis !== undefined ? sanitizeMixed(diagnosis, current.diagnosis) : current.diagnosis,
       recommendations:
         recommendations !== undefined
-          ? sanitizeText(recommendations)
-          : sanitizeText(current.recommendations),
+          ? sanitizeMixed(recommendations, current.recommendations)
+          : current.recommendations,
       comorbidConditions:
         comorbidConditions !== undefined
           ? sanitizeConditions(comorbidConditions)
@@ -217,18 +330,37 @@ exports.versionEvaluation = async (req, res) => {
       });
     }
 
+    const decision = normStatus === EVALUATION_STATUS.FINALIZED ? evaluateDecision(nextPayload) : undefined;
+
     const versioned = await ClinicalEvaluation.create({
       caseId: current.caseId,
       clinicianId,
       ...nextPayload,
-      status,
+      ...(decision ? { decision } : {}),
+      status: normStatus,
       sourceEvaluationId: current._id,
     });
+
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: clinicianId,
+        action: 'evaluation_updated',
+        entityType: 'ClinicalEvaluation',
+        entityId: versioned._id,
+        caseId: current.caseId,
+        summary: `status=${normStatus} source=${String(current._id)}`,
+        before: { id: String(current._id), status: current.status },
+        after: { id: String(versioned._id), status: normStatus },
+      });
+    } catch (e) {
+      console.error('audit evaluation_updated:', e);
+    }
 
     return res.status(201).json({
       success: true,
       message:
-        current.status === EVALUATION_STATUS.FINAL
+        current.status === EVALUATION_STATUS.FINALIZED
           ? 'Final evaluation locked. New version created.'
           : 'Evaluation updated as a new version.',
       data: versioned,

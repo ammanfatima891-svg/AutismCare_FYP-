@@ -38,10 +38,10 @@ type Props = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: 'border-slate-200 bg-slate-100 text-slate-800',
-  submitted: 'border-sky-200 bg-sky-50 text-sky-900',
-  reviewed: 'border-amber-200 bg-amber-50 text-amber-950',
-  completed: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+  pending: 'border bg-muted text-foreground',
+  submitted: 'border-border bg-secondary/50 text-primary',
+  reviewed: 'border-border bg-accent/10 text-accent-foreground',
+  completed: 'border-border bg-secondary text-primary',
 };
 
 function resolveUploadUrl(filePath: string) {
@@ -100,17 +100,17 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
       />
 
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className="rounded-md border bg-muted px-3 py-2 text-sm text-destructive">{error}</div>
       ) : null}
 
-      <Card className="border border-slate-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Home assignments</CardTitle>
-          <CardDescription className="text-slate-600">Track parent submissions and provide feedback.</CardDescription>
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b border">
+          <CardTitle className="text-base font-semibold text-foreground">Home assignments</CardTitle>
+          <CardDescription className="text-muted-foreground">Track parent submissions and provide feedback.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           {assignments.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-600">
+            <p className="rounded-lg border-dashed border bg-muted/80 px-4 py-10 text-center text-sm text-muted-foreground">
               No assignments yet. Assign an activity above to appear here.
             </p>
           ) : (
@@ -124,11 +124,11 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                 const fileAbs = ps?.submissionUrl || ps?.fileUrl ? resolveUploadUrl(String(ps.submissionUrl || ps.fileUrl)) : '';
 
                 return (
-                  <li key={String(a._id)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <li key={String(a._id)} className="rounded-xl border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-slate-900">{activityName(a)}</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="font-semibold text-foreground">{activityName(a)}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Due {a.dueDate ? new Date(a.dueDate).toLocaleDateString() : '—'}
                         </p>
                       </div>
@@ -137,35 +137,35 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                       </Badge>
                     </div>
                     {a.instructions ? (
-                      <p className="mt-3 text-sm leading-relaxed text-slate-700">{a.instructions}</p>
+                      <p className="mt-3 text-sm leading-relaxed text-foreground">{a.instructions}</p>
                     ) : null}
                     {a.materials ? (
-                      <p className="mt-2 text-sm text-slate-600">
-                        <span className="font-medium text-slate-800">Materials: </span>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Materials: </span>
                         {a.materials}
                       </p>
                     ) : null}
 
                     {(ps?.submissionUrl || ps?.fileUrl) && (st === 'submitted' || st === 'reviewed' || st === 'completed') ? (
-                      <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50/80 p-3">
-                        <p className="text-xs font-medium text-slate-800">Parent submission</p>
-                        <p className="text-xs text-slate-500">
+                      <div className="mt-4 rounded-lg border bg-muted/80 p-3">
+                        <p className="text-xs font-medium text-foreground">Parent submission</p>
+                        <p className="text-xs text-muted-foreground">
                           {ps.submittedAt ? new Date(ps.submittedAt).toLocaleString() : ''} · {ps.fileType || 'file'}
                         </p>
                         {ps.fileType === 'image' ? (
                           <img
                             src={fileAbs}
                             alt="Submission"
-                            className="mt-2 max-h-56 rounded-md border border-slate-200 object-contain"
+                            className="mt-2 max-h-56 rounded-md border object-contain"
                           />
                         ) : ps.fileType === 'video' ? (
-                          <video src={fileAbs} className="mt-2 max-h-56 w-full rounded-md border border-slate-200" controls />
+                          <video src={fileAbs} className="mt-2 max-h-56 w-full rounded-md border" controls />
                         ) : (
                           <a
                             href={fileAbs}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-2 inline-block text-sm text-sky-700 underline"
+                            className="mt-2 inline-block text-sm text-primary underline"
                           >
                             Open file
                           </a>
@@ -174,27 +174,27 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                     ) : null}
 
                     {fb?.comment || fb?.feedback || (fb?.rating != null && fb.rating > 0) ? (
-                      <div className="mt-3 rounded-lg border border-slate-100 bg-white px-3 py-2">
-                        <p className="text-xs font-medium text-slate-800">Your feedback</p>
-                        {fb.rating ? <p className="text-sm text-slate-700">Rating: {fb.rating}/5</p> : null}
+                      <div className="mt-3 rounded-lg border bg-card px-3 py-2">
+                        <p className="text-xs font-medium text-foreground">Your feedback</p>
+                        {fb.rating ? <p className="text-sm text-foreground">Rating: {fb.rating}/5</p> : null}
                         {fb.feedback || fb.comment ? (
-                          <p className="text-sm text-slate-700">{fb.feedback || fb.comment}</p>
+                          <p className="text-sm text-foreground">{fb.feedback || fb.comment}</p>
                         ) : null}
                       </div>
                     ) : null}
 
                     {showReview && st !== 'completed' ? (
-                      <div className="mt-4 border-t border-slate-100 pt-4">
+                      <div className="mt-4 border-t border pt-4">
                         {reviewId === String(a._id) ? (
                           <div className="space-y-3">
                             <div className="space-y-1">
-                              <Label className="text-slate-800">Feedback</Label>
-                              <Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} className="border-slate-200" />
+                              <Label className="text-foreground">Feedback</Label>
+                              <Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} className="border" />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-slate-800">Rating (optional)</Label>
+                              <Label className="text-foreground">Rating (optional)</Label>
                               <Select value={rating || undefined} onValueChange={setRating}>
-                                <SelectTrigger className="border-slate-200 bg-white">
+                                <SelectTrigger className="border bg-card">
                                   <SelectValue placeholder="1–5" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -210,7 +210,7 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                               <Button
                                 type="button"
                                 size="sm"
-                                className="bg-sky-600 text-white hover:bg-sky-700"
+                                variant="default"
                                 disabled={reviewSaving}
                                 onClick={() => void submitReview(String(a._id), false)}
                               >
@@ -221,7 +221,7 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="border-slate-200"
+                                className="border"
                                 disabled={reviewSaving}
                                 onClick={() => void submitReview(String(a._id), true)}
                               >
@@ -233,7 +233,7 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                             </div>
                           </div>
                         ) : (
-                          <Button type="button" size="sm" variant="outline" className="border-slate-200" onClick={() => setReviewId(String(a._id))}>
+                          <Button type="button" size="sm" variant="outline" className="border" onClick={() => setReviewId(String(a._id))}>
                             {st === 'submitted' ? 'Review submission' : 'Update feedback'}
                           </Button>
                         )}

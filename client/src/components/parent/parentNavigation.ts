@@ -1,33 +1,54 @@
-import { Home, Baby, ClipboardList, Calendar, FlaskConical, FileText, FolderOpen, ListChecks, Stethoscope } from 'lucide-react';
+import {
+  Home,
+  Baby,
+  ClipboardList,
+  Calendar,
+  FlaskConical,
+  FileText,
+  FolderOpen,
+  ListChecks,
+  Stethoscope,
+  MessageSquare,
+} from 'lucide-react';
 import type { NavigationItem } from '../layout/DashboardLayout';
 
-/** Shared parent sidebar — Child Case links to entry route `/parent/case` (redirects to /parent/case/:caseId). */
+/**
+ * Parent sidebar order: care path first (children → case → day-to-day care),
+ * then scheduling, dual screening entry (questionnaires + facial), history, labs.
+ */
 export function getParentNavigationItems(): NavigationItem[] {
   return [
-    { id: 'home', label: 'Home', icon: Home, color: 'text-blue-600' },
-    { id: 'children', label: 'My Children', icon: Baby, color: 'text-pink-600' },
+    { id: 'home', label: 'Home', icon: Home },
+    { id: 'children', label: 'My Children', icon: Baby },
     {
       id: 'child-case',
       label: 'Child Case',
       icon: FolderOpen,
-      color: 'text-sky-700',
       to: '/parent/case',
       activePathPrefix: '/parent/case',
     },
-    { id: 'home-activities', label: 'Home Activities', icon: ListChecks, color: 'text-sky-700' },
-    { id: 'therapy-reports', label: 'Therapy Reports', icon: Stethoscope, color: 'text-sky-700' },
-    { id: 'screening', label: 'Screening', icon: ClipboardList, color: 'text-purple-600' },
-    { id: 'total-screenings', label: 'Total Screenings', icon: FileText, color: 'text-indigo-600' },
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
+    { id: 'home-activities', label: 'Home Activities', icon: ListChecks },
+    { id: 'therapy-reports', label: 'Therapy Reports', icon: Stethoscope },
     {
       id: 'appointments',
       label: 'Appointments',
       icon: Calendar,
-      color: 'text-orange-600',
       children: [
-        { id: 'book-appointment', label: 'Book Appointment' },
-        { id: 'appointments', label: 'Total Appointments' },
+        { id: 'book-appointment', label: 'Book appointment' },
+        { id: 'appointments', label: 'Appointment status' },
       ],
     },
-    { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical, color: 'text-teal-600' },
+    {
+      id: 'screening',
+      label: 'Screening',
+      icon: ClipboardList,
+      children: [
+        { id: 'screening-questionnaires', label: 'Questionnaires (M-CHAT / ASQ)' },
+        { id: 'facial-screening', label: 'Facial screening' },
+      ],
+    },
+    { id: 'total-screenings', label: 'Screening history', icon: FileText },
+    { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical },
   ];
 }

@@ -28,17 +28,17 @@ const RISK_ALL = 'all';
 const STATUS_ALL = 'all';
 
 const riskBadgeClass: Record<string, string> = {
-  low: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  medium: 'bg-amber-100 text-amber-900 border-amber-200',
-  high: 'bg-red-100 text-red-800 border-red-200',
-  unknown: 'bg-slate-100 text-slate-700 border-slate-200',
+  low: 'bg-primary/10 text-primary border-primary/20 font-medium',
+  medium: 'bg-warning-yellow/10 text-warning-yellow border-warning-yellow/20 font-medium',
+  high: 'bg-destructive/10 text-destructive border-destructive/20 font-medium',
+  unknown: 'bg-muted text-muted-foreground border-muted font-medium',
 };
 
 const statusBadgeClass: Record<string, string> = {
-  Active: 'bg-blue-100 text-blue-800 border-blue-200',
-  'Under Evaluation': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  Referred: 'bg-violet-100 text-violet-800 border-violet-200',
-  'Ongoing Therapy': 'bg-teal-100 text-teal-800 border-teal-200',
+  Active: 'bg-accent/10 text-accent-foreground border-accent/20 font-medium',
+  'Under Evaluation': 'bg-primary/10 text-primary border-primary/20 font-medium',
+  Referred: 'bg-secondary text-secondary-foreground border-secondary font-medium',
+  'Ongoing Therapy': 'bg-success-green/10 text-success-green border-success-green/20 font-medium',
 };
 
 type Row = {
@@ -83,8 +83,8 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-900 tracking-tight">Child Cases</h2>
-          <p className="text-slate-600 mt-1 text-sm">
+  <h2 className="text-2xl font-semibold text-primary tracking-tight">Child Cases</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
             Centralized cases linked to approved appointments, screening results, and care status.
           </p>
         </div>
@@ -94,18 +94,18 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
         </Button>
       </div>
 
-      <Card className="border border-slate-200 shadow-sm bg-white">
-        <CardHeader className="pb-4 border-b border-slate-100">
+      <Card className="border shadow-sm bg-card">
+        <CardHeader className="pb-4 border-b border">
           <div className="flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
             <div>
-              <CardTitle className="text-lg text-slate-900">Caseload</CardTitle>
+              <CardTitle className="text-lg text-foreground">Caseload</CardTitle>
               <CardDescription>Filter by risk level and case status</CardDescription>
             </div>
             <div className="flex flex-wrap gap-3">
               <div className="w-[160px]">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Risk level</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Risk level</label>
                 <Select value={riskFilter} onValueChange={setRiskFilter}>
-                  <SelectTrigger className="bg-white border-slate-200">
+                  <SelectTrigger className="bg-card border">
                     <SelectValue placeholder="Risk" />
                   </SelectTrigger>
                   <SelectContent>
@@ -118,9 +118,9 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
                 </Select>
               </div>
               <div className="w-[200px]">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Status</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="bg-white border-slate-200">
+                  <SelectTrigger className="bg-card border">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -137,41 +137,41 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
         </CardHeader>
         <CardContent className="pt-6">
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <div className="mb-4 rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">
               {error}
             </div>
           )}
           {loading ? (
-            <div className="flex justify-center py-16 text-slate-500">
+            <div className="flex justify-center py-16 text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
           ) : rows.length === 0 ? (
-            <div className="text-center py-16 text-slate-500 border border-dashed border-slate-200 rounded-lg bg-slate-50/50">
-              <UserCircle2 className="h-10 w-10 mx-auto mb-3 text-slate-400" />
-              <p className="font-medium text-slate-700">No cases match your filters</p>
+            <div className="text-center py-16 text-muted-foreground border-dashed border rounded-lg bg-background/50">
+              <UserCircle2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="font-medium text-foreground">No cases match your filters</p>
               <p className="text-sm mt-1">Cases are created when you approve a diagnostic appointment for a child.</p>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
+            <div className="rounded-lg border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50">
-                    <TableHead className="font-semibold text-slate-800">Child</TableHead>
-                    <TableHead className="font-semibold text-slate-800">Parent / Guardian</TableHead>
-                    <TableHead className="font-semibold text-slate-800">Risk</TableHead>
-                    <TableHead className="font-semibold text-slate-800">Status</TableHead>
-                    <TableHead className="font-semibold text-slate-800">Last updated</TableHead>
+                  <TableRow className="bg-background hover:bg-background">
+                    <TableHead className="font-semibold text-foreground">Child</TableHead>
+                    <TableHead className="font-semibold text-foreground">Parent / Guardian</TableHead>
+                    <TableHead className="font-semibold text-foreground">Risk</TableHead>
+                    <TableHead className="font-semibold text-foreground">Status</TableHead>
+                    <TableHead className="font-semibold text-foreground">Last updated</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => (
                     <TableRow key={row._id} className="hover:bg-blue-50/40">
-                      <TableCell className="font-medium text-slate-900">{row.childName}</TableCell>
+                      <TableCell className="font-medium text-foreground">{row.childName}</TableCell>
                       <TableCell>
-                        <div className="text-slate-800">{row.parentName}</div>
+                        <div className="text-foreground">{row.parentName}</div>
                         {row.parentEmail && (
-                          <div className="text-xs text-slate-500">{row.parentEmail}</div>
+                          <div className="text-xs text-muted-foreground">{row.parentEmail}</div>
                         )}
                       </TableCell>
                       <TableCell>
@@ -185,18 +185,18 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className={statusBadgeClass[row.status] || 'bg-slate-100 text-slate-700'}
+                          className={statusBadgeClass[row.status] || 'bg-muted text-foreground'}
                         >
                           {row.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-slate-600 text-sm">
+                      <TableCell className="text-muted-foreground text-sm">
                         {new Date(row.updatedAt).toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <Button
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700"
+                          className="btn-accent"
                           onClick={() => onOpenCase(row._id)}
                         >
                           Open

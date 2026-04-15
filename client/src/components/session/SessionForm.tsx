@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { cn } from '../ui/utils';
+import { AlertTriangle, ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { activityAPI, scheduleAPI } from '../../api';
 import { createSession, getSessionApiErrorMessage, updateSession } from '../../services/sessionService';
 import { toast } from 'sonner';
@@ -32,7 +35,14 @@ import { isActiveGoalStatus, normalizeShortTermGoalsList } from '../../utils/the
 export type TherapyPlanLike = {
   domains?: string[];
   longTermGoal?: { title?: string; description?: string; timeline?: string };
-  shortTermGoals?: { _id?: string; title?: string; domain?: string; status?: string }[];
+  shortTermGoals?: {
+    _id?: string;
+    goalKey?: string;
+    title?: string;
+    domain?: string;
+    status?: string;
+    measurement?: { type?: string; unit?: string };
+  }[];
   goals?: { title?: string; type?: string; status?: string }[];
   activities?: { title?: string; linkedGoal?: string }[];
 } | null;
@@ -65,6 +75,11 @@ const STATUS_OPTIONS = [
   { value: 'missed', label: 'Missed' },
   { value: 'rescheduled', label: 'Rescheduled' },
 ];
+
+/** Full-page variant: align Select with Input (rounded-xl, border-2) — avoid `border` alone, it overrides border-2 from primitives. */
+const PAGE_INPUT_CLASS = 'bg-background shadow-xs hover:shadow-md';
+const PAGE_SELECT_TRIGGER_CLASS =
+  'h-10 w-full rounded-xl border-2 border-input bg-background px-4 shadow-xs hover:shadow-md focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
 function defaultDateTimeLocal() {
   const now = new Date();
@@ -107,30 +122,36 @@ function filterPlanActivityTitlesForDomain(plan: TherapyPlanLike, domain: string
   return acts.map((a) => String(a.title || '').trim()).filter(Boolean);
 }
 
+type GoalOptionRow = { key: string; label: string; goalKey?: string; measurementType?: string; goalId?: string };
+
 /**
- * Build selectable goals from everything the plan may store. Plans often have activities
- * (and domain) while shortTermGoals is still empty in DB — activities alone still showed
- * under "Activities used", but "Goals targeted" stayed empty. We also include long-term
- * title and unique activity linkedGoal strings.
+ * When the plan defines `shortTermGoals`, therapists must pick from those rows (with stable `goalId` when present).
+ * Legacy plans without short-term rows still fall back to legacy goals / long-term / activity-linked titles.
  */
-function buildGoalOptionsFromPlan(therapyPlan: TherapyPlanLike | null | undefined): { key: string; label: string }[] {
+function buildGoalOptionsFromPlan(therapyPlan: TherapyPlanLike | null | undefined): GoalOptionRow[] {
   if (!therapyPlan) return [];
   const seen = new Set<string>();
-  const rows: { key: string; label: string }[] = [];
-  const push = (key: string, label: string) => {
+  const rows: GoalOptionRow[] = [];
+  const push = (key: string, label: string, goalKey?: string, measurementType?: string, goalId?: string) => {
     const t = String(label || '').trim();
     if (!t || seen.has(t)) return;
     seen.add(t);
-    rows.push({ key, label: t });
+    rows.push({ key, label: t, goalKey, measurementType, goalId });
   };
 
   const st = normalizeShortTermGoalsList(therapyPlan.shortTermGoals);
-  let stUse = st.filter((g) => g && String(g.title || '').trim() && isActiveGoalStatus(g.status));
-  if (stUse.length === 0) stUse = st.filter((g) => g && String(g.title || '').trim());
-  stUse.forEach((g, idx) => {
-    const k = g._id != null ? String(g._id) : `st-${idx}`;
-    push(k, String(g.title).trim());
-  });
+  if (st.length > 0) {
+    let stUse = st.filter((g) => g && String(g.title || '').trim() && isActiveGoalStatus(g.status));
+    if (stUse.length === 0) stUse = st.filter((g) => g && String(g.title || '').trim());
+    stUse.forEach((g, idx) => {
+      const mongoId = g._id != null ? String(g._id).trim() : '';
+      const k = mongoId || `st-${idx}`;
+      const gk = g.goalKey ? String(g.goalKey).trim() : undefined;
+      const mt = g.measurement?.type ? String(g.measurement.type) : undefined;
+      push(k, String(g.title).trim(), gk, mt, mongoId || undefined);
+    });
+    return rows;
+  }
 
   const legacyRaw = Array.isArray(therapyPlan.goals) ? therapyPlan.goals : [];
   let leg = legacyRaw.filter(
@@ -139,14 +160,14 @@ function buildGoalOptionsFromPlan(therapyPlan: TherapyPlanLike | null | undefine
   if (leg.length === 0) {
     leg = legacyRaw.filter((g) => g && String(g.title || '').trim() && g.type !== 'long-term');
   }
-  leg.forEach((g, idx) => push(`lg-${idx}`, String(g.title).trim()));
+  leg.forEach((g, idx) => push(`lg-${idx}`, String(g.title).trim(), undefined, undefined, undefined));
 
   const lt = therapyPlan.longTermGoal?.title;
-  if (typeof lt === 'string' && lt.trim()) push('lt-goal', lt.trim());
+  if (typeof lt === 'string' && lt.trim()) push('lt-goal', lt.trim(), undefined, undefined, undefined);
 
   (therapyPlan.activities || []).forEach((a, i) => {
     const link = String(a?.linkedGoal || '').trim();
-    if (link) push(`lnk-${i}`, link);
+    if (link) push(`lnk-${i}`, link, undefined, undefined, undefined);
   });
 
   return rows;
@@ -433,12 +454,23 @@ export function SessionForm({
       }
 
       const childResponse = buildChildResponseString('scale', scaleVal, 0);
+      const goalData = goalOptions
+        .filter((g) => selectedGoals[g.key])
+        .map((g) => ({
+          ...(g.goalId ? { goalId: g.goalId } : {}),
+          ...(g.goalKey ? { goalKey: g.goalKey } : {}),
+          goalTitleMatch: g.label,
+          measurementType: 'rating_1_5' as const,
+          rating: scaleVal,
+          source: 'therapist' as const,
+        }));
       const payload = {
         sessionDate: new Date(sessionDate).toISOString(),
         duration: Number(duration),
         goalsTargeted,
         activitiesUsed,
         childResponse,
+        goalData,
         notes: notes.trim(),
         parentInstructions: parentInstructions.trim(),
         status,
@@ -481,57 +513,94 @@ export function SessionForm({
 
   const hasCaseContext = String(caseId || '').trim().length > 0;
 
+  const planTabHref = `/therapist/case/${String(caseId || '').trim()}?tab=plans`;
+
   const renderGoalsTargeted = () => {
     if (casePicker && !hasCaseContext) {
       return (
-        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          Select a child to load goals from the therapy plan.
-        </p>
+        <Alert className="border-blue-200/80 bg-blue-50/80 text-foreground dark:border-blue-900/50 dark:bg-blue-950/40">
+          <Info className="text-blue-600 dark:text-blue-400" />
+          <AlertTitle>Select a child</AlertTitle>
+          <AlertDescription className="text-foreground/90">
+            Choose a case above to load goals from the therapy plan.
+          </AlertDescription>
+        </Alert>
       );
     }
     if (hasCaseContext && therapyPlan === undefined) {
       return (
-        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-sky-600" />
-          Loading goals from therapy plan…
-        </div>
+        <Alert>
+          <Loader2 className="animate-spin text-primary" />
+          <AlertTitle>Loading therapy plan</AlertTitle>
+          <AlertDescription>Fetching goals for this case…</AlertDescription>
+        </Alert>
       );
     }
     if (therapyPlanError) {
-      return <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{therapyPlanError}</p>;
+      return (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>Could not load goals</AlertTitle>
+          <AlertDescription>{therapyPlanError}</AlertDescription>
+        </Alert>
+      );
     }
     if (hasCaseContext && therapyPlan == null) {
       return (
-        <p className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
-          No therapy plan found. Please create a plan first.
-        </p>
+        <Alert className="border-amber-200/90 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-50">
+          <AlertTriangle className="text-amber-600 dark:text-amber-400" />
+          <AlertTitle>No therapy plan yet</AlertTitle>
+          <AlertDescription className="space-y-3 text-amber-950/90 dark:text-amber-100/90">
+            <p>Add a plan for this case before you can tie session notes to goals.</p>
+            {String(caseId || '').trim() ? (
+              <Button asChild size="sm" variant="secondary" className="border border-amber-300/80 bg-background shadow-sm hover:bg-muted dark:border-amber-800">
+                <Link to={planTabHref}>Open therapy plan</Link>
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
       );
     }
     if (goalOptions.length === 0) {
+      const stCount = normalizeShortTermGoalsList(therapyPlan?.shortTermGoals).length;
       return (
-        <p className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
-          No goals available in this plan. Add short-term goals in the therapy plan, or link activities to a goal title.
-        </p>
+        <Alert className="border-amber-200/90 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-50">
+          <AlertTriangle className="text-amber-600 dark:text-amber-400" />
+          <AlertTitle>No goals to select yet</AlertTitle>
+          <AlertDescription className="space-y-3 text-amber-950/90 dark:text-amber-100/90">
+            <p>
+              {stCount > 0
+                ? 'Short-term goals exist on the plan but need titles before you can log a session against them.'
+                : 'Add short-term goals in the therapy plan, or link activities to a goal title.'}
+            </p>
+            {String(caseId || '').trim() ? (
+              <Button asChild size="sm" variant="secondary" className="border border-amber-300/80 bg-background shadow-sm hover:bg-muted dark:border-amber-800">
+                <Link to={planTabHref}>Edit therapy plan</Link>
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
       );
     }
     return (
       <div className="space-y-2">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           {goalsSelectedCount > 0
             ? `${goalsSelectedCount} goal(s) selected`
             : 'Select one or more goals addressed in this session'}
         </p>
-        <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+        <div className="max-h-72 space-y-1 overflow-y-auto rounded-xl border-2 border-border/80 bg-muted/20 p-3 shadow-inner">
           {goalOptions.map((g, idx) => (
             <label
               key={`${g.key}-${idx}`}
-              className="flex cursor-pointer items-start gap-3 rounded-md px-1 py-2 text-sm hover:bg-white"
+              className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-background"
             >
               <Checkbox
                 checked={!!selectedGoals[g.key]}
                 onCheckedChange={(c) => setSelectedGoals((prev) => ({ ...prev, [g.key]: c === true }))}
+                className="mt-0.5"
               />
-              <span className="leading-snug text-slate-800">{g.label}</span>
+              <span className="leading-snug text-foreground">{g.label}</span>
             </label>
           ))}
         </div>
@@ -541,10 +610,10 @@ export function SessionForm({
 
   const domainFieldPage =
     planDomains.length > 1 ? (
-      <div className="space-y-1.5">
-        <Label className="text-slate-800">Therapy Domain</Label>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground">Therapy domain</Label>
         <Select value={domainUi || planDomains[0]} onValueChange={setDomainUi}>
-          <SelectTrigger className="border-slate-200 bg-slate-50/80">
+          <SelectTrigger className={PAGE_SELECT_TRIGGER_CLASS}>
             <SelectValue placeholder="Select domain" />
           </SelectTrigger>
           <SelectContent>
@@ -555,26 +624,28 @@ export function SessionForm({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-slate-500">Domain reflects the therapy plan; goals below are tied to this case.</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Domain follows the therapy plan; goals and activities below filter to this area.
+        </p>
       </div>
     ) : planDomains.length === 1 || domainLabel ? (
-      <div className="space-y-1.5">
-        <Label className="text-slate-800">Therapy Domain</Label>
-        <Input readOnly className="border-slate-200 bg-slate-50 text-slate-800" value={planDomains[0] || domainLabel} />
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground">Therapy domain</Label>
+        <Input readOnly className={cn(PAGE_INPUT_CLASS, 'text-foreground')} value={planDomains[0] || domainLabel} />
       </div>
     ) : null;
 
   const dialogFields = (
         <div className="space-y-5 py-2">
           {errors._api ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{errors._api}</div>
+            <div className="rounded-md border bg-muted px-3 py-2 text-sm text-destructive">{errors._api}</div>
           ) : null}
 
           {casePicker ? (
             <div className="space-y-1.5">
-              <Label className="text-slate-800">Child</Label>
+              <Label className="text-foreground">Child</Label>
               <Select value={casePicker.value || undefined} onValueChange={casePicker.onChange}>
-                <SelectTrigger className="border-slate-200 bg-white">
+                <SelectTrigger className="border bg-card">
                   <SelectValue placeholder="Select child" />
                 </SelectTrigger>
                 <SelectContent>
@@ -585,38 +656,38 @@ export function SessionForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.caseId ? <p className="text-xs text-red-600">{errors.caseId}</p> : null}
+              {errors.caseId ? <p className="text-xs text-destructive">{errors.caseId}</p> : null}
             </div>
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-slate-800">Date</Label>
+              <Label className="text-foreground">Date</Label>
               <Input
                 type="datetime-local"
-                className="border-slate-200"
+                className="border"
                 value={sessionDate}
                 onChange={(e) => setSessionDate(e.target.value)}
               />
-              {errors.sessionDate ? <p className="text-xs text-red-600">{errors.sessionDate}</p> : null}
+              {errors.sessionDate ? <p className="text-xs text-destructive">{errors.sessionDate}</p> : null}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-800">Duration (minutes)</Label>
+              <Label className="text-foreground">Duration (minutes)</Label>
               <Input
                 type="number"
                 min={1}
                 step={1}
-                className="border-slate-200"
+                className="border"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
               />
-              {errors.duration ? <p className="text-xs text-red-600">{errors.duration}</p> : null}
+              {errors.duration ? <p className="text-xs text-destructive">{errors.duration}</p> : null}
             </div>
           </div>
 
           {mode === 'create' && hasCaseContext && scheduleSlotOptions.length > 0 ? (
-            <div className="space-y-1.5 rounded-lg border border-sky-100 bg-sky-50/40 p-3">
-              <Label className="text-slate-800">Select Scheduled Session (optional)</Label>
+            <div className="space-y-1.5 rounded-lg border-blue-100 bg-blue-50/40 p-3">
+              <Label className="text-foreground">Select Scheduled Session (optional)</Label>
               <Select
                 value={sessionSlotId || '__none__'}
                 onValueChange={(v) => {
@@ -640,7 +711,7 @@ export function SessionForm({
                   }
                 }}
               >
-                <SelectTrigger className="border-slate-200 bg-white">
+                <SelectTrigger className="border bg-card">
                   <SelectValue placeholder={loadingScheduleSlots ? 'Loading slots…' : 'No match — choose date/time above'} />
                 </SelectTrigger>
                 <SelectContent>
@@ -652,23 +723,23 @@ export function SessionForm({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-muted-foreground">
                 Choosing a slot fills date/time and marks that slot completed when you save (therapy schedule).
               </p>
             </div>
           ) : null}
 
           <div className="space-y-1.5">
-            <Label className="text-slate-800">Goals targeted</Label>
+            <Label className="text-foreground">Goals targeted</Label>
             {renderGoalsTargeted()}
-            {errors.goalsTargeted ? <p className="text-xs text-red-600">{errors.goalsTargeted}</p> : null}
+            {errors.goalsTargeted ? <p className="text-xs text-destructive">{errors.goalsTargeted}</p> : null}
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-slate-800">Activities used</Label>
+            <Label className="text-foreground">Activities used</Label>
             {effectiveDomain ? (
-              <p className="text-xs text-slate-500">
-                Showing library + plan activities for domain: <span className="font-medium text-slate-700">{effectiveDomain}</span>
+              <p className="text-xs text-muted-foreground">
+                Showing library + plan activities for domain: <span className="font-medium text-foreground">{effectiveDomain}</span>
               </p>
             ) : null}
             {allowManualActivityList ? (
@@ -676,38 +747,38 @@ export function SessionForm({
                 <Textarea
                   rows={3}
                   placeholder="Enter activity names separated by commas (required when no activities match this domain)"
-                  className="border-slate-200"
+                  className="border"
                   value={manualActivitiesOnly}
                   onChange={(e) => setManualActivitiesOnly(e.target.value)}
                 />
-                <p className="text-xs text-slate-500">Add templates to the activity library for this domain, or embed activities on the therapy plan.</p>
+                <p className="text-xs text-muted-foreground">Add templates to the activity library for this domain, or embed activities on the therapy plan.</p>
               </div>
             ) : activityOptions.length === 0 ? (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+              <p className="rounded-md border bg-background px-3 py-3 text-sm text-muted-foreground">
                 No activities available for this therapy domain.
               </p>
             ) : (
-              <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+              <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border bg-background/50 p-3">
                 {activityOptions.map((a) => (
-                  <label key={a} className="flex cursor-pointer items-start gap-3 rounded-md px-1 py-2 text-sm hover:bg-white">
+                  <label key={a} className="flex cursor-pointer items-start gap-3 rounded-md px-1 py-2 text-sm hover:bg-card">
                     <Checkbox
                       checked={!!selectedActivities[a]}
                       onCheckedChange={(c) => setSelectedActivities((prev) => ({ ...prev, [a]: c === true }))}
                     />
-                    <span className="leading-snug text-slate-800">{a}</span>
+                    <span className="leading-snug text-foreground">{a}</span>
                   </label>
                 ))}
               </div>
             )}
-            {errors.activitiesUsed ? <p className="text-xs text-red-600">{errors.activitiesUsed}</p> : null}
+            {errors.activitiesUsed ? <p className="text-xs text-destructive">{errors.activitiesUsed}</p> : null}
           </div>
 
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/40 p-4">
-            <Label className="text-base text-slate-900">Child Response Assessment</Label>
+          <div className="space-y-3 rounded-lg border bg-background/40 p-4">
+            <Label className="text-base text-foreground">Child Response Assessment</Label>
             <div className="space-y-1.5">
-              <Label className="text-sm font-normal text-slate-700">Overall response</Label>
+              <Label className="text-sm font-normal text-foreground">Overall response</Label>
               <Select value={String(scaleVal)} onValueChange={(v) => setScaleVal(Number(v))}>
-                <SelectTrigger className="border-slate-200 bg-white">
+                <SelectTrigger className="border bg-card">
                   <SelectValue placeholder="Select response" />
                 </SelectTrigger>
                 <SelectContent>
@@ -719,13 +790,13 @@ export function SessionForm({
                 </SelectContent>
               </Select>
             </div>
-            {errors.childResponse ? <p className="text-xs text-red-600">{errors.childResponse}</p> : null}
+            {errors.childResponse ? <p className="text-xs text-destructive">{errors.childResponse}</p> : null}
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-slate-800">Status</Label>
+            <Label className="text-foreground">Status</Label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="border-slate-200 bg-white">
+              <SelectTrigger className="border bg-card">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -736,20 +807,20 @@ export function SessionForm({
                 ))}
               </SelectContent>
             </Select>
-            {errors.status ? <p className="text-xs text-red-600">{errors.status}</p> : null}
+            {errors.status ? <p className="text-xs text-destructive">{errors.status}</p> : null}
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-slate-800">Clinical notes</Label>
-            <Textarea rows={3} className="border-slate-200" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Label className="text-foreground">Clinical notes</Label>
+            <Textarea rows={3} className="border" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-slate-800">Parent instructions</Label>
-            <p className="text-xs text-slate-500">Visible to parents when saved (therapy session instructions).</p>
+            <Label className="text-foreground">Parent instructions</Label>
+            <p className="text-xs text-muted-foreground">Visible to parents when saved (therapy session instructions).</p>
             <Textarea
               rows={3}
-              className="border-slate-200"
+              className="border"
               placeholder="Home carryover, reminders, or strategies for caregivers"
               value={parentInstructions}
               onChange={(e) => setParentInstructions(e.target.value)}
@@ -760,33 +831,46 @@ export function SessionForm({
 
   if (isPage) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="mx-auto max-w-3xl px-4 py-8 pb-32">
-          <button
-            type="button"
-            onClick={() => handleCancel()}
-            className="mb-4 text-sm text-slate-600 transition-colors hover:text-sky-800"
-          >
-            ← Back to Sessions
-          </button>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Log Therapy Session</h1>
-          <p className="mt-1 text-sm text-slate-600">Document session details, progress, and observations</p>
+      <div className="min-h-screen bg-gradient-to-b from-muted/50 via-background to-muted/30">
+        <div className="mx-auto max-w-3xl px-4 py-8 pb-36 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-ml-2 mb-5 gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => handleCancel()}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to sessions
+            </Button>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Log therapy session</h1>
+            <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted-foreground">
+              Document session details, progress, and observations in one place.
+            </p>
+          </div>
 
           {errors._api ? (
-            <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{errors._api}</div>
+            <Alert variant="destructive" className="mb-8">
+              <AlertTriangle />
+              <AlertTitle>Could not save</AlertTitle>
+              <AlertDescription>{errors._api}</AlertDescription>
+            </Alert>
           ) : null}
 
-          <Card className="mt-8 border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg text-slate-900">Session Information</CardTitle>
-              <CardDescription>Child, domain, date, and duration</CardDescription>
+          <Card className="overflow-hidden rounded-2xl border-border/80 bg-card shadow-md">
+            <CardHeader className="border-b border-border/80 bg-muted/30 pb-5">
+              <CardTitle className="text-xl font-semibold tracking-tight">Session information</CardTitle>
+              <CardDescription className="text-base">Child, domain, date, and duration</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5 pt-6">
+            <CardContent className="space-y-6 pt-8">
               {casePicker ? (
-                <div className="space-y-1.5">
-                  <Label className="text-slate-800">Child</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="session-child" className="text-sm font-medium text-foreground">
+                    Child
+                  </Label>
                   <Select value={casePicker.value || undefined} onValueChange={casePicker.onChange}>
-                    <SelectTrigger className="border-slate-200 bg-slate-50/80">
+                    <SelectTrigger id="session-child" className={PAGE_SELECT_TRIGGER_CLASS}>
                       <SelectValue placeholder="Select child" />
                     </SelectTrigger>
                     <SelectContent>
@@ -797,54 +881,104 @@ export function SessionForm({
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.caseId ? <p className="text-xs text-red-600">{errors.caseId}</p> : null}
+                  {errors.caseId ? <p className="text-sm text-destructive">{errors.caseId}</p> : null}
                 </div>
               ) : null}
               {domainFieldPage}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-slate-800">Session Date</Label>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="session-datetime" className="text-sm font-medium text-foreground">
+                    Session date &amp; time
+                  </Label>
                   <Input
+                    id="session-datetime"
                     type="datetime-local"
-                    className="border-slate-200 bg-slate-50/80"
+                    className={PAGE_INPUT_CLASS}
                     value={sessionDate}
                     onChange={(e) => setSessionDate(e.target.value)}
                   />
-                  {errors.sessionDate ? <p className="text-xs text-red-600">{errors.sessionDate}</p> : null}
+                  {errors.sessionDate ? <p className="text-sm text-destructive">{errors.sessionDate}</p> : null}
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-slate-800">Duration (minutes)</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="session-duration" className="text-sm font-medium text-foreground">
+                    Duration (minutes)
+                  </Label>
                   <Input
+                    id="session-duration"
                     type="number"
                     min={1}
                     step={1}
-                    className="border-slate-200 bg-slate-50/80"
+                    className={PAGE_INPUT_CLASS}
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                   />
-                  {errors.duration ? <p className="text-xs text-red-600">{errors.duration}</p> : null}
+                  {errors.duration ? <p className="text-sm text-destructive">{errors.duration}</p> : null}
                 </div>
               </div>
+
+              {mode === 'create' && hasCaseContext && scheduleSlotOptions.length > 0 ? (
+                <div className="space-y-3 rounded-xl border-2 border-primary/15 bg-primary/5 p-4 dark:border-primary/25 dark:bg-primary/10">
+                  <Label className="text-sm font-medium text-foreground">Match a scheduled slot (optional)</Label>
+                  <Select
+                    value={sessionSlotId || '__none__'}
+                    onValueChange={(v) => {
+                      if (v === '__none__') {
+                        setSessionSlotId('');
+                        return;
+                      }
+                      setSessionSlotId(v);
+                      const picked = scheduleSlotOptions.find((o) => o.id === v);
+                      if (picked?.date && picked.time) {
+                        const d = new Date(picked.date);
+                        const [hh, mm] = picked.time.split(':').map((x) => parseInt(x, 10));
+                        if (!Number.isNaN(d.getTime()) && !Number.isNaN(hh)) {
+                          d.setHours(hh || 0, Number.isNaN(mm) ? 0 : mm, 0, 0);
+                          const pad = (n: number) => String(n).padStart(2, '0');
+                          setSessionDate(
+                            `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+                          );
+                          setDuration(String(picked.duration || duration));
+                        }
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={PAGE_SELECT_TRIGGER_CLASS}>
+                      <SelectValue placeholder={loadingScheduleSlots ? 'Loading slots…' : 'Choose a slot or enter time manually'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None — log without a scheduled slot</SelectItem>
+                      {scheduleSlotOptions.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Selecting a slot fills date and time; saving can complete that appointment in the therapy schedule.
+                  </p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
-          <Card className="mt-6 border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg text-slate-900">Goals and Activities</CardTitle>
-              <CardDescription>From the therapy plan and activity library</CardDescription>
+          <Card className="mt-8 overflow-hidden rounded-2xl border-border/80 bg-card shadow-md">
+            <CardHeader className="border-b border-border/80 bg-muted/30 pb-5">
+              <CardTitle className="text-xl font-semibold tracking-tight">Goals and activities</CardTitle>
+              <CardDescription className="text-base">From the therapy plan and activity library</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5 pt-6">
-              <div className="space-y-1.5">
-                <Label className="text-slate-800">Goals targeted</Label>
+            <CardContent className="space-y-8 pt-8">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-foreground">Goals targeted</Label>
                 {renderGoalsTargeted()}
-                {errors.goalsTargeted ? <p className="text-xs text-red-600">{errors.goalsTargeted}</p> : null}
+                {errors.goalsTargeted ? <p className="text-sm text-destructive">{errors.goalsTargeted}</p> : null}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-slate-800">Activities used</Label>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-foreground">Activities used</Label>
                 {effectiveDomain ? (
-                  <p className="text-xs text-slate-500">
-                    Library and plan activities for domain:{' '}
-                    <span className="font-medium text-slate-700">{effectiveDomain}</span>
+                  <p className="text-sm text-muted-foreground">
+                    Library and plan activities for{' '}
+                    <span className="font-medium text-foreground">{effectiveDomain}</span>
                   </p>
                 ) : null}
                 {allowManualActivityList ? (
@@ -852,44 +986,54 @@ export function SessionForm({
                     <Textarea
                       rows={3}
                       placeholder="Enter activity names separated by commas (required when no activities match this domain)"
-                      className="border-slate-200 bg-slate-50/50"
+                      className={cn(PAGE_INPUT_CLASS, 'min-h-[5.5rem]')}
                       value={manualActivitiesOnly}
                       onChange={(e) => setManualActivitiesOnly(e.target.value)}
                     />
-                    <p className="text-xs text-slate-500">Add templates to the activity library for this domain, or embed activities on the therapy plan.</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Add templates to the activity library for this domain, or embed activities on the therapy plan.
+                    </p>
                   </div>
                 ) : activityOptions.length === 0 ? (
-                  <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                    No activities available for this therapy domain.
-                  </p>
+                  <Alert>
+                    <Info className="text-muted-foreground" />
+                    <AlertTitle>No activities for this domain</AlertTitle>
+                    <AlertDescription>
+                      Add activities to your library or therapy plan, or enter them manually when the list is empty.
+                    </AlertDescription>
+                  </Alert>
                 ) : (
-                  <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                  <div className="max-h-72 space-y-1 overflow-y-auto rounded-xl border-2 border-border/80 bg-muted/20 p-3 shadow-inner">
                     {activityOptions.map((a) => (
-                      <label key={a} className="flex cursor-pointer items-start gap-3 rounded-md px-1 py-2 text-sm hover:bg-white">
+                      <label
+                        key={a}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-background"
+                      >
                         <Checkbox
                           checked={!!selectedActivities[a]}
                           onCheckedChange={(c) => setSelectedActivities((prev) => ({ ...prev, [a]: c === true }))}
+                          className="mt-0.5"
                         />
-                        <span className="leading-snug text-slate-800">{a}</span>
+                        <span className="leading-snug text-foreground">{a}</span>
                       </label>
                     ))}
                   </div>
                 )}
-                {errors.activitiesUsed ? <p className="text-xs text-red-600">{errors.activitiesUsed}</p> : null}
+                {errors.activitiesUsed ? <p className="text-sm text-destructive">{errors.activitiesUsed}</p> : null}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="mt-6 border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg text-slate-900">Child Response Assessment</CardTitle>
-              <CardDescription>Overall response (saved for clinician analytics as a 1–5 scale)</CardDescription>
+          <Card className="mt-8 overflow-hidden rounded-2xl border-border/80 bg-card shadow-md">
+            <CardHeader className="border-b border-border/80 bg-muted/30 pb-5">
+              <CardTitle className="text-xl font-semibold tracking-tight">Child response</CardTitle>
+              <CardDescription className="text-base">Overall response (1–5 scale for analytics)</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pt-6">
-              <div className="space-y-1.5">
-                <Label className="text-slate-800">Overall response</Label>
+            <CardContent className="space-y-4 pt-8">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">Overall response</Label>
                 <Select value={String(scaleVal)} onValueChange={(v) => setScaleVal(Number(v))}>
-                  <SelectTrigger className="border-slate-200 bg-slate-50/80">
+                  <SelectTrigger className={PAGE_SELECT_TRIGGER_CLASS}>
                     <SelectValue placeholder="Select response" />
                   </SelectTrigger>
                   <SelectContent>
@@ -901,33 +1045,33 @@ export function SessionForm({
                   </SelectContent>
                 </Select>
               </div>
-              {errors.childResponse ? <p className="text-xs text-red-600">{errors.childResponse}</p> : null}
+              {errors.childResponse ? <p className="text-sm text-destructive">{errors.childResponse}</p> : null}
             </CardContent>
           </Card>
 
-          <Card className="mt-6 border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg text-slate-900">Session Notes</CardTitle>
-              <CardDescription>Clinical observations and parent-facing guidance</CardDescription>
+          <Card className="mt-8 overflow-hidden rounded-2xl border-border/80 bg-card shadow-md">
+            <CardHeader className="border-b border-border/80 bg-muted/30 pb-5">
+              <CardTitle className="text-xl font-semibold tracking-tight">Session notes</CardTitle>
+              <CardDescription className="text-base">Clinical observations and parent-facing guidance</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5 pt-6">
-              <div className="space-y-1.5">
-                <Label className="text-slate-800">Clinical Observations</Label>
+            <CardContent className="space-y-6 pt-8">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">Clinical observations</Label>
                 <Textarea
                   rows={4}
-                  className="border-slate-200 bg-slate-50/50"
-                  placeholder="Document child's performance, engagement level, challenges, and progress..."
+                  className={cn(PAGE_INPUT_CLASS, 'min-h-[7rem] resize-y')}
+                  placeholder="Performance, engagement, challenges, and progress…"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-slate-800">Parent Instructions</Label>
-                <p className="text-xs text-slate-500">Saved to the parent module for home guidance.</p>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">Parent instructions</Label>
+                <p className="text-sm text-muted-foreground">Visible to caregivers in the parent app when saved.</p>
                 <Textarea
                   rows={4}
-                  className="border-slate-200 bg-slate-50/50"
-                  placeholder="Recommendations for home practice and parent follow-up..."
+                  className={cn(PAGE_INPUT_CLASS, 'min-h-[7rem] resize-y')}
+                  placeholder="Home practice, reminders, or strategies for families…"
                   value={parentInstructions}
                   onChange={(e) => setParentInstructions(e.target.value)}
                 />
@@ -935,44 +1079,35 @@ export function SessionForm({
             </CardContent>
           </Card>
 
-          <Card className="mt-6 border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg text-slate-900">Session Status</CardTitle>
+          <Card className="mt-8 overflow-hidden rounded-2xl border-border/80 bg-card shadow-md">
+            <CardHeader className="border-b border-border/80 bg-muted/30 pb-5">
+              <CardTitle className="text-xl font-semibold tracking-tight">Session status</CardTitle>
+              <CardDescription className="text-base">Completed, missed, or rescheduled</CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
-              <RadioGroup value={status} onValueChange={setStatus} className="space-y-3">
+            <CardContent className="pt-8">
+              <RadioGroup value={status} onValueChange={setStatus} className="flex flex-col gap-3">
                 {STATUS_OPTIONS.map((o) => (
-                  <div key={o.value} className="flex items-center gap-3">
+                  <label
+                    key={o.value}
+                    htmlFor={`page-st-${o.value}`}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-transparent px-3 py-3 transition-colors hover:border-border hover:bg-muted/40 has-[:focus-visible]:border-ring has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50"
+                  >
                     <RadioGroupItem value={o.value} id={`page-st-${o.value}`} />
-                    <Label htmlFor={`page-st-${o.value}`} className="font-normal text-slate-800">
-                      {o.label}
-                    </Label>
-                  </div>
+                    <span className="text-sm font-medium text-foreground">{o.label}</span>
+                  </label>
                 ))}
               </RadioGroup>
-              {errors.status ? <p className="mt-2 text-xs text-red-600">{errors.status}</p> : null}
+              {errors.status ? <p className="mt-3 text-sm text-destructive">{errors.status}</p> : null}
             </CardContent>
           </Card>
 
-          <div className="mt-10 flex flex-row flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-8">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-slate-200 text-slate-900 hover:bg-slate-50"
-              onClick={() => handleCancel()}
-              disabled={saving}
-            >
+          <div className="sticky bottom-0 z-10 mt-10 flex flex-col gap-3 border-t border-border/80 bg-background/95 py-6 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:items-center sm:justify-end">
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => handleCancel()} disabled={saving}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-slate-200 text-slate-900 hover:bg-slate-50"
-              onClick={() => void handleSubmit()}
-              disabled={saving}
-            >
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-slate-900" /> : null}
-              Save Session
+            <Button type="button" className="w-full sm:w-auto" onClick={() => void handleSubmit()} disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save session
             </Button>
           </div>
         </div>
@@ -982,19 +1117,19 @@ export function SessionForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(92vh,900px)] overflow-y-auto border-slate-200 bg-white sm:max-w-lg">
-        <DialogHeader className="space-y-1 border-b border-slate-100 pb-3">
-          <DialogTitle className="text-lg text-sky-950">{mode === 'create' ? 'Log therapy session' : 'Edit session'}</DialogTitle>
-          <DialogDescription className="text-sm text-slate-600">
+      <DialogContent className="max-h-[min(92vh,900px)] overflow-y-auto border bg-card sm:max-w-lg">
+        <DialogHeader className="space-y-1 border-b border pb-3">
+          <DialogTitle className="text-lg text-blue-950">{mode === 'create' ? 'Log therapy session' : 'Edit session'}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
             Goals and activities are validated against your therapy plan and library. Parent instructions appear on the parent view when provided.
           </DialogDescription>
         </DialogHeader>
         {dialogFields}
-        <DialogFooter className="flex flex-row flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
+        <DialogFooter className="flex flex-row flex-wrap items-center justify-end gap-3 border-t border pt-4">
           <Button
             type="button"
             variant="outline"
-            className="border-slate-200 text-slate-900 hover:bg-slate-50"
+            className="border text-foreground hover:bg-background"
             onClick={() => handleCancel()}
             disabled={saving}
           >
@@ -1003,11 +1138,11 @@ export function SessionForm({
           <Button
             type="button"
             variant="outline"
-            className="border-slate-200 text-slate-900 hover:bg-slate-50"
+            className="border text-foreground hover:bg-background"
             onClick={() => void handleSubmit()}
             disabled={saving}
           >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-slate-900" /> : null}
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-foreground" /> : null}
             {mode === 'create' ? 'Save session' : 'Update session'}
           </Button>
         </DialogFooter>

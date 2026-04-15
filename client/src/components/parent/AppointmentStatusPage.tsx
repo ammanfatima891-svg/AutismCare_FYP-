@@ -7,21 +7,29 @@ import API from '../../api';
 
 interface Appointment {
   _id: string;
-  childId: string;
-  childName: string;
-  appointmentType: string;
+  child: string;
+  childInfo?: {
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+  } | null;
+  appointmentType: 'DIAGNOSTIC' | 'THERAPY' | 'LAB_TEST' | string;
   preferredDate: string;
   preferredTime: string;
+  finalDate?: string | null;
+  finalTime?: string | null;
   reason: string;
-  urgency: string;
-  status: string;
-  assignedTo?: {
-    firstName: string;
-    lastName: string;
-    role: string;
-  };
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED' | string;
+  professional?: {
+    firstName?: string;
+    lastName?: string;
+    labName?: string;
+    role?: string;
+  } | null;
   createdAt: string;
-  notes?: string;
+  additionalNotes?: string;
+  rejectionReason?: string;
+  completionNotes?: string;
 }
 
 interface AppointmentStatusPageProps {
@@ -39,7 +47,7 @@ export function AppointmentStatusPage({ onBack }: AppointmentStatusPageProps) {
 
   const fetchAppointments = async () => {
     try {
-      const response = await API.get('/appointments/parent');
+      const response = await API.get('/appointments/my');
       setAppointments(response.data.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch appointments');
@@ -48,25 +56,43 @@ export function AppointmentStatusPage({ onBack }: AppointmentStatusPageProps) {
     }
   };
 
+  const statusKey = (status: string) => String(status || '').trim().toUpperCase();
+
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'completed': return 'bg-gray-100 text-gray-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+    switch (statusKey(status)) {
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'APPROVED': return 'bg-blue-50 text-primary';
+      case 'REJECTED': return 'bg-muted text-destructive';
+      case 'COMPLETED': return 'bg-muted text-foreground';
+      case 'CANCELLED': return 'bg-muted text-destructive';
+      default: return 'bg-muted text-foreground';
     }
   };
 
-  const getUrgencyColor = (urgency: string) => {
-    switch (urgency) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'normal': return 'bg-blue-100 text-blue-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const displayStatus = (status: string) =>
+    statusKey(status).toLowerCase().replace('_', ' ');
+
+  const displayAppointmentType = (t: string) =>
+    String(t || '')
+      .trim()
+      .replace(/_/g, ' ')
+      .replace(/-/g, ' ')
+      .toUpperCase();
+
+  const childName = (a: Appointment) => {
+    const first = a.childInfo?.firstName || '';
+    const last = a.childInfo?.lastName || '';
+    const full = `${first} ${last}`.trim();
+    return full || 'Child';
+  };
+
+  const professionalName = (a: Appointment) => {
+    const labName = a.professional?.labName;
+    if (labName && String(labName).trim()) return String(labName).trim();
+    const first = a.professional?.firstName || '';
+    const last = a.professional?.lastName || '';
+    const full = `${first} ${last}`.trim();
+    return full || 'Professional';
   };
 
   if (loading) {
@@ -76,7 +102,7 @@ export function AppointmentStatusPage({ onBack }: AppointmentStatusPageProps) {
   if (error) {
     return (
       <div className="text-center">
-        <div className="text-red-600 mb-4">{error}</div>
+        <div className="text-destructive mb-4">{error}</div>
         <Button onClick={fetchAppointments}>Try Again</Button>
       </div>
     );
@@ -96,7 +122,7 @@ export function AppointmentStatusPage({ onBack }: AppointmentStatusPageProps) {
       {appointments.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">No appointment requests found.</p>
+            <p className="text-muted-foreground">No appointment requests found.</p>
           </CardContent>
         </Card>
       ) : (
@@ -106,14 +132,11 @@ export function AppointmentStatusPage({ onBack }: AppointmentStatusPageProps) {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">
-                    {appointment.appointmentType.replace('-', ' ').toUpperCase()}
+                    {displayAppointmentType(appointment.appointmentType)}
                   </CardTitle>
                   <div className="flex gap-2">
                     <Badge className={getStatusColor(appointment.status)}>
-                      {appointment.status}
-                    </Badge>
-                    <Badge className={getUrgencyColor(appointment.urgency)}>
-                      {appointment.urgency}
+                      {displayStatus(appointment.status)}
                     </Badge>
                   </div>
                 </div>
@@ -121,49 +144,68 @@ export function AppointmentStatusPage({ onBack }: AppointmentStatusPageProps) {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm">Child: {appointment.childName}</span>
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Child: {childName(appointment)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
                       Preferred: {new Date(appointment.preferredDate).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
+                    <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">Time: {appointment.preferredTime}</span>
                   </div>
-                  {appointment.assignedTo && (
+                  {appointment.professional && (
                     <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-500" />
+                      <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        Assigned to: {appointment.assignedTo.firstName} {appointment.assignedTo.lastName}
-                        ({appointment.assignedTo.role})
+                        Professional: {professionalName(appointment)} ({appointment.professional.role})
                       </span>
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-start gap-2">
-                  <FileText className="h-4 w-4 text-gray-500 mt-0.5" />
+                  <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div>
                     <p className="text-sm font-medium">Reason:</p>
-                    <p className="text-sm text-gray-600">{appointment.reason}</p>
+                    <p className="text-sm text-muted-foreground">{appointment.reason}</p>
                   </div>
                 </div>
 
-                {appointment.notes && (
+                {appointment.additionalNotes && (
                   <div className="flex items-start gap-2">
-                    <FileText className="h-4 w-4 text-gray-500 mt-0.5" />
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Notes:</p>
-                      <p className="text-sm text-gray-600">{appointment.notes}</p>
+                      <p className="text-sm text-muted-foreground">{appointment.additionalNotes}</p>
                     </div>
                   </div>
                 )}
 
-                <div className="text-xs text-gray-500">
+                {appointment.rejectionReason && (
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Rejection reason:</p>
+                      <p className="text-sm text-muted-foreground">{appointment.rejectionReason}</p>
+                    </div>
+                  </div>
+                )}
+
+                {appointment.completionNotes && (
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Completion notes:</p>
+                      <p className="text-sm text-muted-foreground">{appointment.completionNotes}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground">
                   Requested on: {new Date(appointment.createdAt).toLocaleDateString()}
                 </div>
               </CardContent>

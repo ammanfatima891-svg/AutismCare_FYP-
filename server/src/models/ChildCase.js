@@ -49,6 +49,20 @@ const ChildCaseSchema = new Schema(
       enum: Object.values(CASE_STATUS),
       default: CASE_STATUS.UNDER_EVALUATION,
       index: true,
+      set: (v) => {
+        if (v == null) return v;
+        const raw = String(v).trim();
+        if (!raw) return raw;
+        const key = raw.toLowerCase().replace(/\s+/g, '_');
+        const map = {
+          active: CASE_STATUS.ACTIVE,
+          under_evaluation: CASE_STATUS.UNDER_EVALUATION,
+          under__evaluation: CASE_STATUS.UNDER_EVALUATION,
+          referred: CASE_STATUS.REFERRED,
+          ongoing_therapy: CASE_STATUS.ONGOING_THERAPY,
+        };
+        return map[key] ?? raw;
+      },
     },
   },
   { timestamps: true }

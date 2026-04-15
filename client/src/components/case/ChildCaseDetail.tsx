@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { caseAPI } from '../../api';
+import { caseAPI, progressEngineAPI } from '../../api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -10,13 +10,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Loader2, ArrowLeft, AlertCircle, ClipboardList, Users, Activity } from 'lucide-react';
+import { Loader2, ArrowLeft, AlertCircle, ClipboardList, Users, Activity, TrendingUp, FlaskConical } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ClinicalEvaluationTab } from '../evaluation/ClinicalEvaluationTab';
 import { ReferralTab } from '../referral/ReferralTab';
 import { TherapyOversightTab } from '../therapy/TherapyOversightTab';
 import { ProgressMonitoringTab } from '../progress/ProgressMonitoringTab';
 import { ClinicianCaseReports } from '../reports/ClinicianCaseReports';
+import { cn } from '../ui/utils';
+import { CaseLabRequestsPanel, type CaseLabRequestRow } from './CaseLabRequestsPanel';
 
 export interface ChildCaseDetailProps {
   caseId: string;
@@ -24,11 +26,26 @@ export interface ChildCaseDetailProps {
 }
 
 const riskBadgeClass: Record<string, string> = {
-  low: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  medium: 'bg-amber-100 text-amber-900 border-amber-200',
-  high: 'bg-red-100 text-red-800 border-red-200',
-  unknown: 'bg-slate-100 text-slate-700 border-slate-200',
+  low: 'bg-blue-100 text-blue-800 border-blue-200',
+  medium: 'bg-yellow-100 text-yellow-900 border-yellow-200',
+  high: 'bg-muted text-destructive border',
+  unknown: 'bg-muted text-foreground border',
 };
+
+type ProgressEngineCaseSummary = {
+  overallScore: number;
+  improvementRate: number;
+  weakestDomain: string | null;
+  trend: string;
+  alertCount?: number;
+};
+
+function snapshotTrendClass(t?: string) {
+  const x = String(t || '').toLowerCase();
+  if (x === 'improving') return 'border-emerald-200/90 bg-emerald-50 text-emerald-900';
+  if (x === 'declining') return 'border-red-200/90 bg-red-50 text-red-900';
+  return 'border-slate-200 bg-slate-50 text-slate-800';
+}
 
 export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
   const [data, setData] = useState<any>(null);
@@ -36,8 +53,10 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [peSummary, setPeSummary] = useState<ProgressEngineCaseSummary | null>(null);
+  const [peSummaryLoading, setPeSummaryLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'evaluation' | 'referrals' | 'therapy' | 'progress' | 'reports'
+    'overview' | 'evaluation' | 'referrals' | 'therapy' | 'progress' | 'reports' | 'lab'
   >('overview');
 
   useEffect(() => {
@@ -55,6 +74,25 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
         if (!cancelled) setError(e.response?.data?.message || 'Failed to load case');
       } finally {
         if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setPeSummaryLoading(true);
+        const res = await progressEngineAPI.getSummary(caseId);
+        const d = (res.data as { data?: ProgressEngineCaseSummary })?.data;
+        if (!cancelled) setPeSummary(d && typeof d === 'object' ? d : null);
+      } catch {
+        if (!cancelled) setPeSummary(null);
+      } finally {
+        if (!cancelled) setPeSummaryLoading(false);
       }
     })();
     return () => {
@@ -90,7 +128,7 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-700">
+        <Button variant="ghost" size="sm" onClick={onBack} className="text-foreground">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to cases
         </Button>
@@ -103,7 +141,7 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 flex items-center gap-2">
+        <div className="rounded-lg border bg-muted px-4 py-3 text-destructive flex items-center gap-2">
           <AlertCircle className="h-5 w-5 shrink-0" />
           {error}
         </div>
@@ -113,17 +151,17 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
         <>
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold text-slate-900">{childName}</h2>
-              <p className="text-slate-600 text-sm mt-1">Child case · ID {data._id}</p>
+  <h2 className="text-2xl font-semibold text-primary">{childName}</h2>
+              <p className="text-muted-foreground text-sm mt-1">Child case · ID {data._id}</p>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <span className="text-sm font-medium text-slate-600">Case status</span>
+              <span className="text-sm font-medium text-muted-foreground">Case status</span>
               <Select
                 value={status}
                 onValueChange={handleStatusChange}
                 disabled={saving}
               >
-                <SelectTrigger className="w-[220px] border-slate-200 bg-white">
+                <SelectTrigger className="w-[220px] border bg-card">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -141,7 +179,9 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
           <Tabs
             value={activeTab}
             onValueChange={(v) =>
-              setActiveTab(v as 'overview' | 'evaluation' | 'referrals' | 'therapy' | 'progress' | 'reports')
+              setActiveTab(
+                v as 'overview' | 'evaluation' | 'referrals' | 'therapy' | 'progress' | 'reports' | 'lab'
+              )
             }
           >
             <TabsList className="w-full justify-start sm:w-auto">
@@ -151,12 +191,97 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
               <TabsTrigger value="therapy">Therapy Oversight</TabsTrigger>
               <TabsTrigger value="progress">Progress Monitoring</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="lab" className="gap-1">
+                <FlaskConical className="h-3.5 w-3.5" />
+                Lab
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6 pt-2">
+              <Card className="overflow-hidden border border-slate-200/90 bg-card shadow-md">
+                <CardHeader className="border-b border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-sky-50/35 px-6 py-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm">
+                        <TrendingUp className="h-4 w-4 text-sky-700" aria-hidden />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-semibold tracking-tight text-slate-900">
+                          Therapy progress snapshot
+                        </CardTitle>
+                        <CardDescription className="text-sm text-slate-600">
+                          Unified progress engine — composite score, trajectory, and domain focus for rounds.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-6 py-5">
+                  {peSummaryLoading ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-8 text-sm text-slate-600">
+                      <Loader2 className="h-5 w-5 shrink-0 animate-spin text-sky-600" aria-hidden />
+                      Loading clinical summary…
+                    </div>
+                  ) : !peSummary ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/50 px-4 py-8 text-center text-sm text-slate-600">
+                      No summary available yet. This usually appears once there is an active therapy plan and session
+                      data.
+                    </div>
+                  ) : (
+                    <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="border-b border-slate-100 p-4 sm:border-b-0 sm:border-r lg:border-r">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          Composite (0–5)
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">
+                          {(peSummary.overallScore ?? 0).toFixed(2)}
+                          <span className="text-sm font-normal text-slate-500"> / 5</span>
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">Therapy + home weighted blend</p>
+                      </div>
+                      <div className="border-b border-slate-100 p-4 sm:border-b-0 lg:border-r">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          Improvement rate
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">
+                          {peSummary.improvementRate != null ? peSummary.improvementRate.toFixed(3) : '—'}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">From smoothed weekly trend</p>
+                      </div>
+                      <div className="border-b border-slate-100 p-4 sm:border-b-0 sm:border-r lg:border-r">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          Focus domain
+                        </p>
+                        <p className="mt-1 text-base font-semibold capitalize text-slate-900">
+                          {peSummary.weakestDomain || '—'}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">Lowest current domain score</p>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Trajectory</p>
+                        <Badge
+                          variant="outline"
+                          className={cn('mt-2 px-3 py-1 text-xs font-semibold capitalize', snapshotTrendClass(peSummary.trend))}
+                        >
+                          {peSummary.trend || '—'}
+                        </Badge>
+                        {typeof peSummary.alertCount === 'number' && peSummary.alertCount > 0 ? (
+                          <p className="mt-3 text-xs font-medium text-amber-800">
+                            {peSummary.alertCount} active engine alert
+                            {peSummary.alertCount === 1 ? '' : 's'} — review Progress tab
+                          </p>
+                        ) : (
+                          <p className="mt-3 text-xs text-slate-500">No open engine alerts</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="border-slate-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-slate-100 bg-blue-50/50">
+                <Card className="border shadow-sm bg-card">
+                  <CardHeader className="border-b border bg-blue-50/50">
                     <CardTitle className="text-base flex items-center gap-2 text-blue-900">
                       <Users className="h-5 w-5" />
                       Child profile
@@ -168,16 +293,16 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                       <>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <p className="text-slate-500 text-xs uppercase tracking-wide">Name</p>
-                            <p className="font-medium text-slate-900">{childName}</p>
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">Name</p>
+                            <p className="font-medium text-foreground">{childName}</p>
                           </div>
                           <div>
-                            <p className="text-slate-500 text-xs uppercase tracking-wide">Gender</p>
-                            <p className="text-slate-800 capitalize">{data.childProfile.gender || '—'}</p>
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">Gender</p>
+                            <p className="text-foreground capitalize">{data.childProfile.gender || '—'}</p>
                           </div>
                           <div>
-                            <p className="text-slate-500 text-xs uppercase tracking-wide">Date of birth</p>
-                            <p className="text-slate-800">
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">Date of birth</p>
+                            <p className="text-foreground">
                               {data.childProfile.dateOfBirth
                                 ? new Date(data.childProfile.dateOfBirth).toLocaleDateString()
                                 : '—'}
@@ -185,30 +310,30 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                           </div>
                         </div>
                         {(data.childProfile.medicalHistory || data.childProfile.allergies) && (
-                          <div className="pt-2 border-t border-slate-100 space-y-2">
+                          <div className="pt-2 border-t border space-y-2">
                             {data.childProfile.medicalHistory && (
                               <div>
-                                <p className="text-slate-500 text-xs uppercase tracking-wide">Medical history</p>
-                                <p className="text-slate-700">{data.childProfile.medicalHistory}</p>
+                                <p className="text-muted-foreground text-xs uppercase tracking-wide">Medical history</p>
+                                <p className="text-foreground">{data.childProfile.medicalHistory}</p>
                               </div>
                             )}
                             {data.childProfile.allergies && (
                               <div>
-                                <p className="text-slate-500 text-xs uppercase tracking-wide">Allergies</p>
-                                <p className="text-slate-700">{data.childProfile.allergies}</p>
+                                <p className="text-muted-foreground text-xs uppercase tracking-wide">Allergies</p>
+                                <p className="text-foreground">{data.childProfile.allergies}</p>
                               </div>
                             )}
                           </div>
                         )}
                       </>
                     ) : (
-                      <p className="text-slate-600">Child profile could not be loaded.</p>
+                      <p className="text-muted-foreground">Child profile could not be loaded.</p>
                     )}
                   </CardContent>
                 </Card>
 
-                <Card className="border-slate-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-slate-100 bg-blue-50/50">
+                <Card className="border shadow-sm bg-card">
+                  <CardHeader className="border-b border bg-blue-50/50">
                     <CardTitle className="text-base flex items-center gap-2 text-blue-900">
                       <Users className="h-5 w-5" />
                       Parent / guardian
@@ -218,23 +343,23 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                   <CardContent className="pt-6 space-y-3 text-sm">
                     {data.parentInfo ? (
                       <>
-                        <p className="font-medium text-slate-900">
+                        <p className="font-medium text-foreground">
                           {data.parentInfo.firstName} {data.parentInfo.lastName}
                         </p>
-                        <p className="text-slate-700">{data.parentInfo.email}</p>
+                        <p className="text-foreground">{data.parentInfo.email}</p>
                         {data.parentInfo.phoneNumber && (
-                          <p className="text-slate-600">{data.parentInfo.phoneNumber}</p>
+                          <p className="text-muted-foreground">{data.parentInfo.phoneNumber}</p>
                         )}
                       </>
                     ) : (
-                      <p className="text-slate-600">Parent information unavailable.</p>
+                      <p className="text-muted-foreground">Parent information unavailable.</p>
                     )}
                   </CardContent>
                 </Card>
               </div>
 
-              <Card className="border-slate-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-slate-100 bg-blue-50/50">
+              <Card className="border shadow-sm bg-card">
+                <CardHeader className="border-b border bg-blue-50/50">
                   <CardTitle className="text-base flex items-center gap-2 text-blue-900">
                     <ClipboardList className="h-5 w-5" />
                     Screening summary
@@ -243,7 +368,7 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                 </CardHeader>
                 <CardContent className="pt-6">
                   {!screening.hasScreening ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
+                    <div className="rounded-lg border-yellow-200 bg-yellow-50 px-4 py-3 text-yellow-900 text-sm">
                       {screening.message || 'No screening data on file for this child yet.'}
                     </div>
                   ) : (
@@ -251,15 +376,15 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                       {screening.latest && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">Latest tool</p>
-                            <p className="font-medium text-slate-900">{screening.latest.questionnaireType}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide">Latest tool</p>
+                            <p className="font-medium text-foreground">{screening.latest.questionnaireType}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">Result</p>
-                            <p className="font-medium text-slate-900">{screening.latest.result}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide">Result</p>
+                            <p className="font-medium text-foreground">{screening.latest.result}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">Risk (from screening)</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide">Risk (from screening)</p>
                             <Badge
                               variant="outline"
                               className={
@@ -272,21 +397,21 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                         </div>
                       )}
                       {screening.latest?.resultDescription && (
-                        <p className="text-sm text-slate-700 border-t border-slate-100 pt-4">
+                        <p className="text-sm text-foreground border-t border pt-4">
                           {screening.latest.resultDescription}
                         </p>
                       )}
                       {Array.isArray(screening.submissions) && screening.submissions.length > 0 && (
-                        <div className="border-t border-slate-100 pt-4">
-                          <p className="text-xs font-semibold text-slate-600 mb-2">All submissions</p>
+                        <div className="border-t border pt-4">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">All submissions</p>
                           <ul className="space-y-2 text-sm">
                             {screening.submissions.map((s: any) => (
                               <li
                                 key={s.submissionId}
-                                className="flex flex-wrap gap-2 justify-between px-3 py-2 rounded-md bg-slate-50 border border-slate-100"
+                                className="flex flex-wrap gap-2 justify-between px-3 py-2 rounded-md bg-background border"
                               >
-                                <span className="text-slate-800">{s.questionnaireType}</span>
-                                <span className="text-slate-600">{s.result}</span>
+                                <span className="text-foreground">{s.questionnaireType}</span>
+                                <span className="text-muted-foreground">{s.result}</span>
                                 <Badge variant="outline" className="text-xs">
                                   {s.riskLevel}
                                 </Badge>
@@ -300,8 +425,8 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                 </CardContent>
               </Card>
 
-              <Card className="border-slate-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-slate-100 bg-blue-50/50">
+              <Card className="border shadow-sm bg-card">
+                <CardHeader className="border-b border bg-blue-50/50">
                   <CardTitle className="text-base flex items-center gap-2 text-blue-900">
                     <Activity className="h-5 w-5" />
                     Case risk indicator
@@ -315,7 +440,7 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                   >
                     {data.riskLevel}
                   </Badge>
-                  <span className="text-sm text-slate-600">
+                  <span className="text-sm text-muted-foreground">
                     Use status above to reflect where the child is in your diagnostic workflow.
                   </span>
                 </CardContent>
@@ -344,6 +469,13 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
 
             <TabsContent value="reports" className="pt-2">
               <ClinicianCaseReports caseId={caseId} />
+            </TabsContent>
+
+            <TabsContent value="lab" className="pt-2">
+              <CaseLabRequestsPanel
+                requests={(data.labRequests || []) as CaseLabRequestRow[]}
+                showLabTechnician
+              />
             </TabsContent>
           </Tabs>
         </>

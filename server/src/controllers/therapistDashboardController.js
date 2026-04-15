@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 /**
  * Therapist dashboard: referrals, appointments, therapy plans, home assignments, session logs.
  * Referral matching uses therapist specialization → therapistType (unchanged).
@@ -11,6 +12,7 @@ const TherapyCase = require('../models/TherapyCase');
 const { SessionSlot } = require('../models/SessionSlot');
 const { HomeAssignment } = require('../models/HomeAssignment');
 const SessionLog = require('../models/SessionLog');
+const { REFERRAL_STATUS } = require('../constants/workflowEnums');
 
 const UPCOMING_SESSION_LIMIT = 8;
 /** Fetch enough rows from each source before merge/sort (cap is applied after merge). */
@@ -111,7 +113,7 @@ async function buildUpcomingSessions(therapistId, startOfToday, limit) {
       professional: therapistId,
       professionalRole: 'therapist',
       appointmentType: APPOINTMENT_TYPES.THERAPY,
-      status: { $in: [APPOINTMENT_STATUS.APPROVED, APPOINTMENT_STATUS.RESCHEDULED] },
+      status: { $in: [APPOINTMENT_STATUS.APPROVED] },
       $or: [
         { finalDate: { $gte: startOfToday } },
         { finalDate: null, preferredDate: { $gte: startOfToday } },
@@ -121,7 +123,7 @@ async function buildUpcomingSessions(therapistId, startOfToday, limit) {
       .sort({ finalDate: 1, preferredDate: 1 })
       .limit(UPCOMING_FETCH_CAP)
       .lean(),
-    TherapyCase.find({ therapistId, status: 'active' }).select('caseId').lean(),
+    TherapyCase.find({ therapistId, status: 'ACTIVE' }).select('caseId').lean(),
   ]);
 
   const appointmentParentIds = [...new Set(appointments.map((a) => String(a.parent)))];
@@ -132,14 +134,13 @@ async function buildUpcomingSessions(therapistId, startOfToday, limit) {
 
   const fromAppointments = appointments.map((a) => {
     const parent = appointmentParentMap.get(String(a.parent));
-    const sessionStatus = a.status === APPOINTMENT_STATUS.RESCHEDULED ? 'Rescheduled' : 'Confirmed';
     return {
       id: a._id,
       date: a.finalDate || a.preferredDate,
       time: a.finalTime || a.preferredTime || '',
       childName: childNameFromParentChildren(parent, a.child),
       duration: 45,
-      sessionStatus,
+      sessionStatus: 'Confirmed',
     };
   });
 
@@ -190,13 +191,13 @@ async function buildUpcomingSessions(therapistId, startOfToday, limit) {
 async function loadTherapistDashboardData(req) {
   const therapistId = req.user._id;
   const therapistTypes = await resolveTherapistTypes(req);
-  const today = new Date();
+  const today = getCurrentTime();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
   const reviewThreshold = new Date(today.getTime() - GOAL_REVIEW_STALE_DAYS * 24 * 60 * 60 * 1000);
 
-  const referralFilter = { status: { $in: ['pending', 'accepted', 'in-progress'] } };
+  const referralFilter = { status: { $in: [REFERRAL_STATUS.CREATED, REFERRAL_STATUS.SENT, REFERRAL_STATUS.ACCEPTED] } };
   if (therapistTypes.length > 0) {
     referralFilter.therapistType = { $in: therapistTypes };
   } else {
@@ -234,7 +235,8 @@ async function loadTherapistDashboardData(req) {
     })
     .filter(Boolean);
 
-  const activeCases = referrals.filter((r) => r.status === 'in-progress').length;
+  // Canonical workflow: referrals do not have an "in-progress" state; therapy lifecycle is tracked on TherapyCase.
+  const activeCases = await TherapyCase.countDocuments({ therapistId, status: 'ACTIVE' });
 
   const upcomingSessions = await buildUpcomingSessions(therapistId, startOfToday, UPCOMING_SESSION_LIMIT);
 

@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('./time.js');
 const { AuditLog, AUDIT_ACTIONS, RESOURCE_TYPES } = require('../models/AuditLog');
 
 /**
@@ -29,7 +30,7 @@ const logAction = async ({
             ipAddress,
             userAgent,
             details,
-            timestamp: new Date()
+            timestamp: getCurrentTime()
         });
 
         await auditLog.save();

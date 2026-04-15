@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const path = require('path');
 const { HomeAssignment } = require('../models/HomeAssignment');
@@ -10,6 +11,7 @@ const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
 const { createNotification } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { activityAccessFilter } = require('../utils/activityShared');
+const { invalidateProgressEngineCache } = require('../services/progressEngine');
 
 const ASSIGN_POPULATE = [
   { path: 'activityId', select: 'name instructions objective procedure materials domain frequency difficulty' },
@@ -54,6 +56,14 @@ function enrichAssignment(doc) {
 function enrichAssignments(list) {
   if (!Array.isArray(list)) return list;
   return list.map((x) => enrichAssignment(x));
+}
+
+function isSafeSubmissionPath(value) {
+  if (!value || typeof value !== 'string') return false;
+  if (!value.startsWith('/')) return false;
+  if (/\\/.test(value)) return false;
+  if (value.includes('..')) return false;
+  return /^\/uploads\/home-assignments\/[A-Za-z0-9._-]+$/.test(value);
 }
 
 exports.enrichAssignment = enrichAssignment;
@@ -157,6 +167,12 @@ exports.createHomeAssignment = async (req, res) => {
     const created = await HomeAssignment.create(payload);
     const populated = await HomeAssignment.findById(created._id).populate(ASSIGN_POPULATE).lean();
 
+    try {
+      invalidateProgressEngineCache(caseId);
+    } catch (_) {
+      /* ignore */
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Assignment created',
@@ -195,7 +211,7 @@ exports.createAssignmentPost = async (req, res) => {
 exports.getHomeAssignmentsSummaryForTherapist = async (req, res) => {
   try {
     const therapistId = req.user._id;
-    const startOfToday = new Date();
+    const startOfToday = getCurrentTime();
     startOfToday.setHours(0, 0, 0, 0);
 
     const base = { therapistId };
@@ -333,6 +349,10 @@ exports.reviewAssignment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Nothing submitted to review yet' });
     }
 
+    if (doc.status === 'completed') {
+      return res.status(400).json({ success: false, message: 'Completed assignments cannot be reviewed' });
+    }
+
     const set = {};
     let newStatus = doc.status;
     if (markComplete === true || markComplete === 'true') {
@@ -350,12 +370,18 @@ exports.reviewAssignment = async (req, res) => {
         set['therapistFeedback.rating'] = r;
       }
     }
-    set['therapistFeedback.reviewedAt'] = new Date();
+    set['therapistFeedback.reviewedAt'] = getCurrentTime();
     set.status = newStatus;
 
     const updated = await HomeAssignment.findByIdAndUpdate(id, { $set: set }, { new: true })
       .populate(ASSIGN_POPULATE)
       .lean();
+
+    try {
+      invalidateProgressEngineCache(doc.caseId);
+    } catch (_) {
+      /* ignore */
+    }
 
     return res.status(200).json({
       success: true,
@@ -401,7 +427,7 @@ exports.getParentHomeAssignments = async (req, res) => {
       assignments.map((a) => {
         const c = caseMap.get(String(a.caseId));
         const child = (parent?.children || []).find((x) => c && String(x._id) === String(c.childId));
-        const isLate = a.dueDate && new Date(a.dueDate) < new Date() && a.status === 'pending';
+        const isLate = a.dueDate && new Date(a.dueDate) < getCurrentTime() && a.status === 'pending';
         return {
           ...a,
           childName: child ? `${child.firstName || ''} ${child.lastName || ''}`.trim() || 'Child' : 'Child',
@@ -440,7 +466,7 @@ exports.getParentAssignmentsByCase = async (req, res) => {
     const data = enrichAssignments(
       list.map((a) => ({
         ...a,
-        isLate: a.dueDate && new Date(a.dueDate) < new Date() && a.status === 'pending',
+        isLate: a.dueDate && new Date(a.dueDate) < getCurrentTime() && a.status === 'pending',
       }))
     );
 
@@ -507,9 +533,9 @@ exports.submitParentAssignment = async (req, res) => {
         return res.status(400).json({ success: false, message: 'fileType must be image or video' });
       }
       const isHttp = /^https?:\/\//i.test(rawUrl);
-      const isRel = rawUrl.startsWith('/');
+      const isRel = isSafeSubmissionPath(rawUrl);
       if (!isHttp && !isRel) {
-        return res.status(400).json({ success: false, message: 'submissionUrl must be a valid URL or path' });
+        return res.status(400).json({ success: false, message: 'submissionUrl must be a valid URL or a safe uploads path' });
       }
       fileUrl = rawUrl;
       fileType = ft;
@@ -523,7 +549,7 @@ exports.submitParentAssignment = async (req, res) => {
           parentSubmission: {
             fileUrl,
             fileType,
-            submittedAt: new Date(),
+            submittedAt: getCurrentTime(),
           },
         },
       },
@@ -547,6 +573,12 @@ exports.submitParentAssignment = async (req, res) => {
       } catch (notifyErr) {
         console.error('submitParentAssignment notification:', notifyErr);
       }
+    }
+
+    try {
+      invalidateProgressEngineCache(doc.caseId);
+    } catch (_) {
+      /* ignore */
     }
 
     return res.status(200).json({
@@ -594,6 +626,12 @@ exports.parentMarkComplete = async (req, res) => {
     )
       .populate(ASSIGN_POPULATE)
       .lean();
+
+    try {
+      invalidateProgressEngineCache(doc.caseId);
+    } catch (_) {
+      /* ignore */
+    }
 
     return res.status(200).json({ success: true, message: 'Marked complete', data: enrichAssignment(updated) });
   } catch (error) {

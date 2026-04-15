@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ChildList } from './child/ChildList';
@@ -7,19 +7,36 @@ import { ChildProfile } from './child/ChildProfile';
 
 type View = 'list' | 'add' | 'profile';
 
-export function ChildManagement() {
+interface ChildManagementProps {
+  onQuickScreen?: () => void;
+}
+
+export function ChildManagement({ onQuickScreen }: ChildManagementProps) {
   const [currentView, setCurrentView] = useState<View>('list');
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
+  const [profileOpensInEdit, setProfileOpensInEdit] = useState(false);
 
   const handleViewChild = (childId: number) => {
     setSelectedChildId(childId);
+    setProfileOpensInEdit(false);
+    setCurrentView('profile');
+  };
+
+  const handleEditChild = (childId: number) => {
+    setSelectedChildId(childId);
+    setProfileOpensInEdit(true);
     setCurrentView('profile');
   };
 
   const handleBack = () => {
     setCurrentView('list');
     setSelectedChildId(null);
+    setProfileOpensInEdit(false);
   };
+
+  const consumeProfileEditIntent = useCallback(() => {
+    setProfileOpensInEdit(false);
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -27,18 +44,22 @@ export function ChildManagement() {
         <div>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-pink-600 mb-2">My Children</h2>
-              <p className="text-gray-600">Manage your children's profiles and information</p>
+              <h2 className="text-primary mb-2">My Children</h2>
+              <p className="text-muted-foreground">Manage your children's profiles and information</p>
             </div>
             <Button
               onClick={() => setCurrentView('add')}
-              className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+              className="rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Child
             </Button>
           </div>
-          <ChildList onViewChild={handleViewChild} />
+          <ChildList
+            onViewChild={handleViewChild}
+            onEditChild={handleEditChild}
+            onQuickScreen={onQuickScreen}
+          />
         </div>
       )}
 
@@ -66,7 +87,11 @@ export function ChildManagement() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to List
           </Button>
-          <ChildProfile childId={selectedChildId} />
+          <ChildProfile
+            childId={selectedChildId}
+            initialEditFromList={profileOpensInEdit}
+            onConsumedInitialEdit={consumeProfileEditIntent}
+          />
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -6,16 +7,16 @@ import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, Filter, X, Chevro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { appointmentAPI } from '../../api';
 import { childAPI } from '../../api';
+import { APPOINTMENT_STATUS, normalizeAppointmentStatus } from '../../utils/workflowStatus';
 
 // ─── Status Config ───────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  PENDING_APPROVAL: { color: 'text-yellow-800', bg: 'bg-yellow-100', label: 'Pending Approval' },
-  APPROVED: { color: 'text-green-800', bg: 'bg-green-100', label: 'Approved' },
-  REJECTED: { color: 'text-red-800', bg: 'bg-red-100', label: 'Rejected' },
-  RESCHEDULED: { color: 'text-blue-800', bg: 'bg-blue-100', label: 'Rescheduled' },
-  COMPLETED: { color: 'text-gray-800', bg: 'bg-gray-100', label: 'Completed' },
-  CANCELLED: { color: 'text-red-800', bg: 'bg-red-200', label: 'Cancelled' },
+  PENDING: { color: 'text-accent-foreground', bg: 'bg-accent/15', label: 'Pending' },
+  APPROVED: { color: 'text-primary', bg: 'bg-secondary', label: 'Approved' },
+  REJECTED: { color: 'text-destructive', bg: 'bg-muted', label: 'Rejected' },
+  COMPLETED: { color: 'text-foreground', bg: 'bg-muted', label: 'Completed' },
+  CANCELLED: { color: 'text-destructive', bg: 'bg-muted', label: 'Cancelled' },
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -155,31 +156,31 @@ function BookingForm({ children, onClose, onSuccess }: {
   const minDate = today.toISOString().split('T')[0];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-2xl flex items-center justify-between">
-          <h3 className="text-xl font-bold text-gray-900">Book Appointment</h3>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-border bg-card p-6">
+          <h3 className="text-xl font-bold text-foreground">Book Appointment</h3>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="form p-6">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+            <div className="p-3 bg-muted border rounded-lg flex items-center gap-2 text-destructive text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
             </div>
           )}
 
           {/* Child Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Child *</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Select Child *</label>
             <select
               required
               value={formData.childId}
               onChange={e => setFormData(prev => ({ ...prev, childId: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="input"
             >
               <option value="">Choose a child...</option>
               {children.map(c => (
@@ -189,13 +190,13 @@ function BookingForm({ children, onClose, onSuccess }: {
           </div>
 
           {/* Appointment Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Type *</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Appointment Type *</label>
             <select
               required
               value={formData.appointmentType}
               onChange={e => setFormData(prev => ({ ...prev, appointmentType: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="input"
             >
               <option value="">Choose type...</option>
               <option value="DIAGNOSTIC">Diagnostic (Clinician)</option>
@@ -205,14 +206,14 @@ function BookingForm({ children, onClose, onSuccess }: {
           </div>
 
           {/* Professional */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Professional *</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Select Professional *</label>
             <select
               required
               value={formData.professionalId}
               onChange={e => setFormData(prev => ({ ...prev, professionalId: e.target.value }))}
               disabled={!formData.appointmentType || loadingProfessionals}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
+              className="input disabled:bg-muted"
             >
               <option value="">{loadingProfessionals ? 'Loading...' : 'Choose professional...'}</option>
               {professionals.map(p => (
@@ -222,38 +223,38 @@ function BookingForm({ children, onClose, onSuccess }: {
               ))}
             </select>
             {formData.appointmentType && professionals.length === 0 && !loadingProfessionals && (
-              <p className="text-xs text-red-500 mt-1">No approved professionals available for this type</p>
+              <p className="text-xs text-destructive mt-1">No approved professionals available for this type</p>
             )}
           </div>
 
           {/* Date & Time */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date *</label>
+          <div className="form-grid-2">
+            <div className="form-field">
+              <label className="block text-sm font-medium text-foreground">Preferred Date *</label>
               <input
                 type="date"
                 required
                 min={minDate}
                 value={formData.preferredDate}
                 onChange={e => setFormData(prev => ({ ...prev, preferredDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="input"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time *</label>
+            <div className="form-field">
+              <label className="block text-sm font-medium text-foreground">Preferred Time *</label>
               <input
                 type="time"
                 required
                 value={formData.preferredTime}
                 onChange={e => setFormData(prev => ({ ...prev, preferredTime: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="input"
               />
             </div>
           </div>
 
           {/* Mode */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mode *</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Mode *</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -262,9 +263,9 @@ function BookingForm({ children, onClose, onSuccess }: {
                   value="IN_PERSON"
                   checked={formData.mode === 'IN_PERSON'}
                   onChange={e => setFormData(prev => ({ ...prev, mode: e.target.value }))}
-                  className="text-orange-600 focus:ring-orange-500"
+                  className="text-primary focus-visible:ring-ring/50"
                 />
-                <MapPin className="w-4 h-4 text-green-600" />
+                <MapPin className="w-4 h-4 text-primary" />
                 <span className="text-sm">In-Person</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -274,35 +275,35 @@ function BookingForm({ children, onClose, onSuccess }: {
                   value="ONLINE"
                   checked={formData.mode === 'ONLINE'}
                   onChange={e => setFormData(prev => ({ ...prev, mode: e.target.value }))}
-                  className="text-orange-600 focus:ring-orange-500"
+                  className="text-primary focus-visible:ring-ring/50"
                 />
-                <Video className="w-4 h-4 text-blue-600" />
+                <Video className="w-4 h-4 text-primary" />
                 <span className="text-sm">Online</span>
               </label>
             </div>
           </div>
 
           {/* Reason */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Symptoms *</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Reason / Symptoms *</label>
             <textarea
               required
               rows={3}
               maxLength={2000}
               value={formData.reason}
               onChange={e => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="input h-auto py-3"
               placeholder="Describe symptoms, concerns, or reason for appointment..."
             />
           </div>
 
           {/* Documents */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Documents (optional)</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Documents (optional)</label>
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                <Upload className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-600">{files ? `${files.length} file(s)` : 'Upload files'}</span>
+              <label className="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                <Upload className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{files ? `${files.length} file(s)` : 'Upload files'}</span>
                 <input
                   type="file"
                   multiple
@@ -311,19 +312,19 @@ function BookingForm({ children, onClose, onSuccess }: {
                   className="hidden"
                 />
               </label>
-              <span className="text-xs text-gray-400">Max 25MB per file</span>
+              <span className="text-xs text-muted-foreground">Max 25MB per file</span>
             </div>
           </div>
 
           {/* Additional Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+          <div className="form-field">
+            <label className="block text-sm font-medium text-foreground">Additional Notes</label>
             <textarea
               rows={2}
               maxLength={1000}
               value={formData.additionalNotes}
               onChange={e => setFormData(prev => ({ ...prev, additionalNotes: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="input h-auto py-3"
               placeholder="Any additional information..."
             />
           </div>
@@ -341,7 +342,8 @@ function BookingForm({ children, onClose, onSuccess }: {
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+              className="flex-1"
+              variant="accent"
             >
               {loading ? 'Submitting...' : 'Book Appointment'}
             </Button>
@@ -371,16 +373,16 @@ function AppointmentTimeline({ appointment }: { appointment: Appointment }) {
   if (entries.length === 0) return null;
 
   return (
-    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-      <p className="text-xs font-semibold text-gray-600 mb-2">Timeline</p>
+    <div className="mt-3 p-3 bg-muted rounded-lg">
+      <p className="text-xs font-semibold text-muted-foreground mb-2">Timeline</p>
       <div className="space-y-2">
         {entries.map((entry, i) => (
           <div key={i} className="flex items-start gap-2 text-xs">
-            <div className="w-2 h-2 rounded-full bg-orange-400 mt-1 flex-shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1 flex-shrink-0" />
             <div>
-              <span className="font-medium text-gray-700">{entry.action}</span>
-              <span className="text-gray-500 ml-2">{new Date(entry.date).toLocaleString()}</span>
-              {entry.details && <p className="text-gray-500 mt-0.5">{entry.details}</p>}
+              <span className="font-medium text-foreground">{entry.action}</span>
+              <span className="text-muted-foreground ml-2">{new Date(entry.date).toLocaleString()}</span>
+              {entry.details && <p className="text-muted-foreground mt-0.5">{entry.details}</p>}
             </div>
           </div>
         ))}
@@ -398,6 +400,7 @@ interface AppointmentsSectionProps {
 
 export function AppointmentsSection({ initialShowBooking = false, formOnly = false }: AppointmentsSectionProps = {}) {
   const [showBooking, setShowBooking] = useState(initialShowBooking);
+  const [bookingAcknowledged, setBookingAcknowledged] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
@@ -448,6 +451,7 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
 
   const handleBookingSuccess = () => {
     setShowBooking(false);
+    setBookingAcknowledged(true);
     setPage(1);
     setStatusFilter('');
     fetchAppointments();
@@ -456,11 +460,11 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
   const getProfName = (prof: Appointment['professional']) =>
     prof.labName || `Dr. ${prof.firstName} ${prof.lastName}`;
 
-  const upcomingStatuses = ['PENDING_APPROVAL', 'APPROVED', 'RESCHEDULED'];
-  const pastStatuses = ['COMPLETED', 'REJECTED', 'CANCELLED'];
+  const upcomingStatuses = [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.APPROVED];
+  const pastStatuses = [APPOINTMENT_STATUS.COMPLETED, APPOINTMENT_STATUS.REJECTED, APPOINTMENT_STATUS.CANCELLED];
 
-  const upcoming = appointments.filter(a => upcomingStatuses.includes(a.status));
-  const past = appointments.filter(a => pastStatuses.includes(a.status));
+  const upcoming = appointments.filter(a => upcomingStatuses.includes(normalizeAppointmentStatus(a.status)));
+  const past = appointments.filter(a => pastStatuses.includes(normalizeAppointmentStatus(a.status)));
 
   if (formOnly) {
     return (
@@ -471,14 +475,46 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
             onClose={() => setShowBooking(false)}
             onSuccess={handleBookingSuccess}
           />
+        ) : bookingAcknowledged ? (
+          <Card className="border-primary/25 bg-primary/5">
+            <CardContent className="flex flex-col items-center justify-center gap-4 px-6 py-12 text-center sm:px-10">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
+                <CheckCircle className="h-8 w-8 text-primary" />
+              </div>
+              <div className="space-y-2 max-w-md">
+                <h2 className="text-xl font-semibold text-foreground">Request received</h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Your appointment request was submitted successfully. You will see it under{' '}
+                  <span className="font-medium text-foreground">Appointments → Appointment status</span> once it is
+                  listed, and you will be notified when it is reviewed.
+                </p>
+              </div>
+              <Button
+                variant="accent"
+                className="mt-2"
+                onClick={() => {
+                  setBookingAcknowledged(false);
+                  setShowBooking(false);
+                }}
+              >
+                Done
+              </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setShowBooking(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Book another appointment
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <CalendarIcon className="h-12 w-12 text-orange-400 mb-4" />
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Book Appointment</h2>
-              <p className="text-gray-600 text-center mb-6">Schedule a healthcare appointment for your child</p>
+            <CardContent className="flex flex-col items-center justify-center py-16 px-6">
+              <CalendarIcon className="mb-4 h-12 w-12 text-muted-foreground" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">Book Appointment</h2>
+              <p className="text-muted-foreground text-center mb-6 max-w-md">
+                Schedule a healthcare appointment for your child
+              </p>
               <Button
-                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                variant="accent"
                 onClick={() => setShowBooking(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -495,8 +531,8 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-orange-600 mb-1">Appointments</h2>
-        <p className="text-gray-600">Manage your children's healthcare appointments</p>
+        <h2 className="text-2xl font-bold text-foreground mb-1">Appointments</h2>
+        <p className="text-muted-foreground">Manage your children's healthcare appointments</p>
       </div>
 
       {/* Filters */}
@@ -504,13 +540,13 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">Filter:</span>
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filter:</span>
             </div>
             <select
               value={statusFilter}
               onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+              className="input h-9 w-auto px-3 py-1.5 text-sm"
             >
               <option value="">All Statuses</option>
               {Object.entries(STATUS_CONFIG).map(([key, val]) => (
@@ -520,7 +556,7 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
             <select
               value={typeFilter}
               onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+              className="input h-9 w-auto px-3 py-1.5 text-sm"
             >
               <option value="">All Types</option>
               {Object.entries(TYPE_LABELS).map(([key, val]) => (
@@ -530,7 +566,7 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
             {(statusFilter || typeFilter) && (
               <button
                 onClick={() => { setStatusFilter(''); setTypeFilter(''); setPage(1); }}
-                className="text-xs text-orange-600 hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 Clear filters
               </button>
@@ -542,14 +578,14 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
       {/* Appointments */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : appointments.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <CalendarIcon className="h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments found</h3>
-            <p className="text-gray-500 text-center mb-4">
+            <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No appointments found</h3>
+            <p className="text-muted-foreground text-center mb-4">
               {statusFilter || typeFilter ? 'Try adjusting your filters.' : 'No appointments found. Use the Book Appointment menu to schedule one.'}
             </p>
           </CardContent>
@@ -565,40 +601,48 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
             <TabsContent key={key} value={key} className="space-y-4 mt-4">
               {items.length === 0 ? (
                 <Card>
-                  <CardContent className="py-8 text-center text-gray-500">
+                  <CardContent className="py-8 text-center text-muted-foreground">
                     No {key} appointments
                   </CardContent>
                 </Card>
               ) : items.map(apt => {
-                const sc = STATUS_CONFIG[apt.status] || { color: 'text-gray-800', bg: 'bg-gray-100', label: apt.status };
+                const normStatus = normalizeAppointmentStatus(apt.status);
+                const sc = STATUS_CONFIG[normStatus] || { color: 'text-foreground', bg: 'bg-muted', label: normStatus || String(apt.status) };
                 const isExpanded = expandedId === apt._id;
 
                 return (
-                  <Card key={apt._id} className={`border-l-4 hover:shadow-lg transition-shadow ${apt.status === 'APPROVED' ? 'border-l-green-500' :
-                      apt.status === 'PENDING_APPROVAL' ? 'border-l-yellow-500' :
-                        apt.status === 'REJECTED' ? 'border-l-red-500' :
-                          apt.status === 'COMPLETED' ? 'border-l-gray-400' :
-                            apt.status === 'RESCHEDULED' ? 'border-l-blue-500' :
-                              'border-l-orange-500'
-                    }`}>
+                  <Card
+                    key={apt._id}
+                    className={`border-l-4 transition-shadow hover:shadow-lg ${
+                      normStatus === APPOINTMENT_STATUS.APPROVED
+                        ? 'border-l-primary'
+                        : normStatus === APPOINTMENT_STATUS.PENDING
+                          ? 'border-l-accent'
+                          : normStatus === APPOINTMENT_STATUS.REJECTED
+                            ? 'border-l-destructive'
+                            : normStatus === APPOINTMENT_STATUS.COMPLETED
+                              ? 'border-l-border'
+                              : 'border-l-border'
+                    }`}
+                  >
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-1">
-                            <CardTitle className="text-lg text-gray-900">
+                            <CardTitle className="text-lg text-foreground">
                               {TYPE_LABELS[apt.appointmentType] || apt.appointmentType}
                             </CardTitle>
                             <Badge className={`${sc.bg} ${sc.color} border-0`}>{sc.label}</Badge>
-                            <Badge className={apt.mode === 'ONLINE' ? 'bg-blue-100 text-blue-800 border-0' : 'bg-green-100 text-green-800 border-0'}>
+                            <Badge className={apt.mode === 'ONLINE' ? 'bg-secondary text-primary border-0' : 'bg-muted text-foreground border-0'}>
                               {apt.mode === 'ONLINE' ? <><Video className="w-3 h-3 mr-1" /> Online</> : <><MapPin className="w-3 h-3 mr-1" /> In-Person</>}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600">{getProfName(apt.professional)}</p>
+                          <p className="text-sm text-muted-foreground">{getProfName(apt.professional)}</p>
                           {apt.professional.specialization && (
-                            <p className="text-xs text-gray-500">{apt.professional.specialization}</p>
+                            <p className="text-xs text-muted-foreground">{apt.professional.specialization}</p>
                           )}
                         </div>
-                        <div className="text-right text-sm text-gray-600">
+                        <div className="text-right text-sm text-muted-foreground">
                           <div className="flex items-center gap-1 justify-end">
                             <CalendarIcon className="w-4 h-4" />
                             {new Date(apt.finalDate || apt.preferredDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -613,28 +657,28 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
                     <CardContent className="space-y-3">
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="text-gray-500">Patient</p>
-                          <p className="font-medium text-gray-900">
+                          <p className="text-muted-foreground">Patient</p>
+                          <p className="font-medium text-foreground">
                             {apt.childInfo ? `${apt.childInfo.firstName} ${apt.childInfo.lastName}` : 'N/A'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-gray-500">Reason</p>
-                          <p className="text-gray-700 line-clamp-2">{apt.reason}</p>
+                          <p className="text-muted-foreground">Reason</p>
+                          <p className="text-foreground line-clamp-2">{apt.reason}</p>
                         </div>
                       </div>
 
                       {apt.rejectionReason && (
-                        <div className="p-3 bg-red-50 rounded-lg">
-                          <p className="text-xs text-red-600 font-medium mb-1">Rejection Reason:</p>
-                          <p className="text-sm text-red-800">{apt.rejectionReason}</p>
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-destructive font-medium mb-1">Rejection Reason:</p>
+                          <p className="text-sm text-destructive">{apt.rejectionReason}</p>
                         </div>
                       )}
 
                       {apt.completionNotes && (
-                        <div className="p-3 bg-green-50 rounded-lg">
-                          <p className="text-xs text-green-600 font-medium mb-1">Completion Notes:</p>
-                          <p className="text-sm text-green-800">{apt.completionNotes}</p>
+                        <div className="p-3 bg-primary/20 rounded-lg">
+                          <p className="text-xs text-primary font-medium mb-1">Completion Notes:</p>
+                          <p className="text-sm text-primary">{apt.completionNotes}</p>
                         </div>
                       )}
 
@@ -648,11 +692,11 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
                         >
                           {isExpanded ? 'Hide Details' : 'View History'}
                         </Button>
-                        {(apt.status === 'PENDING_APPROVAL' || apt.status === 'APPROVED' || apt.status === 'RESCHEDULED') && (
+                        {(normStatus === APPOINTMENT_STATUS.PENDING || normStatus === APPOINTMENT_STATUS.APPROVED) && (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-red-600 hover:bg-red-50"
+                            className="text-destructive hover:bg-muted"
                             onClick={() => handleCancel(apt._id)}
                           >
                             <X className="w-4 h-4 mr-1" /> Cancel
@@ -679,7 +723,7 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-muted-foreground">
             Page {page} of {pagination.pages}
           </span>
           <Button
@@ -693,14 +737,6 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
         </div>
       )}
 
-      {/* Booking Modal - only shown in formOnly (Book Appointment) view */}
-      {formOnly && showBooking && (
-        <BookingForm
-          children={children}
-          onClose={() => setShowBooking(false)}
-          onSuccess={handleBookingSuccess}
-        />
-      )}
     </div>
   );
 }

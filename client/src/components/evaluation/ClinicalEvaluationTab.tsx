@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { AlertCircle, ClipboardCheck, FileClock, Loader2, PlusCircle } from 'lucide-react';
-import { EvaluationForm, type EvaluationDraft, type EvaluationStatus } from './EvaluationForm';
+import { EvaluationForm, type EvaluationDraft, type EvaluationStatus } from '@/components/evaluation/EvaluationForm';
 
 interface ClinicalEvaluationTabProps {
   caseId: string;
@@ -13,9 +13,82 @@ interface ClinicalEvaluationTabProps {
 }
 
 const badgeClassByStatus: Record<string, string> = {
-  draft: 'bg-slate-100 text-slate-700 border-slate-300',
-  final: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  DRAFT: 'bg-muted text-foreground border',
+  FINALIZED: 'bg-blue-100 text-blue-800 border-blue-200',
 };
+
+function safeText(value: any) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function summarizeDiagnosis(value: any) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  const primary = value.primary === 'Other' ? value.primaryFreeText : value.primary;
+  const sev = value.severityLevel ? ` · ${value.severityLevel}` : '';
+  const conf = value.confidence ? ` · ${value.confidence}` : '';
+  return [primary, conf, sev].filter(Boolean).join('');
+}
+
+function summarizeObservations(value: any) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  const tags = Array.isArray(value.tags) && value.tags.length ? value.tags.join(', ') : '';
+  const sev = value.severity ? `Severity: ${value.severity}` : '';
+  const notes = safeText(value.notes);
+  return [tags, sev, notes].filter(Boolean).join(' · ');
+}
+
+function summarizeRecommendations(value: any) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  const therapies = Array.isArray(value.therapies) && value.therapies.length ? value.therapies.join(', ') : '';
+  const followUp =
+    value.followUp === 'Other' ? safeText(value.followUpFreeText) : safeText(value.followUp);
+  return [therapies ? `Therapies: ${therapies}` : '', followUp ? `Follow-up: ${followUp}` : '']
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function hasAnyEvaluationField(payload: EvaluationDraft) {
+  const obs = payload.observations as any;
+  const dev = payload.developmentalSummary as any;
+  const dx = payload.diagnosis as any;
+  const rec = payload.recommendations as any;
+
+  const observationsFilled =
+    typeof obs === 'string'
+      ? !!safeText(obs)
+      : !!(Array.isArray(obs?.tags) && obs.tags.length) || !!safeText(obs?.severity) || !!safeText(obs?.notes);
+
+  const devFilled =
+    typeof dev === 'string'
+      ? !!safeText(dev)
+      : !!safeText(dev?.notes) ||
+        !!safeText(dev?.override?.communication) ||
+        !!safeText(dev?.override?.motorSkills) ||
+        !!safeText(dev?.override?.social);
+
+  const diagnosisFilled =
+    typeof dx === 'string'
+      ? !!safeText(dx)
+      : !!safeText(dx?.primary) ||
+        !!safeText(dx?.primaryFreeText) ||
+        !!safeText(dx?.confidence) ||
+        !!safeText(dx?.severityLevel) ||
+        !!safeText(dx?.rationale);
+
+  const recommendationsFilled =
+    typeof rec === 'string'
+      ? !!safeText(rec)
+      : !!(Array.isArray(rec?.therapies) && rec.therapies.length) ||
+        !!safeText(rec?.followUp) ||
+        !!safeText(rec?.followUpFreeText);
+
+  const comorbidFilled = Array.isArray(payload.comorbidConditions) && payload.comorbidConditions.length > 0;
+
+  return observationsFilled || devFilled || diagnosisFilled || recommendationsFilled || comorbidFilled;
+}
 
 function toDraft(value: any): EvaluationDraft {
   return {
@@ -40,7 +113,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
     [evaluations, selectedId]
   );
   const hasFinal = useMemo(
-    () => evaluations.some((item) => item.status === 'final'),
+    () => evaluations.some((item) => item.status === 'FINALIZED'),
     [evaluations]
   );
 
@@ -64,13 +137,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
   }, [load]);
 
   const handleCreate = async (payload: EvaluationDraft, status: EvaluationStatus) => {
-    const isEmpty =
-      !payload.observations.trim() &&
-      !payload.developmentalSummary.trim() &&
-      !payload.diagnosis.trim() &&
-      !payload.recommendations.trim() &&
-      (!Array.isArray(payload.comorbidConditions) || payload.comorbidConditions.length === 0);
-    if (isEmpty) {
+    if (!hasAnyEvaluationField(payload)) {
       setError('Please fill at least one field before submitting.');
       return;
     }
@@ -106,8 +173,8 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h3 className="text-xl font-semibold text-slate-900">Clinical Evaluation</h3>
-          <p className="text-sm text-slate-600">
+          <h3 className="text-xl font-semibold text-foreground">Clinical Evaluation</h3>
+          <p className="text-sm text-muted-foreground">
             Evaluation history and versioned notes for {childName || 'this case'}.
           </p>
         </div>
@@ -124,15 +191,15 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm flex gap-2 items-center">
+        <div className="rounded-lg border bg-muted px-4 py-3 text-destructive text-sm flex gap-2 items-center">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <Card className="lg:col-span-4 border-slate-200 shadow-sm bg-white">
-          <CardHeader className="border-b border-slate-100 bg-blue-50/40">
+        <Card className="lg:col-span-4 border shadow-sm bg-card">
+          <CardHeader className="border-b border bg-blue-50/40">
             <CardTitle className="text-base text-blue-900">Evaluation History</CardTitle>
             <CardDescription>Latest first · Draft and Final versions</CardDescription>
           </CardHeader>
@@ -142,7 +209,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
                 <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
               </div>
             ) : evaluations.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              <div className="rounded-lg border-dashed border bg-background p-4 text-sm text-muted-foreground">
                 No evaluations yet. Create the first draft for this case.
               </div>
             ) : (
@@ -153,7 +220,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
                   className={`w-full text-left rounded-lg border p-3 transition ${
                     selected?._id === item._id
                       ? 'border-blue-300 bg-blue-50'
-                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      : 'border hover:border hover:bg-background'
                   }`}
                   onClick={() => {
                     setSelectedId(item._id);
@@ -161,18 +228,21 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-muted-foreground">
                       {new Date(item.createdAt).toLocaleString()}
                     </span>
                     <Badge
                       variant="outline"
-                      className={badgeClassByStatus[item.status] || badgeClassByStatus.draft}
+                      className={badgeClassByStatus[item.status] || badgeClassByStatus.DRAFT}
                     >
                       {item.status}
                     </Badge>
                   </div>
-                  <p className="mt-2 text-sm text-slate-800 line-clamp-2">
-                    {item.diagnosis || item.developmentalSummary || item.observations || 'No text provided'}
+                  <p className="mt-2 text-sm text-foreground line-clamp-2">
+                    {summarizeDiagnosis(item.diagnosis) ||
+                      summarizeRecommendations(item.recommendations) ||
+                      summarizeObservations(item.observations) ||
+                      'No details provided'}
                   </p>
                 </button>
               ))
@@ -184,6 +254,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
           {mode === 'create' && (
             <EvaluationForm
               title="New Clinical Evaluation"
+              caseId={caseId}
               submitting={submitting}
               onSubmit={handleCreate}
             />
@@ -191,16 +262,17 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
 
           {mode === 'edit' && selected && (
             <EvaluationForm
-              title={`Create New Version (${selected.status === 'final' ? 'from final evaluation' : 'from draft'})`}
+              title={`Create New Version (${selected.status === 'FINALIZED' ? 'from finalized evaluation' : 'from draft'})`}
               initialValue={toDraft(selected)}
+              caseId={caseId}
               submitting={submitting}
               onSubmit={handleVersionUpdate}
             />
           )}
 
           {mode === 'list' && (
-            <Card className="border-slate-200 shadow-sm bg-white">
-              <CardHeader className="border-b border-slate-100 bg-blue-50/40">
+            <Card className="border shadow-sm bg-card">
+              <CardHeader className="border-b border bg-blue-50/40">
                 <CardTitle className="text-base text-blue-900">Evaluation Detail</CardTitle>
                 <CardDescription>
                   Final evaluations are immutable; editing creates a new version.
@@ -208,7 +280,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
               </CardHeader>
               <CardContent className="pt-6">
                 {!selected ? (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-600">
+                  <div className="rounded-lg border-dashed border bg-background p-6 text-muted-foreground">
                     Select an evaluation from the history or create a new one.
                   </div>
                 ) : (
@@ -216,38 +288,42 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
-                        className={badgeClassByStatus[selected.status] || badgeClassByStatus.draft}
+                        className={badgeClassByStatus[selected.status] || badgeClassByStatus.DRAFT}
                       >
                         {selected.status}
                       </Badge>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-muted-foreground">
                         Created {new Date(selected.createdAt).toLocaleString()}
                       </span>
                     </div>
 
                     <section>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-1">Observations</h4>
-                      <p className="text-sm text-slate-800 whitespace-pre-wrap">
-                        {selected.observations || '—'}
+                      <h4 className="text-sm font-semibold text-foreground mb-1">Observations</h4>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {summarizeObservations(selected.observations) || '—'}
                       </p>
                     </section>
 
                     <section>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-1">Developmental Summary</h4>
-                      <p className="text-sm text-slate-800 whitespace-pre-wrap">
-                        {selected.developmentalSummary || '—'}
+                      <h4 className="text-sm font-semibold text-foreground mb-1">Developmental Summary</h4>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {typeof selected.developmentalSummary === 'string'
+                          ? (selected.developmentalSummary || '—')
+                          : (safeText(selected.developmentalSummary?.notes) || '—')}
                       </p>
                     </section>
 
                     <section>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-1">Diagnosis Impression</h4>
-                      <p className="text-sm text-slate-800 whitespace-pre-wrap">
-                        {selected.diagnosis || '—'}
+                      <h4 className="text-sm font-semibold text-foreground mb-1">Diagnosis Impression</h4>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {summarizeDiagnosis(selected.diagnosis) ||
+                          (typeof selected.diagnosis === 'string' ? selected.diagnosis : '') ||
+                          '—'}
                       </p>
                     </section>
 
                     <section>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-1">Comorbid Conditions</h4>
+                      <h4 className="text-sm font-semibold text-foreground mb-1">Comorbid Conditions</h4>
                       {Array.isArray(selected.comorbidConditions) &&
                       selected.comorbidConditions.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
@@ -258,20 +334,22 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-800">—</p>
+                        <p className="text-sm text-foreground">—</p>
                       )}
                     </section>
 
                     <section>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-1">Recommendations</h4>
-                      <p className="text-sm text-slate-800 whitespace-pre-wrap">
-                        {selected.recommendations || '—'}
+                      <h4 className="text-sm font-semibold text-foreground mb-1">Recommendations</h4>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {summarizeRecommendations(selected.recommendations) ||
+                          (typeof selected.recommendations === 'string' ? selected.recommendations : '') ||
+                          '—'}
                       </p>
                     </section>
 
                     <div className="flex flex-wrap gap-3 pt-2">
                       <Button variant="outline" onClick={() => setMode('edit')}>
-                        {selected.status === 'final'
+                        {selected.status === 'FINALIZED'
                           ? 'Create New Version'
                           : 'Edit (New Version)'}
                       </Button>
@@ -294,7 +372,7 @@ export function ClinicalEvaluationTab({ caseId, childName, onCreateReferral }: C
                       </Button>
                     </div>
                     {!hasFinal && (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         Referral is disabled until at least one evaluation is finalized.
                       </p>
                     )}

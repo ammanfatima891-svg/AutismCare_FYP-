@@ -1,0 +1,7 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+pillow==11.2.1
+numpy>=2.0.0,<3
+# TensorFlow pins vary by Python/OS. 2.19 has no wheel for Python 3.13 on Windows; use 2.20+.
+tensorflow>=2.20.0,<2.22
+

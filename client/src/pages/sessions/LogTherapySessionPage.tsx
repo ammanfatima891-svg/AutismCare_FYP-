@@ -5,12 +5,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { therapistAPI, therapyPlanAPI } from '../../api';
+import { therapistAPI, therapyPlanAPI, sessionAPI } from '../../api';
 import { SessionForm, type TherapyPlanLike } from '../../components/session/SessionForm';
+import type { SessionRow } from '../../components/session/SessionList';
 import { normalizeShortTermGoalsList, therapyPlanFromApiResponse } from '../../utils/therapyPlanResponse';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 type CaseOpt = { caseId: string; label: string };
 
@@ -25,6 +27,10 @@ export default function LogTherapySessionPage() {
   const [therapyPlanError, setTherapyPlanError] = useState<string | null>(null);
   const [loadingCases, setLoadingCases] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const sessionId = searchParams.get('sessionId')?.trim() || '';
+  const [editSession, setEditSession] = useState<SessionRow | null>(null);
+  const [sessionEditError, setSessionEditError] = useState<string | null>(null);
+  const [sessionEditLoading, setSessionEditLoading] = useState(false);
 
   const loadCases = useCallback(async () => {
     const oid = (s: string) => /^[a-fA-F0-9]{24}$/.test(s);
@@ -134,6 +140,46 @@ export default function LogTherapySessionPage() {
     };
   }, [selectedCaseId]);
 
+  useEffect(() => {
+    if (!sessionId || !/^[a-fA-F0-9]{24}$/.test(sessionId)) {
+      setEditSession(null);
+      setSessionEditError(null);
+      setSessionEditLoading(false);
+      return;
+    }
+    if (!selectedCaseId || !/^[a-fA-F0-9]{24}$/.test(selectedCaseId)) {
+      setEditSession(null);
+      setSessionEditError(null);
+      setSessionEditLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSessionEditLoading(true);
+    setSessionEditError(null);
+    setEditSession(null);
+    void (async () => {
+      try {
+        const res = await sessionAPI.getByCase(selectedCaseId);
+        const list = (res.data as { data?: SessionRow[] })?.data || [];
+        const found = list.find((x) => String(x._id) === sessionId) || null;
+        if (!cancelled) {
+          if (found) setEditSession(found);
+          else setSessionEditError('Session not found for this case.');
+        }
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } };
+        if (!cancelled) {
+          setSessionEditError(err.response?.data?.message || 'Failed to load session');
+        }
+      } finally {
+        if (!cancelled) setSessionEditLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, selectedCaseId]);
+
   const domainLabel = useMemo(() => {
     const d = therapyPlan?.domains;
     if (Array.isArray(d) && d.length > 0) return String(d[0]);
@@ -160,27 +206,59 @@ export default function LogTherapySessionPage() {
 
   if (loadingCases) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gradient-to-b from-muted/50 via-background to-muted/30">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading your cases…</p>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-slate-50 p-8">
-        <div className="mx-auto max-w-lg rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</div>
+      <div className="min-h-screen bg-gradient-to-b from-muted/50 via-background to-muted/30 px-4 py-12">
+        <Alert variant="destructive" className="mx-auto max-w-lg">
+          <AlertTriangle />
+          <AlertTitle>Cannot open session log</AlertTitle>
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (sessionId && sessionEditLoading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gradient-to-b from-muted/50 via-background to-muted/30">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading session…</p>
+      </div>
+    );
+  }
+
+  if (sessionId && sessionEditError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-muted/50 via-background to-muted/30 px-4 py-12">
+        <Alert variant="destructive" className="mx-auto max-w-lg">
+          <AlertTriangle />
+          <AlertTitle>Cannot edit session</AlertTitle>
+          <AlertDescription>{sessionEditError}</AlertDescription>
+        </Alert>
       </div>
     );
   }
 
   if (caseOptions.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-12">
-        <Card className="mx-auto max-w-lg border-slate-200">
+      <div className="min-h-screen bg-gradient-to-b from-muted/50 via-background to-muted/30 px-4 py-12">
+        <Card className="mx-auto max-w-lg overflow-hidden rounded-2xl border-border/80 shadow-md">
+          <CardHeader className="border-b border-border/80 bg-muted/30">
+            <CardTitle className="text-lg">No cases to log</CardTitle>
+            <CardDescription>You need an assigned case before logging a session.</CardDescription>
+          </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            <p className="text-sm text-slate-700">No active assigned cases are available. Accept a referral or start therapy for a case before logging sessions.</p>
-            <Button type="button" variant="outline" className="border-slate-200" onClick={() => void navigate('/therapist-dashboard')}>
+            <p className="text-sm leading-relaxed text-foreground">
+              Accept a referral or start therapy for a case first, then return here.
+            </p>
+            <Button type="button" onClick={() => void navigate('/therapist-dashboard')}>
               Back to dashboard
             </Button>
           </CardContent>
@@ -188,6 +266,8 @@ export default function LogTherapySessionPage() {
       </div>
     );
   }
+
+  const isEdit = Boolean(sessionId && editSession);
 
   return (
     <SessionForm
@@ -207,9 +287,9 @@ export default function LogTherapySessionPage() {
       therapyPlan={therapyPlan}
       therapyPlanError={therapyPlanError}
       onSaved={handleSaved}
-      mode="create"
-      initialSession={null}
-      casePicker={casePicker}
+      mode={isEdit ? 'edit' : 'create'}
+      initialSession={isEdit ? editSession : null}
+      casePicker={isEdit ? null : casePicker}
       domainLabel={domainLabel}
     />
   );

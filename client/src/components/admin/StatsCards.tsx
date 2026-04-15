@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Users, UserCheck, UserX, Calendar, FileText, TrendingUp } from 'lucide-react';
@@ -39,8 +40,8 @@ export function StatsCards() {
           <Card key={i}>
             <CardContent className="p-6">
               <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-1/2"></div>
               </div>
             </CardContent>
           </Card>
@@ -52,11 +53,8 @@ export function StatsCards() {
   if (error) {
     return (
       <div className="text-center">
-        <div className="text-red-600 mb-4">{error}</div>
-        <button
-          onClick={fetchStats}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
+        <div className="text-destructive mb-4">{error}</div>
+        <button onClick={fetchStats} className="btn btn-primary">
           Try Again
         </button>
       </div>
@@ -70,43 +68,43 @@ export function StatsCards() {
       title: 'Total Users',
       value: stats.totalUsers,
       icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100'
+      color: 'text-primary',
+      bgColor: 'bg-secondary'
     },
     {
       title: 'Active Users',
       value: stats.activeUsers,
       icon: UserCheck,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
+      color: 'text-primary',
+      bgColor: 'bg-secondary/40'
     },
     {
       title: 'Pending Approvals',
       value: stats.pendingUsers,
       icon: UserX,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100'
+      color: 'text-accent',
+      bgColor: 'bg-accent/15'
     },
     {
       title: 'Total Appointments',
       value: stats.totalAppointments,
       icon: Calendar,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100'
+      color: 'text-primary',
+      bgColor: 'bg-muted'
     },
     {
       title: 'Completed Screenings',
       value: stats.completedScreenings,
       icon: FileText,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-100'
+      color: 'text-primary',
+      bgColor: 'bg-secondary'
     },
     {
       title: 'Growth Rate',
       value: `${stats.growthRate}%`,
       icon: TrendingUp,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100'
+      color: 'text-accent',
+      bgColor: 'bg-accent/15'
     }
   ];
 

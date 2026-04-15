@@ -1,5 +1,7 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const { ChildCase } = require('../models/ChildCase');
+const { getLabRequestsForCase } = require('../utils/labCaseIntegration');
 const { Referral } = require('../models/Referral');
 const { User } = require('../models/User');
 const TherapyCase = require('../models/TherapyCase');
@@ -8,16 +10,22 @@ const SessionLog = require('../models/SessionLog');
 const { enrichAssignments } = require('./homeAssignment.controller');
 const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
 const { validateSessionBody } = require('../utils/sessionLogShared');
-const { validateSessionGoalsAndActivities } = require('../utils/sessionPlanValidation');
+const {
+  validateSessionGoalsAndActivities,
+  validateSessionGoalData,
+} = require('../utils/sessionPlanValidation');
 const { completeMatchingSessionSlot, validateSessionSlotForNewLog } = require('../utils/sessionSlotLink');
+const { invalidateProgressEngineCache } = require('../services/progressEngine');
+const { maybeLockPlanBaselineAfterSession } = require('../utils/planBaselineLock');
 const { HomeAssignment } = require('../models/HomeAssignment');
 const { resolveTherapistTypes } = require('./referralController');
+const { THERAPY_STATUS } = require('../constants/workflowEnums');
 
 function ageFromDob(dob) {
   if (!dob) return null;
   const d = new Date(dob);
   if (Number.isNaN(d.getTime())) return null;
-  const diff = Date.now() - d.getTime();
+  const diff = getCurrentTimeMs() - d.getTime();
   return Math.max(0, Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000)));
 }
 
@@ -110,14 +118,14 @@ exports.getTherapistCaseFile = async (req, res) => {
     const therapistId = req.user._id;
     const therapistTypes = await resolveTherapistTypes(req);
 
-    const therapyCaseActive = await TherapyCase.findOne({ caseId, therapistId, status: 'active' }).lean();
+    const therapyCaseActive = await TherapyCase.findOne({ caseId, therapistId, status: 'ACTIVE' }).lean();
 
     let referral = null;
     if (therapistTypes.length > 0) {
       referral = await Referral.findOne({
         caseId,
         therapistType: { $in: therapistTypes },
-        status: { $in: ['pending', 'accepted', 'in-progress'] },
+        status: { $in: ['CREATED', 'SENT', 'ACCEPTED'] },
       })
         .sort({ updatedAt: -1 })
         .lean();
@@ -129,15 +137,18 @@ exports.getTherapistCaseFile = async (req, res) => {
 
     const { child, parent } = await loadChildAndParent(caseDoc);
 
-    const therapyPlan = await TherapyPlan.findOne({ caseId, therapistId }).lean();
-    const sessions = await SessionLog.find({ caseId, therapistId }).sort({ sessionDate: -1 }).lean();
-    const assignments = await HomeAssignment.find({ caseId, therapistId })
-      .populate([
-        { path: 'activityId', select: 'name instructions objective procedure materials domain' },
-        { path: 'sourceActivityId', select: 'name materials instructions' },
-      ])
-      .sort({ dueDate: -1 })
-      .lean();
+    const [therapyPlan, sessions, assignments, labRequests] = await Promise.all([
+      TherapyPlan.findOne({ caseId, therapistId }).lean(),
+      SessionLog.find({ caseId, therapistId }).sort({ sessionDate: -1 }).lean(),
+      HomeAssignment.find({ caseId, therapistId })
+        .populate([
+          { path: 'activityId', select: 'name instructions objective procedure materials domain' },
+          { path: 'sourceActivityId', select: 'name materials instructions' },
+        ])
+        .sort({ dueDate: -1 })
+        .lean(),
+      getLabRequestsForCase(caseDoc, 'therapist'),
+    ]);
 
     const domainTags = domainTagsFromPlan(therapyPlan?.domains || []);
 
@@ -189,6 +200,7 @@ exports.getTherapistCaseFile = async (req, res) => {
         assignments: enrichAssignments(assignments),
         domainTags,
         progressSummary,
+        labRequests,
       },
     });
   } catch (error) {
@@ -221,9 +233,26 @@ exports.createSessionLog = async (req, res) => {
       return res.status(access.status).json({ success: false, message: access.message });
     }
 
+    // Strict workflow dependency: session logging only allowed for ACTIVE therapy.
+    const activeTherapy = await TherapyCase.findOne({ caseId, therapistId, status: THERAPY_STATUS.ACTIVE })
+      .select('_id')
+      .lean();
+    if (!activeTherapy) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session logging is only allowed for ACTIVE therapy. Start therapy first.',
+        errorCode: 'THERAPY_NOT_ACTIVE',
+      });
+    }
+
     const planCheck = await validateSessionGoalsAndActivities(caseId, therapistId, v.payload.goalsTargeted, v.payload.activitiesUsed);
     if (!planCheck.ok) {
       return res.status(400).json({ success: false, message: planCheck.message });
+    }
+
+    const goalDataCheck = await validateSessionGoalData(caseId, therapistId, v.payload.goalData || []);
+    if (!goalDataCheck.ok) {
+      return res.status(400).json({ success: false, message: goalDataCheck.message });
     }
 
     const slotCheck = await validateSessionSlotForNewLog({ caseId, sessionSlotId });
@@ -237,6 +266,8 @@ exports.createSessionLog = async (req, res) => {
         ? new mongoose.Types.ObjectId(String(sessionSlotId))
         : undefined;
 
+    const planStamp = await TherapyPlan.findOne({ caseId, therapistId }).select('_id planVersion').lean();
+
     const created = await SessionLog.create({
       caseId,
       therapistId,
@@ -248,6 +279,12 @@ exports.createSessionLog = async (req, res) => {
       notes: p.notes,
       parentInstructions: p.parentInstructions,
       status: p.status,
+      goalData: Array.isArray(p.goalData) ? p.goalData : [],
+      planId: planStamp?._id,
+      planVersionNumber: planStamp?.planVersion != null ? Number(planStamp.planVersion) : 1,
+      noteState: p.noteState || 'draft',
+      lateEntry: Boolean(p.lateEntry),
+      lateEntryReason: p.lateEntryReason || '',
       ...(slotRef ? { sessionSlotId: slotRef } : {}),
     });
 
@@ -259,6 +296,18 @@ exports.createSessionLog = async (req, res) => {
       });
     } catch (linkErr) {
       console.error('completeMatchingSessionSlot (therapist case):', linkErr);
+    }
+
+    try {
+      await maybeLockPlanBaselineAfterSession(caseId, therapistId);
+    } catch (lockErr) {
+      console.error('maybeLockPlanBaselineAfterSession (therapist case):', lockErr);
+    }
+
+    try {
+      invalidateProgressEngineCache(caseId);
+    } catch (_) {
+      /* ignore */
     }
 
     return res.status(201).json({ success: true, data: created });

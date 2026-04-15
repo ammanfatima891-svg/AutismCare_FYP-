@@ -56,11 +56,18 @@ export const screeningAPI = {
   getQuestionnaireByType: (type) => API.get(`/screening/questionnaires/${type}`),
   getAvailableQuestionnaires: () => API.get('/screening/available-questionnaires'),
   getScreeningHistory: () => API.get('/screening/screening-history'),
-  getSubmissionById: (id) => API.get(`screening/submission/${id}`),
+  getSubmissionById: (id) => API.get(`/screening/submission/${id}`),
   downloadSubmissionReport: (id) => API.get(`/screening/submission/${id}/download`, { responseType: 'blob' }),
   getChildScreeningStatus: (childId) => API.get(`/screening/child/${childId}/screening-status`),
   getScreeningStats: () => API.get('/screening/stats'),
   getAvailableCliniciansAndTherapists: () => API.get('/screening/available-clinicians-therapists')
+};
+
+export const facialScreeningAPI = {
+  predict: (formData) =>
+    API.post('/facial-screening/predict', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // Lab API endpoints
@@ -96,6 +103,8 @@ export const therapistAPI = {
   getDashboardSummary: () => API.get('therapist/dashboard-summary'),
   getDashboard: () => API.get('therapist/dashboard'),
   startTherapyFromReferral: (id) => API.patch(`therapist/referrals/${id}/start-therapy`),
+  /** Therapist recommendation note stored as case clinician note (active therapy cases only). */
+  addTherapistRecommendation: (payload) => API.post('therapist/recommendations', payload),
   /** Aggregated case file for tabbed UI (child, parent, referral, plan, sessions, assignments). */
   getCaseFile: (caseId) => API.get(`therapist/case/${caseId}`),
   createAssignment: (caseId, payload) => API.post(`/therapist/cases/${caseId}/assignments`, payload),
@@ -118,6 +127,7 @@ export const sessionAPI = {
   create: (payload) => API.post('/sessions', payload),
   getByCase: (caseId) => API.get(`sessions/case/${caseId}`),
   update: (id, payload) => API.patch(`sessions/${id}`, payload),
+  sign: (id) => API.patch(`sessions/${id}/sign`),
 };
 
 /** Recurring therapy schedules + generated session slots (not appointment booking). */
@@ -154,6 +164,8 @@ export const therapyPlanAPI = {
   getAssignContext: (caseId) => API.get(`therapy-plan/case/${caseId}/assign-context`),
   assignPlan: (payload) => API.post('therapy-plan/assign', payload),
   update: (planId, payload) => API.patch(`therapy-plan/${planId}`, payload),
+  /** Therapist requests clinician sign-off on the plan document. */
+  submitForApproval: (planId) => API.post(`therapy-plan/submit-for-approval/${planId}`),
   /** POST /therapy-plan/duplicate { originalPlanId, caseId } (childId optional, from case if omitted) */
   duplicatePlan: (payload) => API.post('therapy-plan/duplicate', payload),
   duplicate: (planId, payload) => API.post(`therapy-plan/${planId}/duplicate`, payload),
@@ -168,6 +180,8 @@ export const parentAPI = {
   getCaseSessions: (caseId) => API.get(`parent/case/${caseId}/sessions`),
   /** Home assignments for one case (activity name, due date, status). */
   getCaseAssignments: (caseId) => API.get(`parent/case/${caseId}/assignments`),
+  /** Lab orders for one case (status + released files). */
+  getCaseLabRequests: (caseId) => API.get(`parent/case/${caseId}/lab-requests`),
   getHomeAssignments: () => API.get('/parent/home-assignments'),
   getAssignmentsByCase: (caseId) => API.get(`parent/assignments/${caseId}`),
   /** Multipart: pass browser FormData with field "file" (server sets submissionUrl from upload). */
@@ -190,7 +204,12 @@ export const integrationAPI = {
 
 // Clinician API endpoints (no leading `/` so path stays under baseURL `/api`)
 export const clinicianAPI = {
-  getScreeningReviews: () => API.get('clinician/screening-reviews')
+  getScreeningReviews: () => API.get('clinician/screening-reviews'),
+  /** Record screening triage decision (clear / monitor / refer). */
+  recordScreeningDecision: (submissionId, payload) =>
+    API.patch(`clinician/screening-reviews/${submissionId}/decision`, payload),
+  /** Approve a therapy plan pending clinician review (PATCH). */
+  approveTherapyPlan: (planId) => API.patch(`clinician/therapy-plans/${planId}/approve`),
 };
 
 // Child case management (clinician only)
@@ -209,6 +228,7 @@ export const evaluationAPI = {
   listByCase: (caseId) => API.get(`evaluations/${caseId}`),
   getById: (id) => API.get(`evaluations/single/${id}`),
   updateVersion: (id, payload) => API.patch(`evaluations/${id}`, payload),
+  getDevelopmentSummary: (caseId) => API.get(`evaluations/${caseId}/development-summary`),
 };
 
 // Referrals (clinician -> therapist workflow)
@@ -244,13 +264,23 @@ export const analyticsAPI = {
   getByCase: (caseId) => API.get(`analytics/${encodeURIComponent(String(caseId))}`),
 };
 
+/** Unified progress engine (therapist full; clinician full; parent summary). */
+export const progressEngineAPI = {
+  getByCase: (caseId) => API.get(`progress-engine/${encodeURIComponent(String(caseId))}`),
+  getSummary: (caseId) => API.get(`progress-engine/${encodeURIComponent(String(caseId))}/summary`),
+};
+
 /** Auto-generated therapy reports (therapist generates; parent/clinician read role-filtered types). */
 export const reportAPI = {
   generate: (payload) => API.post('reports', payload),
   generateLegacy: (payload) => API.post('reports/generate', payload),
+  /** POST /api/reports/generate/:caseId — integrated progress-engine report */
+  generateByCaseId: (caseId) => API.post(`reports/generate/${encodeURIComponent(String(caseId))}`),
   listMine: (params) => API.get('reports', { params }),
   listByCase: (caseId) => API.get(`reports/${encodeURIComponent(String(caseId))}`),
   getById: (id) => API.get(`reports/view/${encodeURIComponent(String(id))}`),
+  downloadPdf: (reportId) =>
+    API.get(`reports/${encodeURIComponent(String(reportId))}/download`, { responseType: 'blob' }),
 };
 
 // Appointment API endpoints
@@ -275,7 +305,7 @@ export const appointmentAPI = {
   getStats: () => API.get('/appointments/stats')
 };
 
-/** Parent ↔ therapist case messaging (Conversation + Message). */
+/** Case-scoped messaging: parent, assigned therapist, and case clinician (Conversation + Message). */
 export const messagingAPI = {
   listConversations: () => API.get('messaging/conversations'),
   getOrCreateConversation: (caseId) => API.get(`messaging/conversations/${caseId}`),

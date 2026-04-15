@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 /**
  * Lab Data Seeder
  * Run: node src/seeders/labSeeder.js
@@ -64,7 +65,7 @@ async function seed() {
             childId = child._id;
             childName = `${child.firstName} ${child.lastName}`;
             // Calculate age from dateOfBirth
-            const now = new Date();
+            const now = getCurrentTime();
             const dob = new Date(child.dateOfBirth);
             childAge = Math.floor((now - dob) / (365.25 * 24 * 60 * 60 * 1000));
         } else {
@@ -96,7 +97,7 @@ async function seed() {
                 notes: `Sample lab test request #${i + 1} — Routine ${TEST_TYPES[i % TEST_TYPES.length]} screening`,
                 status: statusOptions[i % statusOptions.length],
                 releasedToParent: false,
-                createdAt: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)) // Spread over last 10 days
+                createdAt: new Date(getCurrentTimeMs() - (i * 24 * 60 * 60 * 1000)) // Spread over last 10 days
             });
         }
 

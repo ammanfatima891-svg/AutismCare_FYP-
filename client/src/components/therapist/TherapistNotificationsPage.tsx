@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, Loader2, RefreshCw, CheckCheck, AlertCircle, Trash2 } from 'lucide-react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Loader2, RefreshCw, CheckCheck, AlertCircle, Trash2, MessageSquare } from 'lucide-react';
 import { notificationAPI } from '../../services/api';
+import { AuthContext } from '../../context/AuthContext';
+import { getCaseMessageConversationId, navigateToCaseMessageInbox } from '../../utils/caseMessageNotificationNav';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -21,6 +24,8 @@ function formatTime(dateString: string) {
 
 /** Full-page notifications list for therapist dashboard (embedded). */
 export function TherapistNotificationsPage() {
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,8 +98,8 @@ export function TherapistNotificationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Notifications</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Notifications</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {unreadCount > 0
               ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
               : 'All caught up'}
@@ -102,7 +107,7 @@ export function TherapistNotificationsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={filter} onValueChange={(v) => setFilter(v as 'all' | 'unread' | 'read')}>
-            <SelectTrigger className="w-[150px] border-slate-200 bg-white">
+            <SelectTrigger className="w-[150px] border bg-card">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>
@@ -111,13 +116,13 @@ export function TherapistNotificationsPage() {
               <SelectItem value="read">Read</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" className="border-slate-200" onClick={() => void load()}>
+          <Button variant="outline" size="sm" className="border" onClick={() => void load()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
           <Button
             size="sm"
-            className="bg-sky-600 text-white hover:bg-sky-700"
+            variant="default"
             onClick={() => void markAllRead()}
             disabled={unreadCount === 0}
           >
@@ -128,29 +133,29 @@ export function TherapistNotificationsPage() {
       </div>
 
       {error ? (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="flex items-center gap-2 rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       ) : null}
 
-      <Card className="border border-slate-200/90 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100 bg-sky-50/50">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-            <Bell className="h-4 w-4 text-sky-700" strokeWidth={1.75} />
+      <Card className="border/90 bg-card shadow-sm">
+        <CardHeader className="border-b border border-border bg-secondary/20">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Bell className="h-4 w-4 text-primary" strokeWidth={1.75} />
             Clinical alerts
           </CardTitle>
-          <CardDescription className="text-slate-600">
+          <CardDescription className="text-muted-foreground">
             Case updates, assignments, referrals, and system messages
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           {loading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-9 w-9 animate-spin text-sky-600" />
+              <Loader2 className="h-9 w-9 animate-spin text-primary" />
             </div>
           ) : list.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-8 text-center text-sm text-slate-600">
+            <div className="rounded-lg border-dashed border bg-muted/80 p-8 text-center text-sm text-muted-foreground">
               No notifications to display.
             </div>
           ) : (
@@ -159,33 +164,50 @@ export function TherapistNotificationsPage() {
                 <div
                   key={n._id}
                   className={`rounded-xl border p-4 ${
-                    n.isRead ? 'border-slate-200 bg-white' : 'border-sky-200 bg-sky-50/40'
+                    n.isRead ? 'border border-border bg-card' : 'border-primary/30 bg-secondary/30'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{n.title}</p>
+                        <p className="text-sm font-semibold text-foreground">{n.title}</p>
                         {!n.isRead ? (
-                          <Badge className="border border-sky-200 bg-sky-100 text-sky-900">Unread</Badge>
+                          <Badge className="border-border bg-secondary text-primary">Unread</Badge>
                         ) : null}
                       </div>
                       {n.type ? (
-                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">{n.type}</p>
+                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{n.type}</p>
                       ) : null}
-                      <p className="mt-2 text-sm leading-relaxed text-slate-700">{n.message}</p>
-                      <p className="mt-2 text-xs text-slate-500">{formatTime(n.createdAt)}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground">{n.message}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">{formatTime(n.createdAt)}</p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      {getCaseMessageConversationId(n) ? (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="border"
+                          onClick={() => {
+                            const cid = getCaseMessageConversationId(n);
+                            if (cid) {
+                              void markRead(n._id);
+                              navigateToCaseMessageInbox(navigate, user?.role, cid);
+                            }
+                          }}
+                        >
+                          <MessageSquare className="mr-1 h-4 w-4" />
+                          Open thread
+                        </Button>
+                      ) : null}
                       {!n.isRead ? (
-                        <Button size="sm" variant="outline" className="border-slate-200" onClick={() => void markRead(n._id)}>
+                        <Button size="sm" variant="outline" className="border" onClick={() => void markRead(n._id)}>
                           Mark read
                         </Button>
                       ) : null}
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-red-600 hover:bg-red-50"
+                        className="text-destructive hover:bg-muted"
                         onClick={() => void removeOne(n._id)}
                       >
                         <Trash2 className="h-4 w-4" />

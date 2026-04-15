@@ -1,228 +1,397 @@
-@custom-variant dark (&:is(.dark *));
+/**
+ * Gold + Blue design tokens (loaded after index.css).
+ * Semantic utilities: bg-background, text-foreground, bg-primary, etc. read these variables.
+ */
 
 :root {
-  /* ASD-Friendly Calming Color Palette */
-  --font-size: 18px; /* Larger base font for accessibility */
+  --font-size: 16px;
 
-  /* Backgrounds */
-  --background: #fefefe;
-  --background-secondary: #f8fafc;
-  --background-accent: #f0f9ff;
+  /* Slightly warmer canvas so cards/inputs read as “placed on” a surface, not flat white */
+  --background: #eef2f7;
+  --foreground: #111827;
+  --foreground-secondary: #374151;
+  --foreground-muted: #6b7280;
 
-  /* Text Colors */
-  --foreground: #1e293b;
-  --foreground-secondary: #475569;
-  --foreground-muted: #64748b;
-
-  /* Calming Teal/Cyan Palette */
-  --primary-teal: #0d9488;
-  --primary-teal-light: #14b8a6;
-  --primary-teal-dark: #0f766e;
-  --primary-cyan: #0891b2;
-  --primary-cyan-light: #06b6d4;
-  --primary-cyan-dark: #0e7490;
-
-  /* Supporting Colors */
-  --success-green: #10b981;
-  --success-green-light: #34d399;
-  --warning-yellow: #f59e0b;
-  --warning-yellow-light: #fbbf24;
-  --error-red: #ef4444;
-  --error-red-light: #f87171;
-
-  /* Soft Neutrals */
-  --neutral-50: #fafafa;
-  --neutral-100: #f5f5f5;
-  --neutral-200: #e5e5e5;
-  --neutral-300: #d4d4d4;
-  --neutral-400: #a3a3a3;
-  --neutral-500: #737373;
-  --neutral-600: #525252;
-  --neutral-700: #404040;
-  --neutral-800: #262626;
-  --neutral-900: #171717;
-
-  /* Component Variables */
-  --card: #ffffff;
-  --card-foreground: var(--foreground);
-  --popover: #ffffff;
-  --popover-foreground: var(--foreground);
-  --primary: var(--primary-teal);
+  --primary: #1e3a8a;
   --primary-foreground: #ffffff;
-  --secondary: var(--neutral-100);
-  --secondary-foreground: var(--foreground);
-  --muted: var(--neutral-100);
-  --muted-foreground: var(--foreground-muted);
-  --accent: var(--primary-cyan-light);
-  --accent-foreground: var(--foreground);
-  --destructive: var(--error-red);
+
+  /* Solid “secondary action” buttons (lighter blue) — separate from --secondary surfaces */
+  --action-secondary: #3b82f6;
+  --action-secondary-foreground: #ffffff;
+
+  --accent: #d4af37;
+  --accent-foreground: #111827;
+
+  /* Muted surfaces (badges, subtle fills) */
+  --secondary: #eff6ff;
+  --secondary-foreground: #1e3a8a;
+
+  --muted: #e8edf4;
+  --muted-foreground: #5b6472;
+
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: var(--neutral-200);
-  --input: transparent;
-  --input-background: var(--neutral-50);
-  --switch-background: var(--neutral-300);
+
+  /* Stronger outlines for forms + cards (less “white on white”) */
+  --border: #cfd6e0;
+  --input: #b8c2d1;
+  --input-background: #ffffff;
+  --ring: #d4af37;
+  --switch-background: #cbced4;
+
+  --card: #ffffff;
+  --card-foreground: #111827;
+
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+
+  --radius: 0.75rem;
+
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: var(--primary-teal);
-  --chart-1: var(--primary-teal);
-  --chart-2: var(--primary-cyan);
-  --chart-3: var(--success-green);
-  --chart-4: var(--warning-yellow);
-  --chart-5: var(--error-red);
-  --radius: 0.75rem;
-  --sidebar: var(--background);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary-teal);
+
+  --chart-1: #1e3a8a;
+  --chart-2: #3b82f6;
+  --chart-3: #d4af37;
+  --chart-4: #64748b;
+  --chart-5: #0f172a;
+
+  --sidebar: #f4f6fb;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #1e3a8a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--background-accent);
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  --sidebar-accent: #eff6ff;
+  --sidebar-accent-foreground: #1e3a8a;
+  --sidebar-border: #cfd6e0;
+  --sidebar-ring: #d4af37;
+
+  /* Optional raw palette for arbitrary use / docs */
+  --palette-primary: #1e3a8a;
+  --palette-secondary-blue: #3b82f6;
+  --palette-accent-gold: #d4af37;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
-}
+  --background: #0f172a;
+  --foreground: #f9fafb;
+  --foreground-secondary: #d1d5db;
+  --foreground-muted: #9ca3af;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-input-background: var(--input-background);
-  --color-switch-background: var(--switch-background);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
+  --primary: #1e3a8a;
+  --primary-foreground: #ffffff;
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+  --action-secondary: #3b82f6;
+  --action-secondary-foreground: #ffffff;
 
-  body {
-    @apply bg-background text-foreground;
-  }
-}
+  --accent: #d4af37;
+  --accent-foreground: #111827;
 
-/**
- * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
- */
-@layer base {
-  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
-    h1 {
-      font-size: var(--text-2xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  --secondary: #1e293b;
+  --secondary-foreground: #f9fafb;
 
-    h2 {
-      font-size: var(--text-xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  --muted: #1e293b;
+  --muted-foreground: #9ca3af;
 
-    h3 {
-      font-size: var(--text-lg);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  --destructive: #f87171;
+  --destructive-foreground: #ffffff;
 
-    h4 {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  --border: #334155;
+  --input: #334155;
+  --input-background: rgba(30, 41, 59, 0.55);
+  --ring: #d4af37;
+  --switch-background: #475569;
 
-    p {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
+  --card: #1e293b;
+  --card-foreground: #f9fafb;
 
-    label {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  --popover: #1e293b;
+  --popover-foreground: #f9fafb;
 
-    button {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  --chart-1: #60a5fa;
+  --chart-2: #d4af37;
+  --chart-3: #94a3b8;
+  --chart-4: #1e3a8a;
+  --chart-5: #f9fafb;
 
-    input {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
-  }
+  --sidebar: #0f172a;
+  --sidebar-foreground: #f9fafb;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f9fafb;
+  --sidebar-border: #334155;
+  --sidebar-ring: #d4af37;
 }
 
 html {
   font-size: var(--font-size);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--background);
+    background-image: radial-gradient(
+        1200px 700px at 10% -10%,
+        color-mix(in oklab, var(--action-secondary) 18%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 600px at 100% 0%,
+        color-mix(in oklab, var(--accent) 16%, transparent),
+        transparent 55%
+      );
+    color: var(--foreground);
+  }
+
+  html.dark body {
+    background-image: none;
+  }
+}
+
+/* Reusable patterns (use alone or compose with Tailwind) */
+@layer components {
+  /** Prominent outlines on shadcn inputs (precompiled Tailwind bundle may omit arbitrary hover colors). */
+  @media (hover: hover) {
+    [data-slot="input"]:not(:disabled):not(:focus-visible):hover,
+    [data-slot="textarea"]:not(:disabled):not(:focus-visible):hover {
+      border-color: color-mix(in oklab, var(--primary) 30%, var(--input));
+    }
+
+    [data-slot="card"]:hover {
+      border-color: color-mix(in oklab, var(--primary) 20%, var(--border));
+    }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: calc(var(--radius) + 4px);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  }
+
+  .btn:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  .btn-primary {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+
+  .btn-secondary {
+    background-color: var(--action-secondary);
+    color: var(--action-secondary-foreground);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+
+  .btn-accent {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .btn-accent:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+
+  .input {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    height: 2.5rem;
+    border-radius: calc(var(--radius) + 4px);
+    border: 2px solid var(--input);
+    background-color: var(--input-background);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--foreground);
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+
+  @media (hover: hover) {
+    .input:hover:not(:disabled):not(:focus-visible) {
+      border-color: color-mix(in oklab, var(--primary) 35%, var(--input));
+      box-shadow: 0 6px 18px -10px rgba(15, 23, 42, 0.25);
+    }
+  }
+
+  .input::placeholder {
+    color: var(--muted-foreground);
+  }
+
+  .input:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring), 0 10px 26px -14px rgba(15, 23, 42, 0.25);
+  }
+
+  .input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .card {
+    border-radius: 1rem;
+    border: 2px solid var(--border);
+    background-color: var(--card);
+    color: var(--card-foreground);
+    box-shadow: 0 10px 22px -16px rgba(15, 23, 42, 0.22), 0 2px 6px -3px rgba(15, 23, 42, 0.12);
+    padding: 1.5rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+
+  @media (hover: hover) {
+    .card:hover {
+      border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
+      box-shadow: 0 16px 34px -18px rgba(15, 23, 42, 0.28), 0 6px 14px -8px rgba(15, 23, 42, 0.14);
+      transform: translateY(-1px);
+    }
+  }
+
+  .dark .card {
+    box-shadow: 0 10px 22px -16px rgba(0, 0, 0, 0.55), 0 2px 6px -3px rgba(0, 0, 0, 0.35);
+  }
+
+  /** Page shells (auth, marketing-style full-bleed screens) */
+  .ds-app-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: linear-gradient(to bottom right, #eff6ff, #f9fafb 45%, #fffbeb);
+    color: var(--foreground);
+  }
+
+  .dark .ds-app-shell {
+    background: var(--background);
+  }
+
+  /** Subtle header strip inside cards */
+  .ds-card-header-strip {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--action-secondary) 12%, transparent),
+      color-mix(in srgb, var(--accent) 14%, transparent)
+    );
+    padding-bottom: 1.5rem;
+  }
+
+  .dark .ds-card-header-strip {
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--primary) 35%, transparent),
+      color-mix(in srgb, var(--accent) 18%, transparent)
+    );
+  }
+
+  /* Form system */
+  .form {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .form-section {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .form-grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .form-field {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .form-help {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+  }
+
+  .form-error {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--destructive);
+  }
+
+  .form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .form-actions {
+      flex-direction: row;
+      justify-content: flex-end;
+    }
+  }
+}
+
+@layer utilities {
+  /** Coarse pointers (phones/tablets): keep primary tap targets comfortably tappable. */
+  @media (max-width: 640px) and (pointer: coarse) {
+    button:not([class*="size-"]):not(.sr-only),
+    [role="button"]:not(.sr-only) {
+      min-height: 44px;
+    }
+  }
+
+  .focus-ring-accent:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  }
+
+  /** Subtle motion for interactive tiles without relying on Tailwind arbitrary utilities */
+  .ds-interactive-surface {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+
+  @media (hover: hover) {
+    .ds-interactive-surface:hover {
+      transform: translateY(-1px);
+    }
+  }
 }

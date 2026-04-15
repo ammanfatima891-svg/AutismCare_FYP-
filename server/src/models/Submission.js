@@ -36,6 +36,26 @@ const SubmissionSchema = new mongoose.Schema({
     type: String,
     enum: ['low', 'medium', 'high', 'unknown'],
   },
+  clinicianDecision: {
+    decision: {
+      type: String,
+      enum: ['clear', 'monitor', 'refer'],
+      default: undefined,
+    },
+    notes: {
+      type: String,
+      default: '',
+    },
+    decidedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: undefined,
+    },
+    decidedAt: {
+      type: Date,
+      default: undefined,
+    },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Submission", SubmissionSchema);

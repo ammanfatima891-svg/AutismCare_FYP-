@@ -19,14 +19,14 @@ const PAGE_SIZE = 12;
 function ReportsEmptyIllustration() {
   return (
     <div
-      className="mx-auto flex h-40 w-full max-w-md items-center justify-center rounded-2xl border border-slate-200/80 bg-gradient-to-b from-sky-50/50 to-white"
+      className="mx-auto flex h-40 w-full max-w-md items-center justify-center rounded-2xl border/80 bg-gradient-to-b from-blue-50/50 to-white"
       aria-hidden
     >
-      <svg viewBox="0 0 240 120" className="h-28 w-full max-w-xs text-sky-200" fill="none">
-        <rect x="32" y="24" width="176" height="72" rx="8" className="stroke-sky-300" strokeWidth="1.5" fill="white" />
-        <path d="M48 44h96M48 56h72M48 68h120" className="stroke-sky-200" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="188" cy="52" r="14" className="stroke-amber-300/90" strokeWidth="1.5" fill="#fffbeb" />
-        <path d="M182 52l4 4 8-10" className="stroke-amber-500/80" strokeWidth="1.5" strokeLinecap="round" />
+      <svg viewBox="0 0 240 120" className="h-28 w-full max-w-xs text-blue-200" fill="none">
+        <rect x="32" y="24" width="176" height="72" rx="8" className="stroke-blue-300" strokeWidth="1.5" fill="white" />
+        <path d="M48 44h96M48 56h72M48 68h120" className="stroke-blue-200" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="188" cy="52" r="14" className="stroke-yellow-400" strokeWidth="1.5" fill="#fffbeb" />
+        <path d="M182 52l4 4 8-10" className="stroke-yellow-500" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -189,15 +189,15 @@ export default function TherapistReportsPage() {
     <div className="space-y-8 pb-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Reports</h1>
-          <p className="mt-1.5 max-w-xl text-sm text-slate-600">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
+          <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
             View and manage all generated therapy reports
           </p>
         </div>
         <Button
           type="button"
           onClick={() => setGenerateOpen(true)}
-          className="h-11 shrink-0 rounded-xl border-2 border-amber-200/90 bg-sky-600 px-5 text-white shadow-sm transition hover:bg-sky-700"
+          className="h-11 shrink-0 rounded-xl border-2 border-yellow-200 bg-blue-600 px-5 text-white shadow-sm transition hover:bg-blue-700"
         >
           <Plus className="mr-2 h-4 w-4" />
           Generate Report
@@ -205,7 +205,7 @@ export default function TherapistReportsPage() {
       </header>
 
       {error && !loadingRows ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-2xl border bg-muted/90 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
@@ -234,22 +234,22 @@ export default function TherapistReportsPage() {
             ))}
           </div>
         ) : filteredRows.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200/90 bg-white px-6 py-14 text-center shadow-sm">
+          <div className="rounded-2xl border/90 bg-card px-6 py-14 text-center shadow-sm">
             <ReportsEmptyIllustration />
-            <h2 className="mt-6 text-lg font-semibold text-slate-900">No reports generated yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+            <h2 className="mt-6 text-lg font-semibold text-foreground">No reports generated yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               When you generate reports from here or from a child&apos;s case file, they will appear in this list.
             </p>
             <Button
               type="button"
-              className="mt-6 rounded-xl border-2 border-amber-200/90 bg-sky-600 px-6 text-white hover:bg-sky-700"
+              className="mt-6 rounded-xl border-2 border-yellow-200 bg-blue-600 px-6 text-white hover:bg-blue-700"
               onClick={() => setGenerateOpen(true)}
               disabled={caseOptions.length === 0}
             >
               Generate your first report
             </Button>
             {caseOptions.length === 0 ? (
-              <p className="mt-3 text-xs text-slate-500">Assign a case to generate reports.</p>
+              <p className="mt-3 text-xs text-muted-foreground">Assign a case to generate reports.</p>
             ) : null}
           </div>
         ) : (
@@ -261,8 +261,8 @@ export default function TherapistReportsPage() {
             </div>
 
             {filteredRows.length > PAGE_SIZE ? (
-              <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-6 sm:flex-row">
-                <p className="text-sm text-slate-500">
+              <div className="flex flex-col items-center justify-between gap-3 border-t border pt-6 sm:flex-row">
+                <p className="text-sm text-muted-foreground">
                   Showing {(safePage - 1) * PAGE_SIZE + 1}–
                   {Math.min(safePage * PAGE_SIZE, filteredRows.length)} of {filteredRows.length}
                 </p>
@@ -270,7 +270,7 @@ export default function TherapistReportsPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-xl border-slate-200"
+                    className="rounded-xl border"
                     disabled={safePage <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
@@ -279,7 +279,7 @@ export default function TherapistReportsPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-xl border-slate-200"
+                    className="rounded-xl border"
                     disabled={safePage >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   >

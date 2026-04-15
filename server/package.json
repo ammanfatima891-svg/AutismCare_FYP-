@@ -1,11 +1,16 @@
 {
   "name": "server",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "src/server.js",
   "scripts": {
     "start": "nodemon src/server.js",
+    "start:ci": "node src/server.js",
     "seed:activities": "node src/seeders/seedActivityTemplates.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --runInBand --detectOpenHandles",
+    "test:watch": "jest --watch"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +21,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
     "jsonwebtoken": "^9.0.2",
     "jws": "^4.0.1",
     "mongoose": "^8.19.2",
@@ -24,9 +30,13 @@
     "nodemailer": "^7.0.10",
     "pdfkit": "^0.17.2",
     "qs": "^6.14.1",
+    "sharp": "^0.34.3",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "jest": "^30.2.0",
+    "mongodb-memory-server": "^11.0.1",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
   }
 }

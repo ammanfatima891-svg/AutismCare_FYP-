@@ -1,5 +1,10 @@
 import { sessionAPI } from '../api';
 
+export async function signSessionNote(sessionId: string) {
+  const { data } = await sessionAPI.sign(sessionId);
+  return data;
+}
+
 /** Normalize Axios / API error bodies for user-visible messages. */
 export function getSessionApiErrorMessage(e: unknown): string {
   const err = e as {
@@ -27,6 +32,18 @@ export type SessionPayload = {
   goalsTargeted: string[];
   activitiesUsed: string[];
   childResponse: string;
+  /** Per-goal clinical measurements (stakeholder-grade analytics). */
+  goalData?: Array<{
+    goalKey?: string;
+    goalTitleMatch?: string;
+    measurementType?: string;
+    trials?: number;
+    correct?: number;
+    count?: number;
+    seconds?: number;
+    rating?: number;
+    source?: string;
+  }>;
   notes?: string;
   parentInstructions?: string;
   status: string;

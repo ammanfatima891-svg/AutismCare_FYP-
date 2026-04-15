@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('./time.js');
 const { Notification, NOTIFICATION_TYPES } = require('../models/Notification');
 const { ClinicalEvaluation } = require('../models/ClinicalEvaluation');
 
@@ -140,7 +141,7 @@ const markAsRead = async (notificationId, userId) => {
     try {
         return await Notification.findOneAndUpdate(
             { _id: notificationId, recipientId: userId },
-            { isRead: true, readAt: new Date() },
+            { isRead: true, readAt: getCurrentTime() },
             { new: true }
         );
     } catch (error) {
@@ -157,7 +158,7 @@ const markAllAsRead = async (userId) => {
     try {
         return await Notification.updateMany(
             { recipientId: userId, isRead: false },
-            { isRead: true, readAt: new Date() }
+            { isRead: true, readAt: getCurrentTime() }
         );
     } catch (error) {
         console.error('Error marking all notifications as read:', error);
@@ -183,10 +184,10 @@ const deleteNotification = async (notificationId, userId) => {
  */
 const createFollowUpDueNotifications = async (clinicianId, days = 7) => {
     try {
-        const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const threshold = new Date(getCurrentTimeMs() - days * 24 * 60 * 60 * 1000);
         const dueEvaluations = await ClinicalEvaluation.find({
             clinicianId,
-            status: 'final',
+            status: 'FINALIZED',
             createdAt: { $lte: threshold }
         })
             .select('_id caseId createdAt')

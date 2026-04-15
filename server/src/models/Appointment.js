@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
+const { APPOINTMENT_STATUS: CANON_APPOINTMENT_STATUS } = require('../constants/workflowEnums');
+const { normalizeAppointmentStatus } = require('../utils/normalizeWorkflowStatus');
 
 const APPOINTMENT_TYPES = {
   DIAGNOSTIC: 'DIAGNOSTIC',
@@ -9,15 +11,8 @@ const APPOINTMENT_TYPES = {
   LAB_TEST: 'LAB_TEST'
 };
 
-const APPOINTMENT_STATUS = {
-  REQUESTED: 'REQUESTED',
-  PENDING_APPROVAL: 'PENDING_APPROVAL',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED',
-  RESCHEDULED: 'RESCHEDULED',
-  COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED'
-};
+// Canonical appointment statuses (system-wide rule)
+const APPOINTMENT_STATUS = CANON_APPOINTMENT_STATUS;
 
 const APPOINTMENT_MODES = {
   ONLINE: 'ONLINE',
@@ -34,23 +29,11 @@ const TYPE_TO_ROLE = {
 // ─── Allowed status transitions ──────────────────────────────────────────────
 
 const ALLOWED_TRANSITIONS = {
-  [APPOINTMENT_STATUS.REQUESTED]: [APPOINTMENT_STATUS.PENDING_APPROVAL],
-  [APPOINTMENT_STATUS.PENDING_APPROVAL]: [
-    APPOINTMENT_STATUS.APPROVED,
-    APPOINTMENT_STATUS.REJECTED
-  ],
-  [APPOINTMENT_STATUS.APPROVED]: [
-    APPOINTMENT_STATUS.RESCHEDULED,
-    APPOINTMENT_STATUS.COMPLETED,
-    APPOINTMENT_STATUS.CANCELLED
-  ],
+  [APPOINTMENT_STATUS.PENDING]: [APPOINTMENT_STATUS.APPROVED, APPOINTMENT_STATUS.REJECTED, APPOINTMENT_STATUS.CANCELLED],
+  [APPOINTMENT_STATUS.APPROVED]: [APPOINTMENT_STATUS.COMPLETED, APPOINTMENT_STATUS.CANCELLED],
   [APPOINTMENT_STATUS.REJECTED]: [],
-  [APPOINTMENT_STATUS.RESCHEDULED]: [
-    APPOINTMENT_STATUS.APPROVED,
-    APPOINTMENT_STATUS.CANCELLED
-  ],
   [APPOINTMENT_STATUS.COMPLETED]: [],
-  [APPOINTMENT_STATUS.CANCELLED]: []
+  [APPOINTMENT_STATUS.CANCELLED]: [],
 };
 
 // ─── Sub-schemas ─────────────────────────────────────────────────────────────
@@ -135,7 +118,7 @@ const AppointmentSchema = new Schema({
   status: {
     type: String,
     enum: Object.values(APPOINTMENT_STATUS),
-    default: APPOINTMENT_STATUS.REQUESTED,
+    default: APPOINTMENT_STATUS.PENDING,
     index: true
   },
   rejectionReason: {
@@ -156,17 +139,11 @@ AppointmentSchema.index({ professional: 1, status: 1 });
 AppointmentSchema.index({ parent: 1, status: 1 });
 AppointmentSchema.index({ professional: 1, preferredDate: 1, preferredTime: 1 });
 
-// ─── Pre-save hook: auto-transition REQUESTED → PENDING_APPROVAL on create ──
+// ─── Pre-save hook: normalize legacy statuses ────────────────────────────────
 
 AppointmentSchema.pre('save', function (next) {
-  if (this.isNew && this.status === APPOINTMENT_STATUS.REQUESTED) {
-    this.status = APPOINTMENT_STATUS.PENDING_APPROVAL;
-    this.auditTrail.push({
-      action: 'STATUS_CHANGE',
-      user: this.parent,
-      details: `Status changed from ${APPOINTMENT_STATUS.REQUESTED} to ${APPOINTMENT_STATUS.PENDING_APPROVAL}`
-    });
-  }
+  const norm = normalizeAppointmentStatus(this.status);
+  if (norm) this.status = norm;
   next();
 });
 

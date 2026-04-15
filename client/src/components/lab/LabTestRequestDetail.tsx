@@ -36,9 +36,9 @@ interface RequestData {
 }
 
 const statusConfig: Record<string, { color: string; bg: string; border: string; icon: any }> = {
-    PENDING: { color: 'text-amber-800', bg: 'bg-amber-100', border: 'border-amber-200', icon: Clock },
-    UPLOADED: { color: 'text-blue-800', bg: 'bg-blue-100', border: 'border-blue-200', icon: FileUp },
-    RELEASED: { color: 'text-emerald-800', bg: 'bg-emerald-100', border: 'border-emerald-200', icon: CheckCircle },
+    PENDING: { color: 'text-accent-foreground', bg: 'bg-accent/10', border: 'border-border', icon: Clock },
+    UPLOADED: { color: 'text-primary', bg: 'bg-secondary/60', border: 'border-border', icon: FileUp },
+    RELEASED: { color: 'text-primary', bg: 'bg-secondary', border: 'border-border', icon: CheckCircle },
 };
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -169,7 +169,7 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -177,9 +177,9 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
     if (error || !request) {
         return (
             <div className="text-center py-20">
-                <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-                <p className="text-red-600 font-medium">{error || 'Request not found'}</p>
-                <button onClick={onBack} className="mt-4 text-sm text-teal-600 hover:text-teal-700 font-medium">
+                <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-3" />
+                <p className="text-destructive font-medium">{error || 'Request not found'}</p>
+                <button onClick={onBack} className="mt-4 text-sm text-primary hover:underline font-medium">
                     ← Back to requests
                 </button>
             </div>
@@ -195,13 +195,13 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
             <div className="flex items-center gap-4 mb-6">
                 <button
                     onClick={onBack}
-                    className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                    className="p-2 rounded-lg border text-muted-foreground hover:bg-muted transition-colors"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-gray-900">Test Request Details</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">Request ID: {request._id}</p>
+                    <h2 className="text-2xl font-bold text-foreground">Test Request Details</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">Request ID: {request._id}</p>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border}`}>
                     <StatusIcon className="w-4 h-4" />
@@ -212,129 +212,129 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
             {/* Info cards row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 {/* Child Info */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-card rounded-xl shadow-sm border p-6">
                     <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-teal-50">
-                            <Baby className="w-5 h-5 text-teal-600" />
+                        <div className="p-2 rounded-lg bg-secondary">
+                            <Baby className="w-5 h-5 text-primary" />
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-700">Child Information</h3>
+                        <h3 className="text-sm font-semibold text-foreground">Child Information</h3>
                     </div>
                     <div className="space-y-3 mt-1">
                         <div>
-                            <p className="text-xs text-gray-400">Name</p>
-                            <p className="text-sm font-medium text-gray-900">{request.childName}</p>
+                            <p className="text-xs text-muted-foreground">Name</p>
+                            <p className="text-sm font-medium text-foreground">{request.childName}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-400">Age</p>
-                            <p className="text-sm font-medium text-gray-900">{request.childAge} years</p>
+                            <p className="text-xs text-muted-foreground">Age</p>
+                            <p className="text-sm font-medium text-foreground">{request.childAge} years</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-400">Child ID</p>
-                            <p className="text-xs font-mono text-gray-500">{request.childId}</p>
+                            <p className="text-xs text-muted-foreground">Child ID</p>
+                            <p className="text-xs font-mono text-muted-foreground">{request.childId}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Clinician Info */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-card rounded-xl shadow-sm border p-6">
                     <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-blue-50">
-                            <Stethoscope className="w-5 h-5 text-blue-600" />
+                        <div className="p-2 rounded-lg bg-secondary">
+                            <Stethoscope className="w-5 h-5 text-primary" />
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-700">Clinician</h3>
+                        <h3 className="text-sm font-semibold text-foreground">Clinician</h3>
                     </div>
                     {request.clinicianId ? (
                         <div className="space-y-3 mt-1">
                             <div>
-                                <p className="text-xs text-gray-400">Name</p>
-                                <p className="text-sm font-medium text-gray-900">
+                                <p className="text-xs text-muted-foreground">Name</p>
+                                <p className="text-sm font-medium text-foreground">
                                     {request.clinicianId.firstName} {request.clinicianId.lastName}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-gray-400">Email</p>
-                                <p className="text-sm text-gray-600">{request.clinicianId.email}</p>
+                                <p className="text-xs text-muted-foreground">Email</p>
+                                <p className="text-sm text-muted-foreground">{request.clinicianId.email}</p>
                             </div>
                             {request.clinicianId.specialization && (
                                 <div>
-                                    <p className="text-xs text-gray-400">Specialization</p>
-                                    <p className="text-sm text-gray-600">{request.clinicianId.specialization}</p>
+                                    <p className="text-xs text-muted-foreground">Specialization</p>
+                                    <p className="text-sm text-muted-foreground">{request.clinicianId.specialization}</p>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-400">Not available</p>
+                        <p className="text-sm text-muted-foreground">Not available</p>
                     )}
                 </div>
 
                 {/* Parent Info */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-card rounded-xl shadow-sm border p-6">
                     <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 rounded-lg bg-purple-50">
-                            <User className="w-5 h-5 text-purple-600" />
+                        <div className="p-2 rounded-lg bg-muted">
+                            <User className="w-5 h-5 text-primary" />
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-700">Parent / Guardian</h3>
+                        <h3 className="text-sm font-semibold text-foreground">Parent / Guardian</h3>
                     </div>
                     {request.parentId ? (
                         <div className="space-y-3 mt-1">
                             <div>
-                                <p className="text-xs text-gray-400">Name</p>
-                                <p className="text-sm font-medium text-gray-900">
+                                <p className="text-xs text-muted-foreground">Name</p>
+                                <p className="text-sm font-medium text-foreground">
                                     {request.parentId.firstName} {request.parentId.lastName}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-gray-400">Email</p>
-                                <p className="text-sm text-gray-600">{request.parentId.email}</p>
+                                <p className="text-xs text-muted-foreground">Email</p>
+                                <p className="text-sm text-muted-foreground">{request.parentId.email}</p>
                             </div>
                             {request.parentId.phoneNumber && (
                                 <div>
-                                    <p className="text-xs text-gray-400">Phone</p>
-                                    <p className="text-sm text-gray-600">{request.parentId.phoneNumber}</p>
+                                    <p className="text-xs text-muted-foreground">Phone</p>
+                                    <p className="text-sm text-muted-foreground">{request.parentId.phoneNumber}</p>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-400">Not available</p>
+                        <p className="text-sm text-muted-foreground">Not available</p>
                     )}
                 </div>
             </div>
 
             {/* Test Details */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Test Details</h3>
+            <div className="bg-card rounded-xl shadow-sm border p-6 mb-6">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Test Details</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
-                        <p className="text-xs text-gray-400">Test Type</p>
-                        <span className="inline-flex mt-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-800">
+                        <p className="text-xs text-muted-foreground">Test Type</p>
+                        <span className="inline-flex mt-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-muted text-foreground">
                             {request.testType}
                         </span>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400">Requested On</p>
-                        <p className="text-sm text-gray-700 mt-1">{formatDate(request.createdAt)}</p>
+                        <p className="text-xs text-muted-foreground">Requested On</p>
+                        <p className="text-sm text-foreground mt-1">{formatDate(request.createdAt)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400">Last Updated</p>
-                        <p className="text-sm text-gray-700 mt-1">{formatDate(request.updatedAt)}</p>
+                        <p className="text-xs text-muted-foreground">Last Updated</p>
+                        <p className="text-sm text-foreground mt-1">{formatDate(request.updatedAt)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400">Released to Parent</p>
-                        <p className="text-sm text-gray-700 mt-1">{request.releasedToParent ? 'Yes' : 'No'}</p>
+                        <p className="text-xs text-muted-foreground">Released to Parent</p>
+                        <p className="text-sm text-foreground mt-1">{request.releasedToParent ? 'Yes' : 'No'}</p>
                     </div>
                 </div>
                 {request.notes && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                        <p className="text-xs text-gray-400 mb-1">Clinician Notes</p>
-                        <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{request.notes}</p>
+                    <div className="mt-4 pt-4 border-t border">
+                        <p className="text-xs text-muted-foreground mb-1">Clinician Notes</p>
+                        <p className="text-sm text-foreground bg-muted rounded-lg p-3">{request.notes}</p>
                     </div>
                 )}
             </div>
 
             {/* Upload Section (only show if status is PENDING) */}
             {request.status === 'PENDING' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Upload Lab Report</h3>
+                <div className="bg-card rounded-xl shadow-sm border p-6 mb-6">
+                    <h3 className="text-sm font-semibold text-foreground mb-4">Upload Lab Report</h3>
 
                     {/* Drag & Drop Zone */}
                     <div
@@ -344,8 +344,8 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
                         className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${dragActive
-                            ? 'border-teal-400 bg-teal-50'
-                            : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                            ? 'border-primary bg-secondary/30'
+                            : 'border-border hover:border-primary/40 hover:bg-muted'
                             }`}
                     >
                         <input
@@ -355,20 +355,20 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                             onChange={handleInputChange}
                             className="hidden"
                         />
-                        <Upload className={`w-10 h-10 mx-auto mb-3 ${dragActive ? 'text-teal-500' : 'text-gray-400'}`} />
-                        <p className="text-sm font-medium text-gray-700">
+                        <Upload className={`w-10 h-10 mx-auto mb-3 ${dragActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <p className="text-sm font-medium text-foreground">
                             {dragActive ? 'Drop your file here' : 'Drag & drop a file here, or click to browse'}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — Max 25MB</p>
+                        <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG — Max 25MB</p>
                     </div>
 
                     {/* Selected file preview */}
                     {selectedFile && (
-                        <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <FileText className="w-8 h-8 text-teal-600 flex-shrink-0" />
+                        <div className="mt-4 flex items-center gap-3 p-3 bg-muted rounded-lg border">
+                            <FileText className="w-8 h-8 text-primary flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{selectedFile.name}</p>
-                                <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                                <p className="text-sm font-medium text-foreground truncate">{selectedFile.name}</p>
+                                <p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p>
                             </div>
                             <button
                                 onClick={(e) => {
@@ -377,9 +377,9 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                                     setUploadError('');
                                     if (fileInputRef.current) fileInputRef.current.value = '';
                                 }}
-                                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+                                className="p-1 rounded-full hover:bg-muted transition-colors"
                             >
-                                <X className="w-4 h-4 text-gray-500" />
+                                <X className="w-4 h-4 text-muted-foreground" />
                             </button>
                         </div>
                     )}
@@ -387,13 +387,13 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                     {/* Progress bar */}
                     {uploading && (
                         <div className="mt-4">
-                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                 <span>Uploading...</span>
                                 <span>{uploadProgress}%</span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="w-full bg-muted rounded-full h-2">
                                 <div
-                                    className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
+                                    className="h-2 rounded-full bg-primary transition-all duration-300"
                                     style={{ width: `${uploadProgress}%` }}
                                 ></div>
                             </div>
@@ -402,7 +402,7 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
 
                     {/* Success message */}
                     {uploadSuccess && (
-                        <div className="mt-4 flex items-center gap-2 p-3 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
+                        <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-primary">
                             <CheckCircle className="w-4 h-4 flex-shrink-0" />
                             <span className="text-sm">{uploadSuccess}</span>
                         </div>
@@ -410,7 +410,7 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
 
                     {/* Error message */}
                     {uploadError && (
-                        <div className="mt-4 flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                        <div className="mt-4 flex items-center gap-2 p-3 bg-muted text-destructive rounded-lg border">
                             <AlertCircle className="w-4 h-4 flex-shrink-0" />
                             <span className="text-sm">{uploadError}</span>
                         </div>
@@ -420,7 +420,7 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                     <button
                         onClick={handleUpload}
                         disabled={!selectedFile || uploading}
-                        className="mt-4 w-full py-2.5 px-4 rounded-lg font-medium text-white bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                        className="mt-4 flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {uploading ? 'Uploading...' : 'Upload Report'}
                     </button>
@@ -429,19 +429,19 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
 
             {/* Existing Reports */}
             {request.reports && request.reports.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                <div className="bg-card rounded-xl shadow-sm border p-6">
+                    <h3 className="text-sm font-semibold text-foreground mb-4">
                         Uploaded Reports ({request.reports.length})
                     </h3>
                     <div className="space-y-3">
                         {request.reports.map((report) => (
-                            <div key={report._id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                <div className="p-2 rounded-lg bg-teal-50">
-                                    <FileText className="w-5 h-5 text-teal-600" />
+                            <div key={report._id} className="flex items-center gap-4 p-3 bg-muted rounded-lg border">
+                                <div className="p-2 rounded-lg bg-secondary">
+                                    <FileText className="w-5 h-5 text-primary" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-800 truncate">{report.fileName}</p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-sm font-medium text-foreground truncate">{report.fileName}</p>
+                                    <p className="text-xs text-muted-foreground">
                                         {formatFileSize(report.fileSize)} · Uploaded {formatDate(report.uploadedAt)}
                                         {report.labTechnicianId && (
                                             <> · by {report.labTechnicianId.firstName} {report.labTechnicianId.lastName}</>
@@ -452,7 +452,7 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                                     href={`${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:4000'}${report.fileUrl}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors border border-teal-200"
+                                    className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-secondary/80"
                                 >
                                     View
                                 </a>

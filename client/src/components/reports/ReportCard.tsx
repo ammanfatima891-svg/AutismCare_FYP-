@@ -33,32 +33,32 @@ export function ReportCard({
   return (
     <article
       className={cn(
-        'group flex flex-col gap-4 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm transition-all duration-200',
-        'hover:border-sky-200 hover:shadow-md',
+        'group flex flex-col gap-4 rounded-2xl border/90 bg-card p-5 shadow-sm transition-all duration-200',
+        'hover:border-blue-200 hover:shadow-md',
         className
       )}
     >
       <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold tracking-tight text-slate-900">{row.childName || 'Child'}</h3>
+            <h3 className="text-lg font-semibold tracking-tight text-foreground">{row.childName || 'Child'}</h3>
             <Badge
               variant="outline"
-              className="border-sky-200 bg-sky-50/80 font-medium text-sky-900"
+              className="border-blue-200 bg-blue-50/80 font-medium text-blue-900"
             >
               {reportTypeLabel(row.type)}
             </Badge>
             {row.insufficientData ? (
               <Badge
                 variant="outline"
-                className="border-amber-200/80 bg-amber-50/90 font-medium text-amber-950"
+                className="border-yellow-200 bg-yellow-50 font-medium text-yellow-900"
               >
                 Partial data
               </Badge>
             ) : null}
           </div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Generated {dateStr}</p>
-          <p className="text-sm leading-relaxed text-slate-600">{truncate(summary)}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Generated {dateStr}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{truncate(summary)}</p>
         </div>
 
         <div className="flex shrink-0 flex-row items-center gap-2 sm:flex-col sm:items-end lg:flex-row lg:items-center">
@@ -66,7 +66,7 @@ export function ReportCard({
             type="button"
             size="sm"
             variant="outline"
-            className="border-sky-200 bg-white text-sky-900 hover:bg-sky-50"
+            className="border-blue-200 bg-card text-blue-900 hover:bg-blue-50"
             onClick={onView}
           >
             <Eye className="mr-1.5 h-4 w-4" />
@@ -76,7 +76,7 @@ export function ReportCard({
             type="button"
             size="sm"
             variant="outline"
-            className="border-slate-200 text-slate-400"
+            className="border text-muted-foreground"
             disabled
             title="Download coming soon"
           >
@@ -85,7 +85,7 @@ export function ReportCard({
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-slate-500">
+              <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground">
                 <MoreHorizontal className="h-4 w-4" />
                 <span className="sr-only">More</span>
               </Button>
@@ -103,17 +103,17 @@ export function ReportCard({
 
 export function ReportCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+    <div className="animate-pulse rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
         <div className="flex-1 space-y-3">
-          <div className="h-5 w-40 rounded-md bg-slate-100" />
-          <div className="h-3 w-28 rounded bg-slate-100" />
-          <div className="h-4 w-full max-w-md rounded bg-slate-100" />
-          <div className="h-4 w-full max-w-sm rounded bg-slate-100" />
+          <div className="h-5 w-40 rounded-md bg-muted" />
+          <div className="h-3 w-28 rounded bg-muted" />
+          <div className="h-4 w-full max-w-md rounded bg-muted" />
+          <div className="h-4 w-full max-w-sm rounded bg-muted" />
         </div>
         <div className="flex gap-2">
-          <div className="h-9 w-20 rounded-md bg-slate-100" />
-          <div className="h-9 w-24 rounded-md bg-slate-100" />
+          <div className="h-9 w-20 rounded-md bg-muted" />
+          <div className="h-9 w-24 rounded-md bg-muted" />
         </div>
       </div>
     </div>

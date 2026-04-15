@@ -1,5 +1,7 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const { Appointment, APPOINTMENT_STATUS, APPOINTMENT_TYPES, TYPE_TO_ROLE } = require('../models/Appointment');
+const { normalizeAppointmentStatus } = require('../utils/normalizeWorkflowStatus');
 const { User, ROLES } = require('../models/User');
 const { createNotification, createNotificationIfNotExists } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
@@ -64,7 +66,7 @@ exports.createAppointment = async (req, res) => {
         if (isNaN(appointmentDate.getTime())) {
             return res.status(400).json({ success: false, message: 'Invalid date format' });
         }
-        const today = new Date();
+        const today = getCurrentTime();
         today.setHours(0, 0, 0, 0);
         if (appointmentDate < today) {
             return res.status(400).json({ success: false, message: 'Preferred date must be in the future' });
@@ -191,7 +193,7 @@ exports.getParentAppointments = async (req, res) => {
         const { status, type, page = 1, limit = 10 } = req.query;
 
         const filter = { parent: parentId };
-        if (status) filter.status = status;
+        if (status) filter.status = normalizeAppointmentStatus(status) || status;
         if (type) filter.appointmentType = type;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -240,7 +242,7 @@ exports.getProfessionalAppointments = async (req, res) => {
         const { status, type, page = 1, limit = 10 } = req.query;
 
         const filter = { professional: professionalId };
-        if (status) filter.status = status;
+        if (status) filter.status = normalizeAppointmentStatus(status) || status;
         if (type) filter.appointmentType = type;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -349,7 +351,7 @@ exports.approveAppointment = async (req, res) => {
             resourceId: appointment._id,
             ipAddress: req.ip,
             userAgent: req.get('User-Agent'),
-            details: { previousStatus: APPOINTMENT_STATUS.PENDING_APPROVAL }
+            details: { previousStatus: APPOINTMENT_STATUS.PENDING }
         });
 
         // Notify parent
@@ -467,7 +469,7 @@ exports.rescheduleAppointment = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid date format' });
         }
 
-        const today = new Date();
+        const today = getCurrentTime();
         today.setHours(0, 0, 0, 0);
         if (parsedNewDate < today) {
             return res.status(400).json({ success: false, message: 'New date must be in the future' });
@@ -482,7 +484,9 @@ exports.rescheduleAppointment = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Not authorized to manage this appointment' });
         }
 
-        if (!Appointment.validateTransition(appointment.status, APPOINTMENT_STATUS.RESCHEDULED)) {
+        // Reschedule does not introduce a separate status in the canonical workflow.
+        // We allow rescheduling when appointment is still actionable.
+        if (![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.APPROVED].includes(appointment.status)) {
             return res.status(400).json({
                 success: false,
                 message: `Cannot reschedule appointment with status: ${appointment.status}`
@@ -518,7 +522,7 @@ exports.rescheduleAppointment = async (req, res) => {
         appointment.preferredTime = newTime;
         appointment.finalDate = parsedNewDate;
         appointment.finalTime = newTime;
-        appointment.status = APPOINTMENT_STATUS.RESCHEDULED;
+        // Keep status as-is (PENDING stays PENDING, APPROVED stays APPROVED).
         appointment.auditTrail.push({
             action: 'RESCHEDULED',
             user: professionalId,
@@ -718,7 +722,7 @@ exports.getAllAppointments = async (req, res) => {
         const { status, type, page = 1, limit = 20 } = req.query;
 
         const filter = {};
-        if (status) filter.status = status;
+        if (status) filter.status = normalizeAppointmentStatus(status) || status;
         if (type) filter.appointmentType = type;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -798,12 +802,11 @@ exports.getAppointmentStats = async (req, res) => {
             data: {
                 total,
                 byStatus: {
-                    pending: statusMap[APPOINTMENT_STATUS.PENDING_APPROVAL] || 0,
+                    pending: statusMap[APPOINTMENT_STATUS.PENDING] || 0,
                     approved: statusMap[APPOINTMENT_STATUS.APPROVED] || 0,
                     rejected: statusMap[APPOINTMENT_STATUS.REJECTED] || 0,
                     completed: statusMap[APPOINTMENT_STATUS.COMPLETED] || 0,
-                    cancelled: statusMap[APPOINTMENT_STATUS.CANCELLED] || 0,
-                    rescheduled: statusMap[APPOINTMENT_STATUS.RESCHEDULED] || 0
+                    cancelled: statusMap[APPOINTMENT_STATUS.CANCELLED] || 0
                 },
                 byType: typeMap,
                 byRole: roleMap,

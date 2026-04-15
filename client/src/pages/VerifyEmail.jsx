@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import API from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { ThemeToggleButton } from '../components/ui/ThemeToggleButton';
 import { toast } from 'sonner';
 
 export default function VerifyEmail() {
@@ -30,20 +31,25 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <Card className="max-w-md mx-auto p-6 shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center">
-          Email Verification
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="text-center">
-        <p className="mb-4">{message}</p>
-        {isVerified && (
-          <Button onClick={() => navigate('/login')} className="w-full">
-            Go to Login
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+    <div className="ds-app-shell relative">
+      <div className="absolute right-4 top-4 z-10">
+        <ThemeToggleButton />
+      </div>
+      <Card className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card p-0 shadow-xl">
+        <CardHeader className="ds-card-header-strip">
+          <CardTitle className="text-center text-2xl font-bold text-foreground">
+            Email verification
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-6 pb-6 pt-2 text-center">
+          <p className="mb-4 text-muted-foreground">{message}</p>
+          {isVerified && (
+            <Button variant="default" onClick={() => navigate('/login')} className="w-full">
+              Go to login
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

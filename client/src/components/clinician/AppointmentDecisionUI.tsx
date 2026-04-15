@@ -73,19 +73,19 @@ export function AppointmentDecisionUI({ appointment, onClose, onDecision }: Appo
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-500" />
+              <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
                 Child: {appointment.childName} | Parent: {appointment.parentName}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
+              <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
                 Preferred: {new Date(appointment.preferred_date).toLocaleDateString()}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-500" />
+              <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">Time: {appointment.preferred_time}</span>
             </div>
             <div>
@@ -95,10 +95,10 @@ export function AppointmentDecisionUI({ appointment, onClose, onDecision }: Appo
           </div>
 
           <div className="flex items-start gap-2">
-            <FileText className="h-4 w-4 text-gray-500 mt-0.5" />
+            <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div>
               <p className="text-sm font-medium">Reason:</p>
-              <p className="text-sm text-gray-600">{appointment.reason}</p>
+              <p className="text-sm text-muted-foreground">{appointment.reason}</p>
             </div>
           </div>
         </CardContent>
@@ -160,7 +160,7 @@ export function AppointmentDecisionUI({ appointment, onClose, onDecision }: Appo
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="text-destructive text-sm">{error}</div>
           )}
 
           <div className="flex gap-4">

@@ -41,11 +41,15 @@ export function ScreeningSection() {
   };
 
   function handleIntroComplete(): void {
-    throw new Error('Function not implemented.');
+    if (screeningType === 'MCHAT-R') setCurrentView('MCHAT-R');
+    else if (screeningType === 'ASQ-3') setCurrentView('ASQ-3');
+    else setCurrentView('selection');
   }
 
   function handleIntroCancel(): void {
-    throw new Error('Function not implemented.');
+    setCurrentView('selection');
+    setSelectedChild(null);
+    setScreeningType('');
   }
 
   return (

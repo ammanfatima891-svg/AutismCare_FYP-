@@ -3,6 +3,7 @@ const { ChildCase } = require('../models/ChildCase');
 const TherapyCase = require('../models/TherapyCase');
 const { Referral } = require('../models/Referral');
 const { resolveTherapistTypes } = require('../controllers/referralController');
+const { REFERRAL_STATUS, THERAPY_STATUS } = require('../constants/workflowEnums');
 
 /**
  * Same gate as GET /api/therapist/case/:caseId — ChildCase exists, and either an active
@@ -14,7 +15,7 @@ async function therapistHasCaseAccess(req, caseId, therapistId) {
   const caseDoc = await ChildCase.findById(caseId).lean();
   if (!caseDoc) return false;
 
-  const active = await TherapyCase.findOne({ caseId, therapistId, status: 'active' }).lean();
+  const active = await TherapyCase.findOne({ caseId, therapistId, status: THERAPY_STATUS.ACTIVE }).lean();
   if (active) return true;
 
   const therapistTypes = await resolveTherapistTypes(req);
@@ -23,7 +24,7 @@ async function therapistHasCaseAccess(req, caseId, therapistId) {
   const referral = await Referral.findOne({
     caseId,
     therapistType: { $in: therapistTypes },
-    status: { $in: ['pending', 'accepted', 'in-progress'] },
+    status: { $in: [REFERRAL_STATUS.CREATED, REFERRAL_STATUS.SENT, REFERRAL_STATUS.ACCEPTED] },
   })
     .sort({ updatedAt: -1 })
     .lean();

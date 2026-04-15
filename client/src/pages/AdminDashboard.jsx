@@ -10,20 +10,17 @@ const navigation = [
   {
     id: "approvals",
     label: "Pending Approvals",
-    icon: Clock,
-    color: "text-blue-600"
+    icon: Clock
   },
   {
     id: "appointments",
     label: "Appointments",
-    icon: Calendar,
-    color: "text-orange-600"
+    icon: Calendar
   },
   {
     id: "users",
     label: "User Management",
-    icon: Users,
-    color: "text-green-600"
+    icon: Users
   }
 ];
 
@@ -33,9 +30,9 @@ const menuItems = {
   users: () => (
     <Card>
       <CardContent className="flex flex-col items-center justify-center py-12">
-        <Users className="h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">User Management</h3>
-        <p className="text-gray-500 text-center">
+        <Users className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium text-foreground mb-2">User Management</h3>
+        <p className="text-muted-foreground text-center">
           User management features coming soon.
         </p>
       </CardContent>
@@ -62,10 +59,10 @@ export default function AdminDashboard() {
       title="Admin Dashboard"
     >
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-primary">
           {navigation.find(item => item.id === activeTab)?.label}
         </h2>
-        <p className="text-gray-600 mt-1">
+        <p className="text-muted-foreground mt-1">
           Manage administrative tasks and approvals
         </p>
       </div>

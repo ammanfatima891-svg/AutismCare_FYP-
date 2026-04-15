@@ -1,7 +1,8 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-/** One thread per case: parent ↔ therapist messaging. */
+/** One thread per case: parent, assigned therapist, and (via API) case clinician. */
 const ConversationSchema = new Schema(
   {
     caseId: {
@@ -25,7 +26,7 @@ const ConversationSchema = new Schema(
     },
     lastMessageAt: {
       type: Date,
-      default: () => new Date(),
+      default: () => getCurrentTime(),
       index: true,
     },
   },

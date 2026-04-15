@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 /**
  * Case-centric integration layer: parent session/assignment views, shared progress, aggregated summary.
  * All data paths filter by caseId (single source of truth).
@@ -11,6 +12,7 @@ const { HomeAssignment } = require('../models/HomeAssignment');
 const { ChildCase } = require('../models/ChildCase');
 const { User } = require('../models/User');
 const { assertUserCaseAccess } = require('../utils/caseAccess');
+const { getLabRequestsForCase } = require('../utils/labCaseIntegration');
 const { computeCaseProgressOverview } = require('./progressController');
 const { enrichAssignments } = require('./homeAssignment.controller');
 
@@ -21,7 +23,9 @@ const ASSIGN_POPULATE = [
 
 async function assertParentOwnsCase(parentId, caseId) {
   if (!mongoose.Types.ObjectId.isValid(caseId)) return null;
-  return ChildCase.findOne({ _id: caseId, parentId }).select('_id childId status riskLevel parentId').lean();
+  return ChildCase.findOne({ _id: caseId, parentId })
+    .select('_id childId status riskLevel parentId clinicianId')
+    .lean();
 }
 
 async function buildChildInfo(caseDoc) {
@@ -121,6 +125,32 @@ exports.getParentCaseSessions = async (req, res) => {
  * GET /api/parent/case/:caseId/assignments
  * Home assignments for this case (activity title, due date, status).
  */
+/**
+ * GET /api/parent/case/:caseId/lab-requests
+ * Lab orders for this case (released files only; pending/uploaded shown without files).
+ */
+exports.getParentCaseLabRequests = async (req, res) => {
+  try {
+    const parentId = req.user._id;
+    const { caseId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(caseId)) {
+      return res.status(400).json({ success: false, message: 'Invalid caseId' });
+    }
+
+    const c = await assertParentOwnsCase(parentId, caseId);
+    if (!c) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const labRequests = await getLabRequestsForCase(c, 'parent');
+    return res.status(200).json({ success: true, data: labRequests });
+  } catch (error) {
+    console.error('getParentCaseLabRequests:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch lab requests' });
+  }
+};
+
 exports.getParentCaseAssignments = async (req, res) => {
   try {
     const parentId = req.user._id;
@@ -143,7 +173,7 @@ exports.getParentCaseAssignments = async (req, res) => {
     const data = enrichAssignments(
       list.map((a) => ({
         ...a,
-        isLate: !!(a.dueDate && new Date(a.dueDate) < new Date() && a.status === 'pending'),
+        isLate: !!(a.dueDate && new Date(a.dueDate) < getCurrentTime() && a.status === 'pending'),
       }))
     );
 
@@ -202,13 +232,16 @@ exports.getCaseSummary = async (req, res) => {
     }
 
     const { caseDoc } = access;
+    const role = String(req.user.role || '').toLowerCase();
+    const labRole = role === 'clinician' ? 'clinician' : role === 'therapist' ? 'therapist' : 'parent';
 
-    const [childInfo, therapyPlan, sessionDocs, assignmentDocs, overview] = await Promise.all([
+    const [childInfo, therapyPlan, sessionDocs, assignmentDocs, overview, labRequests] = await Promise.all([
       buildChildInfo(caseDoc),
       TherapyPlan.findOne({ caseId }).lean(),
       SessionLog.find({ caseId }).sort({ sessionDate: -1 }).lean(),
       HomeAssignment.find({ caseId }).populate(ASSIGN_POPULATE).sort({ dueDate: 1 }).lean(),
       computeCaseProgressOverview(caseId),
+      getLabRequestsForCase(caseDoc, labRole),
     ]);
 
     const sessions = sessionDocs.map((s) => ({
@@ -239,6 +272,7 @@ exports.getCaseSummary = async (req, res) => {
         sessions,
         assignments,
         progress,
+        labRequests,
       },
     });
   } catch (error) {

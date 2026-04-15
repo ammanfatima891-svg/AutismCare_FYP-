@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Home, ClipboardList, Calendar, MessageSquare, TrendingUp, Inbox, LibraryBig, House, FileText, Bell } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Home, ClipboardList, Calendar, TrendingUp, Inbox, LibraryBig, House, FileText } from 'lucide-react';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { TherapistHome } from './TherapistHome';
 import { TherapyPlans } from './TherapyPlans';
@@ -40,17 +41,16 @@ interface TherapistDashboardProps {
   onLogout?: () => void;
 }
 
+/** Weekly clinical loop: caseload → sessions → plans → homework → library → analytics → reporting */
 const navigation = [
-  { id: 'home', label: 'Dashboard', icon: Home, color: 'text-sky-700' },
-  { id: 'assigned', label: 'Assigned Cases', icon: Inbox, color: 'text-sky-700' },
-  { id: 'plans', label: 'Therapy Plans', icon: ClipboardList, color: 'text-sky-700' },
-  { id: 'sessions', label: 'Sessions', icon: Calendar, color: 'text-sky-700' },
-  { id: 'activity-library', label: 'Activity Library', icon: LibraryBig, color: 'text-sky-700' },
-  { id: 'home-assignments', label: 'Home Assignments', icon: House, color: 'text-sky-700' },
-  { id: 'progress', label: 'Progress Analytics', icon: TrendingUp, color: 'text-sky-700' },
-  { id: 'reports', label: 'Reports', icon: FileText, color: 'text-sky-700' },
-  { id: 'messages', label: 'Messages', icon: MessageSquare, color: 'text-sky-700', group: 'communication' },
-  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'text-sky-700', group: 'communication' },
+  { id: 'home', label: 'Dashboard', icon: Home },
+  { id: 'assigned', label: 'Assigned Cases', icon: Inbox },
+  { id: 'sessions', label: 'Sessions', icon: Calendar },
+  { id: 'plans', label: 'Therapy Plans', icon: ClipboardList },
+  { id: 'home-assignments', label: 'Home Assignments', icon: House },
+  { id: 'activity-library', label: 'Activity Library', icon: LibraryBig },
+  { id: 'progress', label: 'Progress Analytics', icon: TrendingUp },
+  { id: 'reports', label: 'Reports', icon: FileText },
 ];
 
 export function TherapistDashboard({ user, onLogout }: TherapistDashboardProps) {
@@ -65,6 +65,25 @@ export function TherapistDashboard({ user, onLogout }: TherapistDashboardProps) 
   };
 
   const [currentSection, setCurrentSection] = useState<Section>('home');
+  const [openConversationId, setOpenConversationId] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const st = (location.state || {}) as { section?: string; openConversationId?: string };
+    if (!st.openConversationId && st.section !== 'messages') return;
+    if (st.openConversationId) {
+      setOpenConversationId(st.openConversationId);
+    }
+    if (st.section === 'messages' || st.openConversationId) {
+      setCurrentSection('messages');
+    }
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (currentSection !== 'messages') setOpenConversationId(null);
+  }, [currentSection]);
 
   // Generate fullName and initials safely
   const fullName = `${safeUser.firstName || ''} ${safeUser.lastName || ''}`.trim();
@@ -75,6 +94,8 @@ export function TherapistDashboard({ user, onLogout }: TherapistDashboardProps) 
   const handleNavigate = (section: string) => {
     setCurrentSection(section as Section);
   };
+
+  const clearOpenConversation = useCallback(() => setOpenConversationId(null), []);
 
   const renderSection = () => {
     switch (currentSection) {
@@ -95,7 +116,12 @@ export function TherapistDashboard({ user, onLogout }: TherapistDashboardProps) 
       case 'reports':
         return <TherapistReportsPage />;
       case 'messages':
-        return <TherapistMessages />;
+        return (
+          <TherapistMessages
+            initialConversationId={openConversationId}
+            onInitialConversationHandled={clearOpenConversation}
+          />
+        );
       case 'notifications':
         return <TherapistNotificationsPage />;
       default:

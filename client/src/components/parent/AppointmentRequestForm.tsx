@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -110,8 +111,8 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
         <CardTitle>Request Appointment</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+        <form onSubmit={handleSubmit} className="form">
+          <div className="form-field">
             <Label htmlFor="childId">Child</Label>
             <Select value={formData.childId} onValueChange={(value) => handleChange('childId', value)}>
               <SelectTrigger>
@@ -127,7 +128,7 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
             </Select>
           </div>
 
-          <div>
+          <div className="form-field">
             <Label htmlFor="clinicianId">Clinician</Label>
             <Select value={formData.clinicianId} onValueChange={(value) => handleChange('clinicianId', value)}>
               <SelectTrigger>
@@ -143,7 +144,7 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
             </Select>
           </div>
 
-          <div>
+          <div className="form-field">
             <Label htmlFor="appointmentType">Appointment Type</Label>
             <Select value={formData.appointmentType} onValueChange={(value) => handleChange('appointmentType', value)}>
               <SelectTrigger>
@@ -158,8 +159,8 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div className="form-grid-2">
+            <div className="form-field">
               <Label htmlFor="preferredDate">Preferred Date</Label>
               <Input
                 id="preferredDate"
@@ -169,7 +170,7 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
                 required
               />
             </div>
-            <div>
+            <div className="form-field">
               <Label htmlFor="preferredTime">Preferred Time</Label>
               <Input
                 id="preferredTime"
@@ -181,7 +182,7 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
             </div>
           </div>
 
-          <div>
+          <div className="form-field">
             <Label htmlFor="urgency">Urgency Level</Label>
             <Select value={formData.urgency} onValueChange={(value) => handleChange('urgency', value)}>
               <SelectTrigger>
@@ -196,7 +197,7 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
             </Select>
           </div>
 
-          <div>
+          <div className="form-field">
             <Label htmlFor="reason">Reason for Appointment</Label>
             <Textarea
               id="reason"
@@ -209,11 +210,11 @@ export function AppointmentRequestForm({ onSuccess, onCancel, initialClinicianId
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="form-error">{error}</div>
           )}
 
-          <div className="flex gap-4">
-            <Button type="submit" disabled={loading}>
+          <div className="form-actions">
+            <Button type="submit" disabled={loading} variant="default">
               {loading ? 'Submitting...' : 'Submit Request'}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>

@@ -3,6 +3,7 @@ const TherapyPlan = require('../models/TherapyPlan');
 const SessionLog = require('../models/SessionLog');
 const ClinicianNotes = require('../models/ClinicianNotes');
 const { ChildCase } = require('../models/ChildCase');
+const { resolvePrimaryTherapyPlanForCase } = require('../services/progressEngine');
 
 async function assertClinicianCaseOwnership(caseId, clinicianId) {
   if (!mongoose.Types.ObjectId.isValid(caseId)) return null;
@@ -18,9 +19,7 @@ exports.getTherapyPlan = async (req, res) => {
     const owned = await assertClinicianCaseOwnership(caseId, clinicianId);
     if (!owned) return res.status(404).json({ success: false, message: 'Case not found' });
 
-    const plan = await TherapyPlan.findOne({ caseId })
-      .populate('therapistId', 'firstName lastName specialization')
-      .lean();
+    const plan = await resolvePrimaryTherapyPlanForCase(caseId);
 
     res.status(200).json({
       success: true,
@@ -59,7 +58,7 @@ exports.getTherapyGoals = async (req, res) => {
     const owned = await assertClinicianCaseOwnership(caseId, clinicianId);
     if (!owned) return res.status(404).json({ success: false, message: 'Case not found' });
 
-    const plan = await TherapyPlan.findOne({ caseId }).lean();
+    const plan = await resolvePrimaryTherapyPlanForCase(caseId);
     if (!plan) {
       return res.status(200).json({
         success: true,

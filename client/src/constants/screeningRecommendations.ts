@@ -1,6 +1,6 @@
 /**
  * Rule-based recommendations for parents based on screening results.
- * Aligned with ASQ-3 and M-CHAT-R clinical guidance and best practices.
+ * M-CHAT-R: likelihood-based. ASQ-3: domain-based developmental screening (no single "risk" score in parent copy).
  */
 
 export type ResultLevel = 'Pass' | 'Monitor' | 'Fail';
@@ -99,136 +99,104 @@ const MCHAT_RECOMMENDATIONS: Record<string, ScreeningRecommendationSet> = {
         description: 'Stable routines and a calm environment help your child. Avoid big changes while you wait for the evaluation.',
         priority: 'consider',
       },
-      {
-        title: 'Use the platform to book a specialist',
-        description: 'You can book an appointment with an approved clinician or therapist from this platform to start the evaluation process.',
-        priority: 'optional',
-      },
     ],
   },
 };
 
+/** Shorter parent-facing ASQ-3 copy; tier is derived from domains, not an overall pass/fail score. */
 const ASQ3_RECOMMENDATIONS: Record<string, ScreeningRecommendationSet> = {
   Pass: {
-    headline: 'Development appears on track for this age',
-    summary:
-      'Your child’s scores suggest development is within the expected range in the areas screened. Keep supporting growth through play and daily activities.',
+    headline: 'Skills look on track for this age',
+    summary: 'Each area below is in the expected range. ASQ-3 looks at five developmental areas separately—not one overall grade.',
     steps: [
       {
-        title: 'Continue routine well-child and developmental checks',
-        description: 'Attend regular pediatric visits. Your provider will track development at each visit.',
+        title: 'Keep regular checkups',
+        description: 'Your pediatrician continues to track growth and development.',
         priority: 'do',
       },
       {
-        title: 'Complete the next ASQ-3 when it’s due',
-        description: 'ASQ-3 is age-interval based (e.g., 2, 4, 6 months). Complete the next questionnaire when your child reaches the next interval.',
+        title: 'Do the next ASQ when it’s due',
+        description: 'Questionnaires are repeated at the next age interval.',
         priority: 'consider',
-      },
-      {
-        title: 'Offer activities across all developmental areas',
-        description: 'Include communication (talking, reading), movement (playground, dancing), fine motor (stacking, drawing), problem-solving (puzzles, cause-and-effect toys), and social play.',
-        priority: 'optional',
       },
     ],
   },
   Monitor: {
-    headline: 'Some areas may benefit from extra attention',
-    summary:
-      'One or more areas suggest monitoring or extra support. This is common and does not mean something is wrong—it means watching and supporting those skills can help.',
+    headline: 'One or more areas: watch and support',
+    summary: 'Some scores are in the “monitoring” range. That means extra practice and a chat with your doctor—not a diagnosis.',
     steps: [
       {
-        title: 'Share results with your pediatrician',
-        description: 'Discuss which domains were “monitor” so they can advise on activities or follow-up screening.',
+        title: 'Tell your pediatrician',
+        description: 'Ask which areas to focus on and when to repeat the screen.',
         priority: 'do',
       },
       {
-        title: 'Re-screen at the next ASQ-3 interval',
-        description: 'Complete the next age-interval ASQ-3 as recommended. Scores can improve with time and targeted activities.',
-        priority: 'do',
-      },
-      {
-        title: 'Focus on the areas that need monitoring',
-        description: 'Use the domain-specific tips below to support your child in areas that were flagged. Small, daily activities often help the most.',
+        title: 'Try the short ideas below',
+        description: 'Small daily play activities in flagged areas often help.',
         priority: 'consider',
-      },
-      {
-        title: 'Consider a developmental check if concerns grow',
-        description: 'If you notice ongoing difficulties in a specific area, ask your provider for a developmental check or referral.',
-        priority: 'optional',
       },
     ],
   },
   Fail: {
-    headline: 'Further developmental evaluation is recommended',
-    summary:
-      'Scores suggest that a fuller developmental evaluation would be helpful. Early evaluation helps identify strengths and any need for early intervention or therapy.',
+    headline: 'One or more areas: follow up with your doctor',
+    summary: 'A score below the cutoff in any area means a developmental check is a good next step. Your child may be doing well in other areas at the same time.',
     steps: [
       {
-        title: 'Request a developmental evaluation',
-        description: 'Ask your pediatrician for a referral to a developmental specialist or early intervention program. Bring this report and your observations.',
+        title: 'Book a visit for next steps',
+        description: 'Ask your pediatrician about evaluation or early intervention. Bring this screen and your notes.',
         priority: 'do',
       },
       {
-        title: 'Share domain results with the specialist',
-        description: 'The areas marked “referral” (see domain scores above) show where evaluation may focus. This helps the specialist plan the assessment.',
+        title: 'Focus on the areas marked below',
+        description: 'The list shows which skills to discuss first.',
         priority: 'do',
-      },
-      {
-        title: 'Support development at home while waiting',
-        description: 'Use the domain-specific tips below to encourage skills in areas of concern. Early intervention often includes parent coaching and home activities.',
-        priority: 'consider',
-      },
-      {
-        title: 'Book a clinician or therapist on this platform',
-        description: 'You can schedule an appointment with an approved clinician or therapist here to start the evaluation process.',
-        priority: 'optional',
       },
     ],
   },
 };
 
-/** Domain-specific tips for ASQ-3 when a domain needs monitoring or referral */
+/** Shorter tips for expandable “ideas” on ASQ-3 parent results */
 export const ASQ3_DOMAIN_TIPS: Record<string, { monitoring: string; referral: string }> = {
   Communication: {
-    monitoring:
-      'Talk and read with your child daily. Name objects, sing songs, and encourage sounds and words. Respond when they point or make sounds.',
-    referral:
-      'Consider a hearing check and a speech-language evaluation. Use simple words, gestures, and pictures. Repeat and expand on what your child says.',
+    monitoring: 'Talk and read daily; name things; respond when your child points or sounds.',
+    referral: 'Ask about hearing and speech-language follow-up; use simple words and gestures.',
   },
   'Gross Motor': {
-    monitoring:
-      'Give plenty of safe space to move: tummy time, crawling, walking, and running. Play ball, dance, and use playground equipment when age-appropriate.',
-    referral:
-      'Ask your pediatrician about a physical therapy or developmental evaluation. Encourage movement through play and avoid long periods in seats or carriers.',
+    monitoring: 'Safe space to move, ball play, playground time when age-appropriate.',
+    referral: 'Ask your doctor if PT or a developmental check is advised.',
   },
   'Fine Motor': {
-    monitoring:
-      'Offer crayons, blocks, and safe small objects to grasp. Practice stacking, scribbling, and self-feeding with fingers or spoons.',
-    referral:
-      'An occupational or developmental evaluation can help. Provide varied textures and activities that use the hands, and break tasks into small steps.',
+    monitoring: 'Crayons, blocks, stacking, finger foods.',
+    referral: 'Ask if OT or developmental evaluation would help.',
   },
   'Problem Solving': {
-    monitoring:
-      'Play simple puzzles, shape sorters, and cause-and-effect toys. Let your child try and make mistakes; offer help when they’re stuck.',
-    referral:
-      'Evaluation can identify strengths and needs. Use simple, step-by-step play and real-life problem-solving (e.g., finding a toy, opening a container).',
+    monitoring: 'Simple puzzles, cause-and-effect toys; let them try before helping.',
+    referral: 'A developmental visit can sort strengths from tricky spots.',
   },
   'Personal-Social': {
-    monitoring:
-      'Play face-to-face, copy your child’s sounds and actions, and take turns. Arrange short playdates or family playtime to practice social skills.',
-    referral:
-      'A developmental or behavioral evaluation can guide next steps. Focus on turn-taking, shared attention, and simple social games at home.',
+    monitoring: 'Face-to-face play, copying, short turn-taking games.',
+    referral: 'Ask about developmental or behavioral follow-up if concerns continue.',
   },
 };
 
-function normalizeResult(results: {
-  result?: string;
-  riskLevel?: string;
-}): ResultLevel {
+function normalizeMchatResult(results: { result?: string; riskLevel?: string }): ResultLevel {
   const r = results.result ?? results.riskLevel;
   if (r === 'Pass' || r === 'low') return 'Pass';
   if (r === 'Monitor' || r === 'medium') return 'Monitor';
   if (r === 'Fail' || r === 'high') return 'Fail';
+  return 'Pass';
+}
+
+/**
+ * ASQ-3: pick parent-message tier from domain statuses only (ignores aggregate riskLevel so we don’t mislabel).
+ */
+export function asqTierFromDomainStatuses(domainStatuses?: Record<string, string>): ResultLevel {
+  if (!domainStatuses || Object.keys(domainStatuses).length === 0) {
+    return 'Pass';
+  }
+  const values = Object.values(domainStatuses);
+  if (values.some((s) => s === 'referral for further evaluation')) return 'Fail';
+  if (values.some((s) => s === 'need monitoring')) return 'Monitor';
   return 'Pass';
 }
 
@@ -248,12 +216,15 @@ export function getScreeningRecommendations(
   const isMCHAT = screeningType === 'M-CHAT-R' || screeningType === 'MCHAT-R';
   const isASQ3 = screeningType === 'ASQ-3';
 
-  const resultKey = normalizeResult(results);
+  const resultKey = isASQ3
+    ? asqTierFromDomainStatuses(results.scores?.domainStatuses)
+    : normalizeMchatResult(results);
+
   const base = isMCHAT
     ? MCHAT_RECOMMENDATIONS[resultKey]
     : isASQ3
       ? ASQ3_RECOMMENDATIONS[resultKey]
-      : MCHAT_RECOMMENDATIONS[resultKey]; // fallback
+      : MCHAT_RECOMMENDATIONS[resultKey];
 
   const out: ScreeningRecommendationSet = {
     headline: base.headline,
@@ -261,7 +232,6 @@ export function getScreeningRecommendations(
     steps: [...base.steps],
   };
 
-  // Add domain-specific tips for ASQ-3 when we have domain statuses
   if (isASQ3 && results.scores?.domainStatuses && ASQ3_DOMAIN_TIPS) {
     const domainTips: { domain: string; tip: string }[] = [];
     for (const [domain, status] of Object.entries(results.scores.domainStatuses)) {

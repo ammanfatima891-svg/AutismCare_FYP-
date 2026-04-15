@@ -48,10 +48,10 @@ type Props = { embedded?: boolean };
 
 function statusBadgeClass(status: string) {
   const s = (status || 'pending').toLowerCase();
-  if (s === 'completed') return 'border border-slate-200 bg-slate-100 text-black';
-  if (s === 'reviewed') return 'bg-emerald-100 text-emerald-900';
-  if (s === 'submitted') return 'bg-sky-100 text-sky-900';
-  return 'bg-amber-100 text-amber-900';
+  if (s === 'completed') return 'border bg-muted text-black';
+  if (s === 'reviewed') return 'bg-blue-100 text-blue-900';
+  if (s === 'submitted') return 'bg-blue-100 text-blue-900';
+  return 'bg-yellow-100 text-yellow-900';
 }
 
 export default function TherapistHomeAssignmentsPage({ embedded = false }: Props) {
@@ -135,7 +135,7 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
     void load();
   }, [load, location.key, location.pathname]);
 
-  const shell = embedded ? 'min-h-0 bg-transparent' : 'min-h-screen bg-white';
+  const shell = embedded ? 'min-h-0 bg-transparent' : 'min-h-screen bg-card';
 
   const derivedSummary: SummaryData = (() => {
     if (summary) return summary;
@@ -166,32 +166,32 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
       label: 'Active Assignments',
       value: derivedSummary.activeAssignments,
       icon: Clock,
-      iconWrap: 'bg-sky-100',
-      iconClass: 'text-sky-600',
+      iconWrap: 'bg-blue-100',
+      iconClass: 'text-blue-600',
     },
     {
       key: 'done',
       label: 'Completed',
       value: derivedSummary.completed,
       icon: CheckCircle2,
-      iconWrap: 'bg-emerald-100',
-      iconClass: 'text-emerald-600',
+      iconWrap: 'bg-blue-100',
+      iconClass: 'text-blue-600',
     },
     {
       key: 'new',
       label: 'New Submissions',
       value: derivedSummary.newSubmissions,
       icon: Upload,
-      iconWrap: 'bg-orange-100',
-      iconClass: 'text-orange-600',
+      iconWrap: 'bg-yellow-100',
+      iconClass: 'text-yellow-600',
     },
     {
       key: 'late',
       label: 'Behind Schedule',
       value: derivedSummary.behindSchedule,
       icon: XCircle,
-      iconWrap: 'bg-violet-100',
-      iconClass: 'text-violet-600',
+      iconWrap: 'bg-blue-100',
+      iconClass: 'text-blue-600',
     },
   ];
 
@@ -200,14 +200,14 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
       <div className={`mx-auto max-w-5xl ${embedded ? 'px-0 py-2' : 'px-4 py-8 md:px-6'}`}>
         <div className="mb-6 flex min-w-0 flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1 pr-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Home Assignments</h1>
-            <p className="mt-1 text-sm leading-snug text-slate-600">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Home Assignments</h1>
+            <p className="mt-1 text-sm leading-snug text-muted-foreground">
               Manage and track home practice activities for families
             </p>
           </div>
           <Button
             type="button"
-            className="shrink-0 border border-slate-300 bg-slate-100 text-black shadow-sm hover:bg-slate-200 hover:text-black"
+            className="shrink-0 border bg-muted text-black shadow-sm hover:bg-muted hover:text-black"
             onClick={() => {
               setShowForm(true);
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -219,10 +219,10 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
 
         {showForm ? (
           <div className="mb-6 min-w-0">
-            <Card className="overflow-hidden rounded-xl border border-sky-100/90 bg-white shadow-md ring-1 ring-slate-200/60">
-              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-sky-50/80 to-white pb-4">
-                <CardTitle className="text-lg font-semibold tracking-tight text-slate-900">Assign activity</CardTitle>
-                <CardDescription className="text-sm text-slate-600">
+            <Card className="overflow-hidden rounded-xl border-blue-100/90 bg-card shadow-md ring-1 shadow-sm">
+              <CardHeader className="border-b border bg-gradient-to-r from-blue-50/80 to-white pb-4">
+                <CardTitle className="text-lg font-semibold tracking-tight text-foreground">Assign activity</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">
                   Choose a child, then pick an activity from your library. Parents will see the assignment on their
                   dashboard.
                 </CardDescription>
@@ -230,7 +230,7 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
                   <Button
                     type="button"
                     variant="ghost"
-                    className="shrink-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    className="shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground"
                     onClick={() => setShowForm(false)}
                   >
                     Cancel
@@ -239,7 +239,7 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
               </CardHeader>
               <CardContent className="space-y-4 pb-6 pt-2">
                 {caseChoices.length === 0 ? (
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-muted-foreground">
                     No assignable cases yet. Accept a referral and start therapy from <strong>Assigned Cases</strong>,
                     then try again.
                   </p>
@@ -247,7 +247,7 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
                   <Suspense
                     fallback={
                       <div className="flex justify-center py-10">
-                        <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                       </div>
                     }
                   >
@@ -267,12 +267,12 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
         ) : null}
 
         {error ? (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+          <div className="mb-4 rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">{error}</div>
         ) : null}
 
         {loading ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
           </div>
         ) : (
           <>
@@ -280,11 +280,11 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
               {metrics.map((m) => {
                 const Icon = m.icon;
                 return (
-                  <Card key={m.key} className="border border-slate-200/90 bg-white shadow-sm">
+                  <Card key={m.key} className="border/90 bg-card shadow-sm">
                     <CardContent className="flex flex-row items-center justify-between gap-2 p-3 sm:p-4">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-medium leading-tight text-slate-500 sm:text-xs">{m.label}</p>
-                        <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900 sm:text-xl">{m.value}</p>
+                        <p className="text-[11px] font-medium leading-tight text-muted-foreground sm:text-xs">{m.label}</p>
+                        <p className="mt-0.5 text-lg font-bold tabular-nums text-foreground sm:text-xl">{m.value}</p>
                       </div>
                       <div
                         className={cn(
@@ -301,9 +301,9 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
             </div>
 
             {items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-12 text-center text-sm text-slate-600">
-                No home assignments yet. Use <span className="font-medium text-slate-800">+ Assign New Activity</span>{' '}
-                above or open a case from <span className="font-medium text-slate-800">Assigned Cases</span> and use the
+              <div className="rounded-xl border-dashed border bg-muted/80 p-12 text-center text-sm text-muted-foreground">
+                No home assignments yet. Use <span className="font-medium text-foreground">+ Assign New Activity</span>{' '}
+                above or open a case from <span className="font-medium text-foreground">Assigned Cases</span> and use the
                 home assignments tab.
               </div>
             ) : (
@@ -318,20 +318,20 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
                   return (
                     <li
                       key={String(a._id)}
-                      className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex min-w-0 flex-1 gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-sky-100">
-                          <House className="h-6 w-6 text-sky-700" />
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                          <House className="h-6 w-6 text-blue-700" />
                         </div>
                         <div className="min-w-0 space-y-1">
-                          <p className="font-semibold text-slate-900 line-clamp-2">{a.title || 'Assignment'}</p>
-                          <p className="text-sm font-medium text-slate-800">{a.childName || 'Child'}</p>
-                          <p className="text-sm text-slate-500">Due {dueStr}</p>
+                          <p className="font-semibold text-foreground line-clamp-2">{a.title || 'Assignment'}</p>
+                          <p className="text-sm font-medium text-foreground">{a.childName || 'Child'}</p>
+                          <p className="text-sm text-muted-foreground">Due {dueStr}</p>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+                      <div className="flex flex-wrap items-center gap-4 border-t border pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
                         <span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${statusBadgeClass(st)}`}>
                           {st}
                         </span>
@@ -340,8 +340,8 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
                           variant="outline"
                           className={
                             st === 'completed'
-                              ? 'border-slate-300 text-black hover:bg-slate-50 hover:text-black'
-                              : 'border-slate-300 text-slate-900'
+                              ? 'border text-black hover:bg-background hover:text-black'
+                              : 'border text-foreground'
                           }
                           onClick={() => void navigate(`/therapist/case/${String(a.caseId)}?tab=assignments`)}
                         >
@@ -358,7 +358,7 @@ export default function TherapistHomeAssignmentsPage({ embedded = false }: Props
 
         {!embedded ? (
           <div className="mt-8">
-            <Button type="button" variant="ghost" className="text-slate-600" onClick={() => void navigate('/therapist-dashboard')}>
+            <Button type="button" variant="ghost" className="text-muted-foreground" onClick={() => void navigate('/therapist-dashboard')}>
               ← Back to dashboard
             </Button>
           </div>

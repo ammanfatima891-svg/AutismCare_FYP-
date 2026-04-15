@@ -9,7 +9,7 @@ import { activityAPI, therapistAPI } from '../../api';
 import { cn } from '../ui/utils';
 
 const selectClassName =
-  'flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 disabled:cursor-not-allowed disabled:opacity-60';
+  'flex h-10 w-full rounded-md border bg-card px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60';
 
 type ActivityTemplate = {
   _id?: string;
@@ -158,12 +158,12 @@ export function AssignActivityForm({ fixedCaseId, caseChoices, onSuccess, bare =
   const body = (
     <>
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
+        <div className="rounded-md border bg-muted px-3 py-2 text-sm text-destructive">{error}</div>
       ) : null}
 
       {showCasePicker ? (
         <div className="space-y-2">
-          <Label className="text-slate-800" htmlFor="assign-activity-case">
+          <Label className="text-foreground" htmlFor="assign-activity-case">
             Child / case
           </Label>
           <select
@@ -183,18 +183,18 @@ export function AssignActivityForm({ fixedCaseId, caseChoices, onSuccess, bare =
       ) : null}
 
       <div className="space-y-2">
-        <Label className="text-slate-800" htmlFor="assign-activity-search">
+        <Label className="text-foreground" htmlFor="assign-activity-search">
           Activity
         </Label>
         {loadingTemplates ? (
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading library…
           </div>
         ) : (
           <>
             <Input
               id="assign-activity-search"
-              className="border-slate-200"
+              className="border"
               placeholder="Search by name or domain (min. 2 characters)"
               value={activityQuery}
               onChange={(e) => {
@@ -204,17 +204,17 @@ export function AssignActivityForm({ fixedCaseId, caseChoices, onSuccess, bare =
               autoComplete="off"
             />
             {activityQuery.trim().length < 2 ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {templates.length === 0
                   ? 'No templates in your library yet.'
                   : `Type at least 2 characters to search ${templates.length} activit${templates.length === 1 ? 'y' : 'ies'}.`}
               </p>
             ) : activityMatches.length === 0 ? (
-              <p className="text-xs text-amber-800">No activities match that search.</p>
+              <p className="text-xs text-muted-foreground">No activities match that search.</p>
             ) : (
               <>
                 {activityMatches.length > MAX_ACTIVITY_OPTIONS ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Showing first {MAX_ACTIVITY_OPTIONS} of {activityMatches.length} matches — type more to narrow.
                   </p>
                 ) : null}
@@ -242,22 +242,22 @@ export function AssignActivityForm({ fixedCaseId, caseChoices, onSuccess, bare =
       </div>
 
       {selectedTemplate ? (
-        <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
-          <p className="font-medium text-slate-800">From library</p>
+        <div className="rounded-lg border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">From library</p>
           {selectedTemplate.materials ? <p className="mt-1">Materials: {selectedTemplate.materials}</p> : null}
         </div>
       ) : null}
 
       <div className="space-y-2">
-        <Label className="text-slate-800">Due date</Label>
-        <Input type="date" className="border-slate-200" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        <Label className="text-foreground">Due date</Label>
+        <Input type="date" className="border" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
       </div>
 
       <div className="space-y-2">
-        <Label className="text-slate-800">Instructions (optional override)</Label>
+        <Label className="text-foreground">Instructions (optional override)</Label>
         <Textarea
           rows={4}
-          className="border-slate-200"
+          className="border"
           placeholder="Leave blank to use the activity’s default instructions"
           value={instructionsOverride}
           onChange={(e) => setInstructionsOverride(e.target.value)}
@@ -268,7 +268,7 @@ export function AssignActivityForm({ fixedCaseId, caseChoices, onSuccess, bare =
         <Button
           type="button"
           variant="outline"
-          className="border-slate-200 bg-white text-black hover:bg-slate-50 hover:text-black"
+          className="border bg-card text-black hover:bg-background hover:text-black"
           onClick={() => void createAssignment()}
           disabled={saving || !dueDate || !activityId || !effectiveCaseId}
         >
@@ -284,10 +284,10 @@ export function AssignActivityForm({ fixedCaseId, caseChoices, onSuccess, bare =
   }
 
   return (
-    <Card className="border border-slate-200 bg-white shadow-sm">
-      <CardHeader className="border-b border-slate-100">
-        <CardTitle className="text-base font-semibold text-slate-900">Assign activity</CardTitle>
-        <CardDescription className="text-slate-600">
+    <Card className="border bg-card shadow-sm">
+      <CardHeader className="border-b border">
+        <CardTitle className="text-base font-semibold text-foreground">Assign activity</CardTitle>
+        <CardDescription className="text-muted-foreground">
           Choose a library activity, set a due date, and optionally override instructions. Parents complete uploads from
           their dashboard.
         </CardDescription>

@@ -213,20 +213,20 @@ export function TherapyPlans() {
   const planStatusBadgeClass = (p: PlanRow) => {
     const active = planStatusLabel(p) === 'Active';
     return active
-      ? 'rounded-full border-0 bg-slate-900 px-3 py-1 text-xs font-medium text-white'
-      : 'rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700';
+      ? 'rounded-full border-0 bg-primary px-3 py-1 text-xs font-medium text-white'
+      : 'rounded-full border bg-muted px-3 py-1 text-xs font-medium text-foreground';
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 pb-10 pt-2">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Therapy Plans</h1>
-          <p className="text-base text-slate-600">Manage therapy plans and track goal progress</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">Therapy Plans</h1>
+          <p className="text-base text-muted-foreground">Manage therapy plans and track goal progress</p>
         </div>
         <Button
           type="button"
-          className="h-11 shrink-0 rounded-lg bg-slate-900 px-5 text-white shadow-sm hover:bg-slate-800"
+          className="h-11 shrink-0 rounded-lg bg-primary px-5 text-white shadow-sm hover:bg-primary/90"
           onClick={openAssignModal}
         >
           <Plus className="mr-2 h-5 w-5" />
@@ -235,7 +235,7 @@ export function TherapyPlans() {
       </div>
 
       {error ? (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="flex items-center gap-2 rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -243,12 +243,12 @@ export function TherapyPlans() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+          <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
         </div>
       ) : plans.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/90 px-6 py-14 text-center">
-          <p className="text-sm font-medium text-slate-800">No therapy plans available</p>
-          <p className="mt-2 text-sm text-slate-600">
+        <div className="rounded-xl border-dashed border bg-background/90 px-6 py-14 text-center">
+          <p className="text-sm font-medium text-foreground">No therapy plans available</p>
+          <p className="mt-2 text-sm text-muted-foreground">
             Use <span className="font-medium">+ Create New Plan</span> to assign a plan from a case file, or open a
             case file to build goals.
           </p>
@@ -263,41 +263,41 @@ export function TherapyPlans() {
             return (
               <li
                 key={plan._id}
-                className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                className="flex min-w-0 flex-col rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1">
-                    <h2 className="text-lg font-bold text-slate-900">{plan.childName || 'Child'}</h2>
-                    <p className="text-sm font-medium text-sky-700">{domainLine}</p>
+                    <h2 className="text-lg font-bold text-foreground">{plan.childName || 'Child'}</h2>
+                      <p className="text-sm font-medium text-primary">{domainLine}</p>
                   </div>
                   <span className={cn('shrink-0', planStatusBadgeClass(plan))}>{planStatusLabel(plan)}</span>
                 </div>
 
                 <div className="mt-6 space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-800">Overall progress</span>
-                    <span className="tabular-nums text-slate-900">{pct}%</span>
+                    <span className="font-medium text-foreground">Overall progress</span>
+                    <span className="tabular-nums text-foreground">{pct}%</span>
                   </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full bg-slate-900 transition-[width]"
+                      className="h-full rounded-full bg-primary transition-[width]"
                       style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-end justify-between gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500">
+                <div className="mt-5 flex flex-wrap items-end justify-between gap-2 border-t border pt-4 text-xs text-muted-foreground">
                   <span>
                     {goals} {goals === 1 ? 'goal' : 'goals'} defined
                   </span>
                   <span>Updated: {fmtDate(plan.updatedAt)}</span>
                 </div>
 
-                <div className="mt-5 w-full border-t border-slate-100 pt-5">
+                <div className="mt-5 w-full border-t border pt-5">
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 min-h-[2.75rem] w-full border-slate-300 bg-white text-sm font-bold text-slate-900 hover:bg-slate-50"
+                    className="h-11 min-h-[2.75rem] w-full border bg-card text-sm font-bold text-foreground hover:bg-background"
                     onClick={() => navigate(`/therapist/case/${cid}`)}
                   >
                     {'View & Edit'}
@@ -310,17 +310,17 @@ export function TherapyPlans() {
       )}
 
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto border-slate-200 bg-white sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto border bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Create New Plan</DialogTitle>
+            <DialogTitle className="text-foreground">Create New Plan</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Choose a case file to see its therapy plans, then assign the plan to the child linked to that case.
           </p>
           <div className="space-y-2">
             <Label>Case file</Label>
             <Select value={assignCaseId || undefined} onValueChange={setAssignCaseId}>
-              <SelectTrigger className="border-slate-200 bg-white">
+              <SelectTrigger className="border bg-card">
                 <SelectValue placeholder="Select case file" />
               </SelectTrigger>
               <SelectContent className="z-[1100]" position="popper" onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -339,7 +339,7 @@ export function TherapyPlans() {
           {assignCaseId ? (
             <div className="space-y-4">
               {assignLoading ? (
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 text-sm text-slate-700">
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/80 px-3 py-3 text-sm text-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading plans for this case…
                 </div>
@@ -352,7 +352,7 @@ export function TherapyPlans() {
                       onValueChange={setSelectedPlanId}
                       disabled={assignContext.plans.length === 0}
                     >
-                      <SelectTrigger className="border-slate-200 bg-white">
+                      <SelectTrigger className="border bg-card">
                         <SelectValue
                           placeholder={
                             assignContext.plans.length === 0 ? 'No plans available for this case' : 'Select plan'
@@ -368,11 +368,11 @@ export function TherapyPlans() {
                       </SelectContent>
                     </Select>
                     {assignContext.plans.length === 0 ? (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         No plans available for this case. Open the{' '}
                         <button
                           type="button"
-                          className="font-medium text-sky-700 underline"
+                          className="font-medium text-primary underline"
                           onClick={() => {
                             setAssignOpen(false);
                             navigate(`/therapist/case/${assignCaseId}`);
@@ -392,7 +392,7 @@ export function TherapyPlans() {
                       onValueChange={setSelectedChildId}
                       disabled={assignContext.children.length === 0}
                     >
-                      <SelectTrigger className="border-slate-200 bg-white">
+                      <SelectTrigger className="border bg-card">
                         <SelectValue
                           placeholder={assignContext.children.length === 0 ? 'No children on file' : 'Select child'}
                         />
@@ -406,12 +406,12 @@ export function TherapyPlans() {
                       </SelectContent>
                     </Select>
                     {assignContext.children.length === 0 ? (
-                      <p className="text-xs text-amber-700">No child is linked to this case in the parent profile.</p>
+                      <p className="text-xs text-muted-foreground">No child is linked to this case in the parent profile.</p>
                     ) : null}
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-slate-500">Could not load case context.</p>
+                <p className="text-sm text-muted-foreground">Could not load case context.</p>
               )}
             </div>
           ) : null}
@@ -422,7 +422,7 @@ export function TherapyPlans() {
             </Button>
             <Button
               type="button"
-              className="rounded-lg bg-slate-900 hover:bg-slate-800"
+              className="rounded-lg bg-primary hover:bg-primary/90"
               disabled={
                 !assignCaseId ||
                 assignLoading ||

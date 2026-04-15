@@ -65,16 +65,16 @@ export function TherapistProgressHub() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" aria-hidden />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
       </div>
     );
   }
 
   if (cases.length === 0) {
     return (
-      <Card className="max-w-2xl border-slate-200 bg-white shadow-sm">
+      <Card className="max-w-2xl border bg-card shadow-sm">
         <CardHeader>
-          <CardTitle className="font-bold text-slate-900">Progress analytics</CardTitle>
+          <CardTitle className="font-bold text-foreground">Progress analytics</CardTitle>
           <CardDescription>
             Accept a referral and start therapy on a case to see session-based analytics here. You can also open{' '}
             <strong>Assigned Cases</strong> and use the case file&apos;s Progress tab.
@@ -89,22 +89,22 @@ export function TherapistProgressHub() {
       {/* Title + copy first; Case control on its own row so nothing can overlap the heading (flex side-by-side was colliding in some viewports). */}
       <div className="space-y-4">
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-slate-900">Progress analytics</h2>
+          <h2 className="text-xl font-bold text-foreground">Progress analytics</h2>
           <p
-            className="mt-1 text-sm text-slate-600 whitespace-nowrap overflow-x-auto [scrollbar-width:thin]"
+            className="mt-1 text-sm text-muted-foreground whitespace-nowrap overflow-x-auto [scrollbar-width:thin]"
             title="Data is computed from session logs, therapy plan goals, and home assignments for the selected case."
           >
             Data is computed from session logs, therapy plan goals, and home assignments for the selected case.
           </p>
         </div>
         <div className="w-full max-w-[min(100%,220px)] space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600" htmlFor="progress-case-select">
+          <Label className="text-xs font-medium text-muted-foreground" htmlFor="progress-case-select">
             Case
           </Label>
           <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
             <SelectTrigger
               id="progress-case-select"
-              className="h-9 w-full border-slate-200 bg-white"
+              className="h-9 w-full border bg-card"
             >
               <SelectValue placeholder="Select case" />
             </SelectTrigger>
@@ -121,11 +121,11 @@ export function TherapistProgressHub() {
 
       {selectedCaseId ? (
         <>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Case detail:{' '}
             <Link
               to={`/therapist/case/${selectedCaseId}?tab=progress`}
-              className="font-medium text-sky-800 underline-offset-4 hover:underline"
+              className="font-medium text-blue-800 underline-offset-4 hover:underline"
             >
               Open case file (Progress tab)
             </Link>

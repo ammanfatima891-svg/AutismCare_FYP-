@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -174,22 +175,22 @@ const dummySessions: Session[] = [
 ];
 
 const therapyTypeColor: Record<string, string> = {
-  'Speech Therapy': 'bg-blue-100 text-blue-700 border-blue-200',
-  'Occupational Therapy': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'Behavioral Therapy': 'bg-amber-100 text-amber-700 border-amber-200',
+  'Speech Therapy': 'bg-secondary/60 text-primary border-border',
+  'Occupational Therapy': 'bg-secondary/60 text-primary border-border',
+  'Behavioral Therapy': 'bg-accent/10 text-accent-foreground border-border',
 };
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
-  Scheduled: { color: 'bg-green-100 text-green-700 border-green-200', icon: <Calendar className="w-3.5 h-3.5" /> },
-  Completed: { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-  Cancelled: { color: 'bg-red-100 text-red-700 border-red-200', icon: <XCircle className="w-3.5 h-3.5" /> },
+  Scheduled: { color: 'bg-secondary/40 text-primary border-border', icon: <Calendar className="w-3.5 h-3.5" /> },
+  Completed: { color: 'bg-secondary text-primary border-border', icon: <CheckCircle className="w-3.5 h-3.5" /> },
+  Cancelled: { color: 'bg-muted text-destructive border', icon: <XCircle className="w-3.5 h-3.5" /> },
 };
 
 const engagementColors: Record<string, string> = {
-  Excellent: 'bg-green-100 text-green-700',
-  Good: 'bg-blue-100 text-blue-700',
-  Fair: 'bg-yellow-100 text-yellow-700',
-  'Needs Support': 'bg-red-100 text-red-700',
+  Excellent: 'bg-secondary/40 text-primary',
+  Good: 'bg-secondary text-primary',
+  Fair: 'bg-accent/10 text-accent-foreground',
+  'Needs Support': 'bg-muted text-destructive',
 };
 
 const defaultActivities: Record<string, string[]> = {
@@ -280,17 +281,17 @@ export function TherapistSessions() {
 
     return (
       <motion.div variants={cardVariants} whileHover={{ scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-purple-400" onClick={() => openSession(session)}>
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-primary" onClick={() => openSession(session)}>
           <CardContent className="p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* Left: Child Info */}
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">{session.childName}</h4>
-                  <p className="text-sm text-gray-500">{session.childAge} years old • Parent: {session.parentName}</p>
+                  <h4 className="font-semibold text-foreground">{session.childName}</h4>
+                  <p className="text-sm text-muted-foreground">{session.childAge} years old • Parent: {session.parentName}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <Badge variant="outline" className={typeColor}>
                       {session.therapyType}
@@ -306,7 +307,7 @@ export function TherapistSessions() {
               </div>
 
               {/* Right: Date/Time */}
-              <div className="flex sm:flex-col items-center sm:items-end gap-2 text-sm text-gray-600">
+              <div className="flex sm:flex-col items-center sm:items-end gap-2 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   {new Date(session.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -324,8 +325,8 @@ export function TherapistSessions() {
 
             {/* Completed note preview */}
             {session.notes && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs text-gray-500 flex items-center gap-1">
+              <div className="mt-3 pt-3 border-t border">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <FileText className="w-3.5 h-3.5" />
                   Notes recorded — click to view details
                 </p>
@@ -339,7 +340,7 @@ export function TherapistSessions() {
 
   // ─── Empty State ─────────────────────────────────────────────
   const EmptyState = ({ icon: Icon, message }: { icon: React.ComponentType<{ className?: string }>; message: string }) => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-16 text-gray-400">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-16 text-muted-foreground">
       <Icon className="w-12 h-12 mb-3" />
       <p className="text-sm">{message}</p>
     </motion.div>
@@ -354,37 +355,37 @@ export function TherapistSessions() {
     >
       {/* Header */}
       <div>
-        <h2 className="text-purple-600 text-xl font-semibold flex items-center gap-2">
+        <h2 className="text-primary text-xl font-semibold flex items-center gap-2">
           <Stethoscope className="w-6 h-6" />
           Therapy Sessions
         </h2>
-        <p className="text-gray-500 text-sm mt-1">Manage your therapy sessions, view schedules, and document clinical notes</p>
+        <p className="text-muted-foreground text-sm mt-1">Manage your therapy sessions, view schedules, and document clinical notes</p>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <motion.div whileHover={{ scale: 1.03 }}>
-          <Card className="border-l-4 border-l-green-500">
+          <Card className="border-l-4 border-l-primary">
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 rounded-lg bg-secondary/40 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{upcoming.length}</p>
-                <p className="text-sm text-gray-500">Upcoming Sessions</p>
+                <p className="text-2xl font-bold text-foreground">{upcoming.length}</p>
+                <p className="text-sm text-muted-foreground">Upcoming Sessions</p>
               </div>
             </CardContent>
           </Card>
         </motion.div>
         <motion.div whileHover={{ scale: 1.03 }}>
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-primary">
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{completed.length}</p>
-                <p className="text-sm text-gray-500">Completed Sessions</p>
+                <p className="text-2xl font-bold text-foreground">{completed.length}</p>
+                <p className="text-sm text-muted-foreground">Completed Sessions</p>
               </div>
             </CardContent>
           </Card>
@@ -392,12 +393,12 @@ export function TherapistSessions() {
         <motion.div whileHover={{ scale: 1.03 }}>
           <Card className="border-l-4 border-l-red-500">
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-red-600" />
+              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-destructive" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{cancelled.length}</p>
-                <p className="text-sm text-gray-500">Cancelled Sessions</p>
+                <p className="text-2xl font-bold text-foreground">{cancelled.length}</p>
+                <p className="text-sm text-muted-foreground">Cancelled Sessions</p>
               </div>
             </CardContent>
           </Card>
@@ -406,14 +407,14 @@ export function TherapistSessions() {
 
       {/* Tabs */}
       <Tabs defaultValue="upcoming" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-purple-50 border border-purple-200">
-          <TabsTrigger value="upcoming" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+        <TabsList className="bg-muted border">
+          <TabsTrigger value="upcoming" className="data-[state=active]:bg-primary data-[state=active]:text-white">
             Upcoming ({upcoming.length})
           </TabsTrigger>
-          <TabsTrigger value="completed" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+          <TabsTrigger value="completed" className="data-[state=active]:bg-primary data-[state=active]:text-white">
             Completed ({completed.length})
           </TabsTrigger>
-          <TabsTrigger value="cancelled" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+          <TabsTrigger value="cancelled" className="data-[state=active]:bg-primary data-[state=active]:text-white">
             Cancelled ({cancelled.length})
           </TabsTrigger>
         </TabsList>
@@ -463,25 +464,25 @@ export function TherapistSessions() {
           {selectedSession && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-purple-700">
+                <DialogTitle className="flex items-center gap-2 text-primary">
                   <ClipboardList className="w-5 h-5" />
                   Session {selectedSession.status === 'Completed' ? 'Review' : 'Notes'} — {selectedSession.childName}
                 </DialogTitle>
               </DialogHeader>
 
               {/* Session Info Banner */}
-              <div className="bg-purple-50 rounded-lg p-4 space-y-1 text-sm">
+              <div className="bg-muted rounded-lg p-4 space-y-1 text-sm">
                 <div className="flex flex-wrap gap-4">
-                  <span className="flex items-center gap-1 text-gray-700">
-                    <User className="w-4 h-4 text-purple-500" />
+                  <span className="flex items-center gap-1 text-foreground">
+                    <User className="w-4 h-4 text-primary" />
                     {selectedSession.childName}, {selectedSession.childAge} yrs
                   </span>
-                  <span className="flex items-center gap-1 text-gray-700">
-                    <Calendar className="w-4 h-4 text-purple-500" />
+                  <span className="flex items-center gap-1 text-foreground">
+                    <Calendar className="w-4 h-4 text-primary" />
                     {new Date(selectedSession.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
-                  <span className="flex items-center gap-1 text-gray-700">
-                    <Clock className="w-4 h-4 text-purple-500" />
+                  <span className="flex items-center gap-1 text-foreground">
+                    <Clock className="w-4 h-4 text-primary" />
                     {selectedSession.time} • {selectedSession.duration}
                   </span>
                 </div>
@@ -494,8 +495,8 @@ export function TherapistSessions() {
 
               {/* Activities Performed */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-purple-500" />
+                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary" />
                   Activities Performed
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -507,12 +508,12 @@ export function TherapistSessions() {
                         onClick={() => toggleActivity(activity)}
                         className={`text-left p-2.5 rounded-lg border text-sm transition-all ${
                           isSelected
-                            ? 'bg-purple-50 border-purple-300 text-purple-700 font-medium'
-                            : 'bg-white border-gray-200 text-gray-600 hover:border-purple-200'
+                            ? 'bg-muted border text-primary font-medium'
+                            : 'bg-card border text-muted-foreground hover:border'
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          {isSelected ? <CheckCircle className="w-4 h-4 text-purple-600" /> : <div className="w-4 h-4 rounded-full border-2 border-gray-300" />}
+                          {isSelected ? <CheckCircle className="w-4 h-4 text-primary" /> : <div className="w-4 h-4 rounded-full border-2" />}
                           {activity}
                         </span>
                       </button>
@@ -525,8 +526,8 @@ export function TherapistSessions() {
 
               {/* Child Behavior & Engagement */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-purple-500" />
+                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-primary" />
                   Child Behavior & Engagement
                 </h4>
                 <div className="flex flex-wrap gap-2">
@@ -537,7 +538,7 @@ export function TherapistSessions() {
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
                         engagement === level
                           ? engagementColors[level] + ' border-current shadow-sm'
-                          : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                          : 'bg-muted text-muted-foreground border hover:bg-muted'
                       }`}
                     >
                       {level}
@@ -550,29 +551,29 @@ export function TherapistSessions() {
 
               {/* Therapist Observations */}
               <div className="space-y-2">
-                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-purple-500" />
+                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
                   Therapist Observations
                 </h4>
                 <textarea
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
                   placeholder="Document the child's responses, any notable behaviors, eye contact quality, communication attempts, sensory reactions, and emotional state during the session..."
-                  className="w-full min-h-[100px] p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-y"
+                  className="w-full min-h-[100px] p-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus-visible:ring-ring/50 resize-y"
                 />
               </div>
 
               {/* Session Outcome Summary */}
               <div className="space-y-2">
-                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <ClipboardList className="w-4 h-4 text-purple-500" />
+                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-primary" />
                   Session Outcome & Recommendations
                 </h4>
                 <textarea
                   value={outcome}
                   onChange={(e) => setOutcome(e.target.value)}
                   placeholder="Summarize session outcomes, goals met, areas needing attention, and recommendations for parents/next session..."
-                  className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-y"
+                  className="w-full min-h-[80px] p-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus-visible:ring-ring/50 resize-y"
                 />
               </div>
 
@@ -580,7 +581,7 @@ export function TherapistSessions() {
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleSaveNotes}>
+                <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveNotes}>
                   <Save className="w-4 h-4 mr-2" />
                   Save Session Notes
                 </Button>

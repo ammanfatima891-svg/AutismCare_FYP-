@@ -105,7 +105,7 @@ export function ReferralRecommendationForm({ childId, onSuccess, onCancel }: Ref
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="text-destructive text-sm">{error}</div>
           )}
 
           <div className="flex gap-4">

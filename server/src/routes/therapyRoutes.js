@@ -7,15 +7,15 @@ const {
   getClinicianNotes,
   addClinicianNote,
 } = require('../controllers/therapyController');
-const { protect, restrictTo } = require('../middleware/auth.middleware');
+const { protect, restrictTo, requireOwnership } = require('../middleware/auth.middleware');
 
 router.use(protect);
 router.use(restrictTo('clinician'));
 
-router.get('/:caseId/plan', getTherapyPlan);
-router.get('/:caseId/sessions', getSessionLogs);
-router.get('/:caseId/goals', getTherapyGoals);
-router.get('/:caseId/notes', getClinicianNotes);
-router.post('/:caseId/notes', addClinicianNote);
+router.get('/:caseId/plan', requireOwnership({ caseIdParam: 'caseId' }), getTherapyPlan);
+router.get('/:caseId/sessions', requireOwnership({ caseIdParam: 'caseId' }), getSessionLogs);
+router.get('/:caseId/goals', requireOwnership({ caseIdParam: 'caseId' }), getTherapyGoals);
+router.get('/:caseId/notes', requireOwnership({ caseIdParam: 'caseId' }), getClinicianNotes);
+router.post('/:caseId/notes', requireOwnership({ caseIdParam: 'caseId' }), addClinicianNote);
 
 module.exports = router;

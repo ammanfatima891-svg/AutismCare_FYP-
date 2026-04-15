@@ -1,15 +1,24 @@
+const { getCurrentTime, getCurrentTimeMs } = require('./utils/time.js');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
 
 // Ensure upload directories exist
-const uploadDirs = ['uploads/documents', 'uploads/lab-reports', 'uploads/appointment-documents', 'uploads/home-assignments'];
+const uploadDirs = [
+  'uploads/documents',
+  'uploads/lab-reports',
+  'uploads/appointment-documents',
+  'uploads/home-assignments',
+  'uploads/facial-screening',
+  'uploads/reports',
+];
 uploadDirs.forEach(dir => {
   const fullPath = path.join(process.cwd(), dir);
   if (!fs.existsSync(fullPath)) {
@@ -23,7 +32,7 @@ const storage = multer.diskStorage({
     cb(null, path.join(process.cwd(), 'uploads/documents/'));
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = getCurrentTimeMs() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
@@ -60,6 +69,15 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// ─── Targeted rate limits ─────────────────────────────────────────────────────
+// Keep limits conservative to avoid breaking demo usage; tighten for production.
+const messagingLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  limit: 60, // 60 req/min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Import routes
 const authRoutes = require('./routes/auth.routes.js');
 const adminRoutes = require('./routes/admin.routes.js');
@@ -77,6 +95,7 @@ const evaluationRoutes = require('./routes/evaluation.routes.js');
 const referralRoutes = require('./routes/referralRoutes.js');
 const therapyRoutes = require('./routes/therapyRoutes.js');
 const progressRoutes = require('./routes/progressRoutes.js');
+const progressEngineRoutes = require('./routes/progressEngineRoutes.js');
 const therapyPlanRoutes = require('./routes/therapyPlanRoutes.js');
 const activityRoutes = require('./routes/activityRoutes.js');
 const sessionRoutes = require('./routes/sessionRoutes.js');
@@ -86,9 +105,15 @@ const integrationRoutes = require('./routes/integrationRoutes.js');
 const analyticsRoutes = require('./routes/analyticsRoutes.js');
 const reportRoutes = require('./routes/reportRoutes.js');
 const { scheduleRouter, sessionSlotRouter } = require('./routes/scheduleRoutes.js');
+const facialScreeningRoutes = require('./routes/facialScreening.routes.js');
 
 
 const connectDB = require('./config/database.js');
+
+/** Liveness for load balancers, CI, and Playwright webServer readiness checks. */
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ ok: true, ts: getCurrentTime().toISOString() });
+});
 
 // Register routes
 app.use("/api/auth", authRoutes);
@@ -111,26 +136,33 @@ app.use("/api/evaluations", evaluationRoutes);
 app.use("/api/referrals", referralRoutes);
 app.use("/api/therapy", therapyRoutes);
 app.use("/api/progress", progressRoutes);
+app.use("/api/progress-engine", progressEngineRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/reports", reportRoutes);
+app.use('/api/facial-screening', facialScreeningRoutes);
 app.use("/api/therapy-plan", therapyPlanRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/assignments", homeAssignmentRoutes);
-app.use('/api/messaging', messageRoutes);
+app.use('/api/messaging', messagingLimiter, messageRoutes);
 
 
 const port = process.env.PORT || 4000;
 
 const startServer = () => {
   try {
-    app.listen(port, () => {
+    return app.listen(port, () => {
       connectDB();
       console.log('Server is running on port: ' + port);
     });
   } catch (error) {
     console.error('Error starting server:', error);
+    return null;
   }
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };

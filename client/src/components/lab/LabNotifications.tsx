@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -63,29 +64,29 @@ export function LabNotifications() {
     const getNotificationIcon = (type: string) => {
         switch (type) {
             case 'urgent_order':
-                return <AlertCircle className="h-5 w-5 text-red-500" />;
+                return <AlertCircle className="h-5 w-5 text-destructive" />;
             case 'new_test_order':
-                return <FileText className="h-5 w-5 text-blue-500" />;
+                return <FileText className="h-5 w-5 text-primary" />;
             case 'order_completed':
             case 'report_released':
-                return <CheckCircle className="h-5 w-5 text-green-500" />;
+                return <CheckCircle className="h-5 w-5 text-primary" />;
             default:
-                return <Bell className="h-5 w-5 text-gray-500" />;
+                return <Bell className="h-5 w-5 text-muted-foreground" />;
         }
     };
 
     const getNotificationStyle = (type: string, read: boolean) => {
-        const baseStyle = read ? 'bg-white' : 'bg-blue-50';
+        const baseStyle = read ? 'bg-card' : 'bg-secondary/20';
         switch (type) {
             case 'urgent_order':
-                return `${baseStyle} border-l-4 border-l-red-500`;
+                return `${baseStyle} border-l-4 border-l-destructive`;
             case 'new_test_order':
-                return `${baseStyle} border-l-4 border-l-blue-500`;
+                return `${baseStyle} border-l-4 border-l-primary`;
             case 'order_completed':
             case 'report_released':
-                return `${baseStyle} border-l-4 border-l-green-500`;
+                return `${baseStyle} border-l-4 border-l-primary`;
             default:
-                return `${baseStyle} border-l-4 border-l-gray-300`;
+                return `${baseStyle} border-l-4 border-l-border`;
         }
     };
 
@@ -107,8 +108,8 @@ export function LabNotifications() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-orange-600 mb-2">Notifications</h2>
-                    <p className="text-gray-600">
+                    <h2 className="mb-2 text-2xl font-bold text-foreground">Notifications</h2>
+                    <p className="text-muted-foreground">
                         {unreadCount > 0
                             ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
                             : 'All caught up!'
@@ -126,12 +127,9 @@ export function LabNotifications() {
                         Refresh
                     </Button>
                     {unreadCount > 0 && (
-                        <button
-                            onClick={markAllAsRead}
-                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                        >
+                        <Button size="sm" variant="default" onClick={markAllAsRead}>
                             Mark all as read
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -139,20 +137,20 @@ export function LabNotifications() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Bell className="h-5 w-5 text-orange-600" />
+                        <Bell className="h-5 w-5 text-primary" />
                         Recent Notifications
                     </CardTitle>
                     <CardDescription>Stay updated with test orders and system alerts</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
-                        <div className="text-center py-12 text-gray-500">
-                            <RefreshCw className="h-8 w-8 mx-auto mb-4 text-gray-300 animate-spin" />
+                        <div className="text-center py-12 text-muted-foreground">
+                            <RefreshCw className="h-8 w-8 mx-auto mb-4 text-muted-foreground animate-spin" />
                             <p>Loading notifications...</p>
                         </div>
                     ) : notifications.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
-                            <Bell className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <div className="text-center py-12 text-muted-foreground">
+                            <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                             <p>No notifications yet</p>
                         </div>
                     ) : (
@@ -169,17 +167,17 @@ export function LabNotifications() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between">
-                                                <p className={`font-medium ${notification.isRead ? 'text-gray-700' : 'text-gray-900'}`}>
+                                                <p className={`font-medium ${notification.isRead ? 'text-foreground' : 'text-foreground'}`}>
                                                     {notification.title}
                                                 </p>
                                                 {!notification.isRead && (
-                                                    <Badge className="bg-blue-100 text-blue-800 text-xs">New</Badge>
+                                                    <Badge className="bg-secondary text-primary text-xs">New</Badge>
                                                 )}
                                             </div>
-                                            <p className={`text-sm mt-1 ${notification.isRead ? 'text-gray-500' : 'text-gray-600'}`}>
+                                            <p className={`text-sm mt-1 ${notification.isRead ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                                                 {notification.message}
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                                            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                                                 <Clock className="h-3 w-3" />
                                                 {formatTime(notification.createdAt)}
                                             </p>

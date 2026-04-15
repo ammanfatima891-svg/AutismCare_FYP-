@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
@@ -6,16 +7,22 @@ const TherapyCase = require('../models/TherapyCase');
 const { HomeAssignment } = require('../models/HomeAssignment');
 const { User } = require('../models/User');
 const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
+const { createNotification } = require('../utils/notification');
+const { NOTIFICATION_TYPES } = require('../models/Notification');
 
 async function assertParentOwnsCase(parentId, caseId) {
   return ChildCase.findOne({ _id: caseId, parentId }).select('_id parentId childId').lean();
+}
+
+async function assertClinicianOwnsCase(clinicianId, caseId) {
+  return ChildCase.findOne({ _id: caseId, clinicianId }).select('_id clinicianId childId parentId').lean();
 }
 
 /**
  * Active therapy case → latest assignment; required to open a thread.
  */
 async function resolveTherapistIdForCase(caseId) {
-  const tc = await TherapyCase.findOne({ caseId, status: 'active' }).sort({ updatedAt: -1 }).lean();
+  const tc = await TherapyCase.findOne({ caseId, status: 'ACTIVE' }).sort({ updatedAt: -1 }).lean();
   if (tc?.therapistId) return tc.therapistId;
   const ha = await HomeAssignment.findOne({ caseId }).sort({ updatedAt: -1 }).lean();
   if (ha?.therapistId) return ha.therapistId;
@@ -29,9 +36,29 @@ function childNameFromParent(parent, childId) {
   return `${found.firstName || ''} ${found.lastName || ''}`.trim() || 'Child';
 }
 
+function parsePagination(query) {
+  const rawPage = query?.page;
+  const rawLimit = query?.limit;
+  const hasPage = rawPage !== undefined;
+  const hasLimit = rawLimit !== undefined;
+  if (!hasPage && !hasLimit) return null;
+
+  const page = Number(rawPage || 1);
+  const limit = Number(rawLimit || 20);
+  if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1) {
+    return { error: 'page and limit must be positive integers' };
+  }
+
+  return {
+    page,
+    limit: Math.min(limit, 100),
+    skip: (page - 1) * Math.min(limit, 100),
+  };
+}
+
 /**
  * GET /api/messaging/conversations
- * Inbox: therapist or parent.
+ * Inbox: therapist, parent, or clinician.
  */
 exports.listConversations = async (req, res) => {
   try {
@@ -41,13 +68,46 @@ exports.listConversations = async (req, res) => {
     let filter;
     if (role === 'therapist') filter = { therapistId: uid };
     else if (role === 'parent') filter = { parentId: uid };
+    else if (role === 'clinician') {
+      const ownedCases = await ChildCase.find({ clinicianId: uid }).select('_id').lean();
+      const caseIds = ownedCases.map((c) => c._id);
+      if (caseIds.length === 0) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      filter = { caseId: { $in: caseIds } };
+    }
     else {
-      return res.status(403).json({ success: false, message: 'Messaging is available for parents and therapists' });
+      return res.status(403).json({ success: false, message: 'Messaging is available for parents, therapists, and clinicians' });
     }
 
-    const list = await Conversation.find(filter).sort({ lastMessageAt: -1 }).lean();
+    const pagination = parsePagination(req.query);
+    if (pagination?.error) {
+      return res.status(400).json({ success: false, message: pagination.error });
+    }
+
+    const findQuery = Conversation.find(filter).sort({ lastMessageAt: -1 });
+    if (pagination) {
+      findQuery.skip(pagination.skip).limit(pagination.limit);
+    }
+
+    const [list, totalCount] = await Promise.all([
+      findQuery.lean(),
+      pagination ? Conversation.countDocuments(filter) : Promise.resolve(null),
+    ]);
     if (list.length === 0) {
-      return res.status(200).json({ success: true, data: [] });
+      if (!pagination) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      return res.status(200).json({
+        success: true,
+        data: [],
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          total: totalCount || 0,
+          hasMore: false,
+        },
+      });
     }
 
     const caseIds = [...new Set(list.map((c) => String(c.caseId)))];
@@ -91,7 +151,20 @@ exports.listConversations = async (req, res) => {
       };
     });
 
-    return res.status(200).json({ success: true, data });
+    if (!pagination) {
+      return res.status(200).json({ success: true, data });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total: totalCount,
+        hasMore: pagination.page * pagination.limit < totalCount,
+      },
+    });
   } catch (e) {
     console.error('listConversations:', e);
     return res.status(500).json({ success: false, message: 'Failed to load conversations' });
@@ -100,7 +173,7 @@ exports.listConversations = async (req, res) => {
 
 /**
  * GET /api/messaging/conversations/:caseId
- * Get or create conversation for a case (parent or therapist with access).
+ * Get or create conversation for a case (parent, therapist, or clinician with access).
  */
 exports.getOrCreateConversation = async (req, res) => {
   try {
@@ -126,6 +199,11 @@ exports.getOrCreateConversation = async (req, res) => {
       if (!access.ok) {
         return res.status(access.status).json({ success: false, message: access.message });
       }
+    } else if (role === 'clinician') {
+      const clinicianCase = await assertClinicianOwnsCase(uid, caseId);
+      if (!clinicianCase) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
     } else {
       return res.status(403).json({ success: false, message: 'Permission denied' });
     }
@@ -144,7 +222,7 @@ exports.getOrCreateConversation = async (req, res) => {
         caseId,
         parentId: caseDoc.parentId,
         therapistId,
-        lastMessageAt: new Date(),
+        lastMessageAt: getCurrentTime(),
       });
       conv = created.toObject();
     } else if (String(conv.therapistId) !== String(therapistId)) {
@@ -189,8 +267,15 @@ exports.listMessages = async (req, res) => {
     const uid = req.user._id;
     const isParticipant =
       String(conv.parentId) === String(uid) || String(conv.therapistId) === String(uid);
+    let isClinicianOwner = false;
     if (!isParticipant) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      if (role === 'clinician') {
+        const clinicianCase = await assertClinicianOwnsCase(uid, conv.caseId);
+        isClinicianOwner = Boolean(clinicianCase);
+      }
+      if (!isClinicianOwner) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
     }
     if (role === 'therapist' && String(conv.therapistId) === String(uid)) {
       const access = await assertTherapistCaseAccess(req, conv.caseId, uid);
@@ -202,8 +287,37 @@ exports.listMessages = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const messages = await Message.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean();
-    return res.status(200).json({ success: true, data: messages });
+    const pagination = parsePagination(req.query);
+    if (pagination?.error) {
+      return res.status(400).json({ success: false, message: pagination.error });
+    }
+
+    const findQuery = Message.find({ conversationId: conv._id })
+      .populate('senderId', 'firstName lastName role')
+      .sort({ createdAt: 1 });
+    if (pagination) {
+      findQuery.skip(pagination.skip).limit(pagination.limit);
+    }
+
+    const [messages, totalCount] = await Promise.all([
+      findQuery.lean(),
+      pagination ? Message.countDocuments({ conversationId: conv._id }) : Promise.resolve(null),
+    ]);
+
+    if (!pagination) {
+      return res.status(200).json({ success: true, data: messages });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: messages,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total: totalCount,
+        hasMore: pagination.page * pagination.limit < totalCount,
+      },
+    });
   } catch (e) {
     console.error('listMessages:', e);
     return res.status(500).json({ success: false, message: 'Failed to load messages' });
@@ -235,8 +349,15 @@ exports.sendMessage = async (req, res) => {
 
     const isTherapist = String(conv.therapistId) === String(uid);
     const isParent = String(conv.parentId) === String(uid);
+    let isClinicianOwner = false;
     if (!isTherapist && !isParent) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      if (role === 'clinician') {
+        const clinicianCase = await assertClinicianOwnsCase(uid, conv.caseId);
+        isClinicianOwner = Boolean(clinicianCase);
+      }
+      if (!isClinicianOwner) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
     }
     if (role === 'therapist' && isTherapist) {
       const access = await assertTherapistCaseAccess(req, conv.caseId, uid);
@@ -254,8 +375,35 @@ exports.sendMessage = async (req, res) => {
       text: trimmed,
     });
 
-    conv.lastMessageAt = new Date();
+    conv.lastMessageAt = getCurrentTime();
     await conv.save();
+
+    const caseRow = await ChildCase.findById(conv.caseId).select('clinicianId').lean();
+    const senderDoc = await User.findById(uid).select('firstName lastName role').lean();
+    const senderLabel = senderDoc
+      ? `${senderDoc.firstName || ''} ${senderDoc.lastName || ''}`.trim() || senderDoc.role || 'Care team'
+      : 'Care team';
+
+    const recipientIds = new Set(
+      [String(conv.parentId), String(conv.therapistId)].filter(Boolean)
+    );
+    if (caseRow?.clinicianId) recipientIds.add(String(caseRow.clinicianId));
+    recipientIds.delete(String(uid));
+
+    const preview = trimmed.length > 180 ? `${trimmed.slice(0, 177)}…` : trimmed;
+    await Promise.all(
+      [...recipientIds].map((rid) =>
+        createNotification({
+          recipientId: rid,
+          type: NOTIFICATION_TYPES.CASE_MESSAGE,
+          title: `New message from ${senderLabel}`,
+          message: preview,
+          relatedResourceType: 'conversation',
+          relatedResourceId: conv._id,
+          relatedCaseId: conv.caseId,
+        })
+      )
+    );
 
     return res.status(201).json({ success: true, data: msg.toObject() });
   } catch (e) {

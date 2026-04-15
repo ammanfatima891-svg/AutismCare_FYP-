@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "./ui/button";
+import { ThemeToggleButton } from "./ui/ThemeToggleButton";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
@@ -141,34 +141,39 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 via-white to-cyan-50 p-4">
+    <div className="ds-app-shell relative">
+      <div className="absolute right-4 top-4 z-10">
+        <ThemeToggleButton />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full max-w-md"
       >
-        <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden">
-          <CardHeader className="text-center bg-gradient-to-r from-teal-500/10 to-cyan-500/10 pb-6">
+        <Card className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl backdrop-blur-sm">
+          <CardHeader className="ds-card-header-strip text-center">
             <motion.div
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, duration: 0.3 }}
               className="mb-4"
             >
-              <div className="w-16 h-16 mx-auto bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center">
-                <Brain size={32} className="text-white" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary shadow-sm">
+                <Brain size={32} className="text-primary-foreground" />
               </div>
             </motion.div>
-            <CardTitle className="text-teal-800 text-2xl font-light">{isLogin ? "Welcome Back!" : "Let's Get Started"}</CardTitle>
-            <CardDescription className="text-teal-600 text-lg">
+            <CardTitle className="text-2xl font-bold text-foreground">
+              {isLogin ? "Welcome Back!" : "Let's Get Started"}
+            </CardTitle>
+            <CardDescription className="text-lg text-muted-foreground">
               {isLogin ? "We're glad to see you again" : "Create your account to begin"}
             </CardDescription>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="text-sm text-teal-500 mt-2 space-y-1"
+              className="mt-2 space-y-1 text-sm text-muted-foreground"
             >
               <p>Your information is safe and secure • You can stop anytime</p>
               <p className="text-xs">This is not a diagnosis • Take your time • We're here to help</p>
@@ -178,16 +183,16 @@ export default function AuthForm() {
           <CardContent className="px-6 pb-6">
             {/* LOGIN / SIGNUP TOGGLE */}
             <motion.div
-              className="grid grid-cols-2 bg-slate-100 rounded-xl mb-6 p-1 shadow-inner"
+              className="grid grid-cols-2 bg-muted rounded-xl mb-6 p-1 shadow-inner"
               layout
             >
               <motion.button
                 type="button"
                 onClick={() => setIsLogin(true)}
-                className={`py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 font-medium ${
+                className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-all ${
                   isLogin
-                    ? "bg-teal-600 text-white shadow-md"
-                    : "text-slate-500 hover:bg-slate-200"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
                 }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -198,10 +203,10 @@ export default function AuthForm() {
               <motion.button
                 type="button"
                 onClick={() => setIsLogin(false)}
-                className={`py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 font-medium ${
+                className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-all ${
                   !isLogin
-                    ? "bg-teal-600 text-white shadow-md"
-                    : "text-slate-500 hover:bg-slate-200"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
                 }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -221,14 +226,14 @@ export default function AuthForm() {
                   transition={{ duration: 0.3, ease: "easeOut" }}
                   className={`p-4 rounded-lg border flex items-center gap-3 ${
                     inlineMessage.type === 'success'
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-red-50 border-red-200 text-red-800'
+                      ? 'bg-primary/20 border text-primary'
+                      : 'bg-muted border text-destructive'
                   }`}
                 >
                   {inlineMessage.type === 'success' ? (
-                    <CheckCircle size={20} className="text-green-600 flex-shrink-0" />
+                    <CheckCircle size={20} className="text-primary flex-shrink-0" />
                   ) : (
-                    <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
+                    <AlertCircle size={20} className="text-destructive flex-shrink-0" />
                   )}
                   <p className="text-sm font-medium">{inlineMessage.text}</p>
                 </motion.div>
@@ -246,7 +251,7 @@ export default function AuthForm() {
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                     className="overflow-hidden"
                   >
-                    <Label className="text-xs font-bold text-slate-500 mb-3 block">SELECT YOUR ROLE</Label>
+                    <Label className="text-xs font-bold text-muted-foreground mb-3 block">SELECT YOUR ROLE</Label>
                     <div className="grid grid-cols-1 gap-3 mb-6">
                       {Object.entries(roleConfig).map(([role, cfg]) => {
                         const Icon = cfg.icon;
@@ -255,24 +260,26 @@ export default function AuthForm() {
                             type="button"
                             key={role}
                             onClick={() => setSelectedRole(role as Role)}
-                            className={`border-2 rounded-xl p-4 flex items-center gap-4 transition-all duration-200 ${
+                            className={`flex items-center gap-4 rounded-xl border-2 p-4 transition-all duration-200 ${
                               selectedRole === role
-                                ? "border-teal-600 bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 shadow-lg ring-2 ring-teal-200"
-                                : "border-slate-200 hover:border-teal-300 hover:bg-slate-50 hover:shadow-md"
+                                ? "border-primary bg-primary/10 text-foreground shadow-md ring-2 ring-ring/50"
+                                : "border-border hover:border-primary/40 hover:bg-muted/50 hover:shadow-sm"
                             }`}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                           >
-                            <div className={`p-2 rounded-lg ${
-                              selectedRole === role
-                                ? "bg-teal-100 text-teal-600"
-                                : "bg-slate-100 text-slate-500"
-                            }`}>
+                            <div
+                              className={`rounded-lg p-2 ${
+                                selectedRole === role
+                                  ? "bg-secondary text-secondary-foreground"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
                               <Icon size={20} />
                             </div>
                             <div className="text-left">
                               <span className="text-sm font-semibold block">{cfg.label}</span>
-                              <span className="text-xs text-slate-500">{cfg.description}</span>
+                              <span className="text-xs text-muted-foreground">{cfg.description}</span>
                             </div>
                             {selectedRole === role && (
                               <motion.div
@@ -280,7 +287,7 @@ export default function AuthForm() {
                                 animate={{ scale: 1 }}
                                 className="ml-auto"
                               >
-                                <CheckCircle size={20} className="text-teal-600" />
+                                <CheckCircle size={20} className="text-primary" />
                               </motion.div>
                             )}
                           </motion.button>
@@ -295,30 +302,30 @@ export default function AuthForm() {
                       className="grid grid-cols-2 gap-4 mb-4"
                     >
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-slate-700">First Name</Label>
-                        <Input {...register("firstName", { required: "First name is required" })} className="focus:ring-teal-500 focus:border-teal-500 h-10" />
+                        <Label className="text-sm font-medium text-foreground">First Name</Label>
+                        <Input {...register("firstName", { required: "First name is required" })} className="h-10" />
                         {errors.firstName && (
                           <motion.div
                             initial={{ opacity: 0, y: -5 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="flex items-center gap-1 mt-1"
                           >
-                            <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                            <p className="text-xs text-red-500">{errors.firstName.message as string}</p>
+                            <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                            <p className="text-xs text-destructive">{errors.firstName.message as string}</p>
                           </motion.div>
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-slate-700">Last Name</Label>
-                        <Input {...register("lastName", { required: "Last name is required" })} className="focus:ring-teal-500 focus:border-teal-500 h-10" />
+                        <Label className="text-sm font-medium text-foreground">Last Name</Label>
+                        <Input {...register("lastName", { required: "Last name is required" })} className="h-10" />
                         {errors.lastName && (
                           <motion.div
                             initial={{ opacity: 0, y: -5 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="flex items-center gap-1 mt-1"
                           >
-                            <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                            <p className="text-xs text-red-500">{errors.lastName.message as string}</p>
+                            <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                            <p className="text-xs text-destructive">{errors.lastName.message as string}</p>
                           </motion.div>
                         )}
                       </div>
@@ -335,10 +342,10 @@ export default function AuthForm() {
                             className="grid grid-cols-2 gap-4 mb-4"
                           >
                             <div className="space-y-2">
-                              <Label className="text-sm font-medium text-slate-700">Specialization</Label>
+                              <Label className="text-sm font-medium text-foreground">Specialization</Label>
                               <Input
                                 {...register("specialization", { required: "Specialization is required" })}
-                                className="focus:ring-teal-500 focus:border-teal-500 h-10"
+                                className="h-10"
                               />
                               {errors.specialization && (
                                 <motion.div
@@ -346,16 +353,16 @@ export default function AuthForm() {
                                   animate={{ opacity: 1, y: 0 }}
                                   className="flex items-center gap-1 mt-1"
                                 >
-                                  <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                                  <p className="text-xs text-red-500">{errors.specialization.message as string}</p>
+                                  <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                                  <p className="text-xs text-destructive">{errors.specialization.message as string}</p>
                                 </motion.div>
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-sm font-medium text-slate-700">License Number</Label>
+                              <Label className="text-sm font-medium text-foreground">License Number</Label>
                               <Input
                                 {...register("licenseNumber", { required: "License number is required" })}
-                                className="focus:ring-teal-500 focus:border-teal-500 h-10"
+                                className="h-10"
                               />
                               {errors.licenseNumber && (
                                 <motion.div
@@ -363,8 +370,8 @@ export default function AuthForm() {
                                   animate={{ opacity: 1, y: 0 }}
                                   className="flex items-center gap-1 mt-1"
                                 >
-                                  <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                                  <p className="text-xs text-red-500">{errors.licenseNumber.message as string}</p>
+                                  <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                                  <p className="text-xs text-destructive">{errors.licenseNumber.message as string}</p>
                                 </motion.div>
                               )}
                             </div>
@@ -377,11 +384,11 @@ export default function AuthForm() {
                             transition={{ duration: 0.2 }}
                             className="space-y-2 mb-4"
                           >
-                            <Label className="text-sm font-medium text-slate-700">Upload Documents</Label>
-                            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-teal-400 transition-colors">
-                              <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-                              <p className="text-sm text-slate-600 mb-2">Upload your license, certifications, or other documents</p>
-                              <p className="text-xs text-slate-500 mb-3">Supported formats: JPEG, PNG, PDF, DOC, DOCX (Max 5MB each)</p>
+                            <Label className="text-sm font-medium text-foreground">Upload Documents</Label>
+                            <div className="rounded-xl border-2 border-dashed border-border p-4 text-center transition-colors hover:border-primary/50">
+                              <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                              <p className="text-sm text-muted-foreground mb-2">Upload your license, certifications, or other documents</p>
+                              <p className="text-xs text-muted-foreground mb-3">Supported formats: JPEG, PNG, PDF, DOC, DOCX (Max 5MB each)</p>
                               <input
                                 type="file"
                                 multiple
@@ -395,7 +402,7 @@ export default function AuthForm() {
                               />
                               <label
                                 htmlFor="document-upload"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 rounded-md hover:bg-teal-100 cursor-pointer transition-colors"
+                                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-secondary px-4 py-2 text-secondary-foreground transition-colors hover:bg-secondary/80"
                               >
                                 <FileText size={16} />
                                 Choose Files
@@ -404,10 +411,10 @@ export default function AuthForm() {
                             {uploadedFiles.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {uploadedFiles.map((file: File, index: number) => (
-                                  <div key={index} className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                                  <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground bg-background p-2 rounded">
                                     <FileText size={14} />
                                     <span className="truncate">{file.name}</span>
-                                    <span className="text-xs text-slate-400">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                                    <span className="text-xs text-muted-foreground">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
                                   </div>
                                 ))}
                               </div>
@@ -427,10 +434,10 @@ export default function AuthForm() {
                           className="grid grid-cols-2 gap-4 mb-4"
                         >
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium text-slate-700">Lab Name</Label>
+                            <Label className="text-sm font-medium text-foreground">Lab Name</Label>
                             <Input
                               {...register("labName", { required: "Lab name is required" })}
-                              className="focus:ring-teal-500 focus:border-teal-500 h-10"
+                              className="h-10"
                             />
                             {errors.labName && (
                               <motion.div
@@ -438,16 +445,16 @@ export default function AuthForm() {
                                 animate={{ opacity: 1, y: 0 }}
                                 className="flex items-center gap-1 mt-1"
                               >
-                                <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                                <p className="text-xs text-red-500">{errors.labName.message as string}</p>
+                                <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                                <p className="text-xs text-destructive">{errors.labName.message as string}</p>
                               </motion.div>
                             )}
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium text-slate-700">Accreditation</Label>
+                            <Label className="text-sm font-medium text-foreground">Accreditation</Label>
                             <Input
                               {...register("accreditation", { required: "Accreditation is required" })}
-                              className="focus:ring-teal-500 focus:border-teal-500 h-10"
+                              className="h-10"
                             />
                             {errors.accreditation && (
                               <motion.div
@@ -455,8 +462,8 @@ export default function AuthForm() {
                                 animate={{ opacity: 1, y: 0 }}
                                 className="flex items-center gap-1 mt-1"
                               >
-                                <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                                <p className="text-xs text-red-500">{errors.accreditation.message as string}</p>
+                                <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                                <p className="text-xs text-destructive">{errors.accreditation.message as string}</p>
                               </motion.div>
                             )}
                           </div>
@@ -474,11 +481,11 @@ export default function AuthForm() {
                 transition={{ delay: 0.3 }}
                 className="space-y-2"
               >
-                <Label className="text-sm font-medium text-slate-700">Email Address</Label>
+                <Label className="text-sm font-medium text-foreground">Email Address</Label>
                 <Input
                   type="email"
                   {...register("email", { required: "Email address is required" })}
-                  className="focus:ring-teal-500 focus:border-teal-500 h-10"
+                  className="h-10"
                 />
                 {errors.email && (
                   <motion.div
@@ -486,8 +493,8 @@ export default function AuthForm() {
                     animate={{ opacity: 1, y: 0 }}
                     className="flex items-center gap-1 mt-1"
                   >
-                    <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                    <p className="text-xs text-red-500">{errors.email.message as string}</p>
+                    <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                    <p className="text-xs text-destructive">{errors.email.message as string}</p>
                   </motion.div>
                 )}
               </motion.div>
@@ -499,7 +506,7 @@ export default function AuthForm() {
                 transition={{ delay: 0.4 }}
                 className="space-y-2"
               >
-                <Label className="text-sm font-medium text-slate-700">Password</Label>
+                <Label className="text-sm font-medium text-foreground">Password</Label>
                 <div className="relative">
                   <Input
                     type={showPassword ? "text" : "password"}
@@ -510,11 +517,11 @@ export default function AuthForm() {
                         message: "Password must be at least 8 characters"
                       }
                     })}
-                    className="focus:ring-teal-500 focus:border-teal-500 pr-10 h-10"
+                    className="h-10 pr-10"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-teal-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
@@ -527,8 +534,8 @@ export default function AuthForm() {
                     animate={{ opacity: 1, y: 0 }}
                     className="flex items-center gap-1 mt-1"
                   >
-                    <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                    <p className="text-xs text-red-500">{errors.password.message as string}</p>
+                    <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                    <p className="text-xs text-destructive">{errors.password.message as string}</p>
                   </motion.div>
                 )}
               </motion.div>
@@ -569,13 +576,13 @@ export default function AuthForm() {
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">Confirm Password</Label>
+                      <Label className="text-sm font-medium text-foreground">Confirm Password</Label>
                       <Input
                         type="password"
                         {...register("confirmPassword", {
                           validate: (v: string) => v === password || "Passwords do not match"
                         })}
-                        className="focus:ring-teal-500 focus:border-teal-500 h-10"
+                        className="h-10"
                       />
                       {errors.confirmPassword && (
                         <motion.div
@@ -583,8 +590,8 @@ export default function AuthForm() {
                           animate={{ opacity: 1, y: 0 }}
                           className="flex items-center gap-1 mt-1"
                         >
-                          <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                          <p className="text-xs text-red-500">{errors.confirmPassword.message as string}</p>
+                          <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                          <p className="text-xs text-destructive">{errors.confirmPassword.message as string}</p>
                         </motion.div>
                       )}
                     </div>
@@ -606,7 +613,7 @@ export default function AuthForm() {
                       <div className="grid gap-1.5 leading-none">
                         <label
                           htmlFor="terms"
-                          className="text-sm font-medium leading-none text-slate-700 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          className="text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                         >
                           I agree to the Terms & Privacy Policy
                         </label>
@@ -616,8 +623,8 @@ export default function AuthForm() {
                             animate={{ opacity: 1, y: 0 }}
                             className="flex items-center gap-1 mt-1"
                           >
-                            <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                            <p className="text-xs text-red-500">{errors.agreeToTerms.message as string}</p>
+                            <AlertCircle size={12} className="text-destructive flex-shrink-0" />
+                            <p className="text-xs text-destructive">{errors.agreeToTerms.message as string}</p>
                           </motion.div>
                         )}
                       </div>
@@ -635,7 +642,7 @@ export default function AuthForm() {
                 <motion.button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 shadow-lg flex items-center justify-center gap-2 px-4 py-2 rounded-md text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-primary flex w-full items-center justify-center gap-2 px-4 py-3 text-base shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >

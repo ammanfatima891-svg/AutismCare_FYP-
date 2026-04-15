@@ -7,6 +7,8 @@ import { Skeleton } from '../ui/skeleton';
 import { childAPI, screeningAPI } from '../../api';
 import { AuthContext } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
+import { Hand, Sparkles } from 'lucide-react';
+import { Button } from '../ui/button';
 
 const DASHBOARD_CACHE_KEY = 'parent_dashboard_cache';
 
@@ -44,9 +46,11 @@ function setCachedData(data: CachedDashboardData): void {
 
 interface DashboardHomeProps {
   onNavigate: (section: string) => void;
+  /** Replays the first-time parent guided tour (Windows-style wizard). */
+  onOpenWelcomeTour?: () => void;
 }
 
-export function DashboardHome({ onNavigate }: DashboardHomeProps) {
+export function DashboardHome({ onNavigate, onOpenWelcomeTour }: DashboardHomeProps) {
   const { user } = useContext(AuthContext);
   const [childrenCount, setChildrenCount] = useState<number>(0);
   const [screeningStats, setScreeningStats] = useState({ totalScreenings: 0, thisMonth: 0 });
@@ -137,20 +141,34 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-3xl"
+          className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 border-primary/20 bg-primary text-primary-foreground shadow-md ring-2 ring-primary/10"
         >
-          👋
+          <Hand className="size-10" strokeWidth={1.75} aria-hidden />
         </motion.div>
-        <h1 className="text-3xl font-light text-gray-800">
+        <h1 className="text-3xl font-light text-foreground">
           Welcome back, {user?.firstName || 'Parent'}!
         </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           Let's take care of your child's development together. This is not a diagnosis - just helpful information.
         </p>
-        <p className="text-sm text-slate-600 max-w-xl mx-auto">
-          Use <span className="font-medium text-sky-800">Child Case</span> in the sidebar for therapy sessions,
-          guidance, home activities, and progress.
+        <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+          Use <span className="font-medium text-blue-800">Child Case</span> for therapy sessions, guidance, and progress.{' '}
+          Under <span className="font-medium text-blue-800">Screening</span>, run questionnaires or optional facial screening.
         </p>
+        {onOpenWelcomeTour ? (
+          <div className="flex justify-center pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 border-2 shadow-sm transition-all hover:shadow-md"
+              onClick={onOpenWelcomeTour}
+            >
+              <Sparkles className="size-4 text-primary" aria-hidden />
+              Guided tour
+            </Button>
+          </div>
+        ) : null}
       </motion.div>
 
       {/* Quick Stats - always visible, interactive Child Profile card */}
@@ -179,7 +197,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
         ) : (
           <>
             <Card
-              className="text-center cursor-pointer hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2"
+              className="ds-interactive-surface text-center cursor-pointer hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2"
               role="button"
               tabIndex={0}
               onClick={() => onNavigate('children')}
@@ -192,21 +210,43 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
             >
               <CardContent className="p-4">
                 <div className="text-2xl font-bold text-blue-600">{childProfileDisplay}</div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted-foreground">
                   Child{childrenCount !== 1 ? 'ren' : ''} Profile{childrenCount !== 1 ? 's' : ''}
                 </div>
               </CardContent>
             </Card>
-            <Card className="text-center">
+            <Card
+              className="ds-interactive-surface text-center cursor-pointer hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+              role="button"
+              tabIndex={0}
+              onClick={() => onNavigate('screening-questionnaires')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onNavigate('screening-questionnaires');
+                }
+              }}
+            >
               <CardContent className="p-4">
-                <div className="text-2xl font-bold text-purple-600">{screeningsMonthDisplay}</div>
-                <div className="text-sm text-gray-600">Screenings This Month</div>
+                <div className="text-2xl font-bold text-primary">{screeningsMonthDisplay}</div>
+                <div className="text-sm text-muted-foreground">Screenings this month</div>
               </CardContent>
             </Card>
-            <Card className="text-center">
+            <Card
+              className="ds-interactive-surface text-center cursor-pointer hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+              role="button"
+              tabIndex={0}
+              onClick={() => onNavigate('total-screenings')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onNavigate('total-screenings');
+                }
+              }}
+            >
               <CardContent className="p-4">
-                <div className="text-2xl font-bold text-green-600">{totalScreeningsDisplay}</div>
-                <div className="text-sm text-gray-600">Total Screenings</div>
+                <div className="text-2xl font-bold text-primary">{totalScreeningsDisplay}</div>
+                <div className="text-sm text-muted-foreground">Screening history</div>
               </CardContent>
             </Card>
           </>
@@ -214,7 +254,7 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
       </div>
 
       {error && !loading && (
-        <p className="text-center text-sm text-amber-600" role="alert">
+        <p className="text-center text-sm text-yellow-600" role="alert">
           {error}. {isOffline ? 'Using cached data.' : 'Showing cached data if available.'}
         </p>
       )}

@@ -50,20 +50,20 @@ export default function TherapistSessionsListPage({ embedded = false }: Props) {
     void load();
   }, [load, location.key, location.pathname]);
 
-  const shell = embedded ? 'min-h-0 bg-transparent' : 'min-h-screen bg-white';
+  const shell = embedded ? 'min-h-0 bg-transparent' : 'min-h-screen bg-card';
 
   return (
     <div className={shell}>
       <div className={`mx-auto max-w-4xl ${embedded ? 'px-0 py-2' : 'px-4 py-8 md:px-6'}`}>
         <div className="mb-8 flex min-w-0 flex-row items-center justify-between gap-4">
           <div className="min-w-0 flex-1 pr-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sessions</h1>
-            <p className="mt-1 text-sm leading-snug text-slate-600">View and manage therapy sessions</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Sessions</h1>
+            <p className="mt-1 text-sm leading-snug text-muted-foreground">View and manage therapy sessions</p>
           </div>
           <Button
             type="button"
             size="sm"
-            className="inline-flex h-9 shrink-0 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-black shadow-sm hover:bg-slate-50"
+            className="inline-flex h-9 shrink-0 whitespace-nowrap rounded-lg border bg-card px-4 text-sm font-medium text-black shadow-sm hover:bg-background"
             onClick={() => void navigate('/therapist/sessions/new')}
           >
             <Plus className="mr-1.5 h-4 w-4 shrink-0 text-black" strokeWidth={2.5} />
@@ -72,17 +72,17 @@ export default function TherapistSessionsListPage({ embedded = false }: Props) {
         </div>
 
         {error ? (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+          <div className="mb-4 rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">{error}</div>
         ) : null}
 
         {loading ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-12 text-center text-sm text-slate-600">
+          <div className="rounded-xl border-dashed border bg-muted/80 p-12 text-center text-sm text-muted-foreground">
             No sessions logged yet.{' '}
-            <Link to="/therapist/sessions/new" className="font-medium text-sky-700 underline">
+            <Link to="/therapist/sessions/new" className="font-medium text-blue-700 underline">
               Add your first session
             </Link>
           </div>
@@ -100,38 +100,38 @@ export default function TherapistSessionsListPage({ embedded = false }: Props) {
               return (
                 <li
                   key={String(s._id)}
-                  className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 flex-1 gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-sky-100">
-                      <Calendar className="h-6 w-6 text-sky-700" />
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                      <Calendar className="h-6 w-6 text-blue-700" />
                     </div>
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
-                        <span className="font-semibold text-slate-900">{dateStr}</span>
-                        <span className="text-sm text-slate-500">{timeStr}</span>
+                        <span className="font-semibold text-foreground">{dateStr}</span>
+                        <span className="text-sm text-muted-foreground">{timeStr}</span>
                       </div>
-                      <p className="font-medium text-slate-900">{s.childName || 'Child'}</p>
-                      <p className="text-sm text-slate-500">{s.therapyDomain || 'Therapy'}</p>
+                      <p className="font-medium text-foreground">{s.childName || 'Child'}</p>
+                      <p className="text-sm text-muted-foreground">{s.therapyDomain || 'Therapy'}</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-6 border-t border-slate-100 pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+                  <div className="flex flex-wrap items-center gap-6 border-t border pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
                     <div>
-                      <p className="text-xs text-slate-500">Duration</p>
-                      <p className="font-semibold text-slate-900">
+                      <p className="text-xs text-muted-foreground">Duration</p>
+                      <p className="font-semibold text-foreground">
                         {s.duration != null && s.duration > 0 ? `${s.duration} min` : '—'}
                       </p>
                     </div>
                     {completed ? (
                       <div>
-                        <p className="text-xs text-slate-500">Response Rating</p>
-                        <p className="font-semibold text-slate-900">{formatChildResponseDisplay(s.childResponse)}</p>
+                        <p className="text-xs text-muted-foreground">Response Rating</p>
+                        <p className="font-semibold text-foreground">{formatChildResponseDisplay(s.childResponse)}</p>
                       </div>
                     ) : null}
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${
-                        completed ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800'
+                        completed ? 'bg-primary text-white' : 'bg-muted text-foreground'
                       }`}
                     >
                       {st}
@@ -139,7 +139,7 @@ export default function TherapistSessionsListPage({ embedded = false }: Props) {
                     <Button
                       type="button"
                       variant={completed ? 'outline' : 'default'}
-                      className={completed ? 'border-slate-300 text-slate-900' : 'bg-slate-900 text-white hover:bg-slate-800'}
+                      className={completed ? 'border text-foreground' : 'bg-primary text-white hover:bg-blue-800'}
                       onClick={() => void navigate(`/therapist/case/${String(s.caseId)}?tab=sessions`)}
                     >
                       {completed ? 'View Details' : 'View case'}
@@ -153,7 +153,7 @@ export default function TherapistSessionsListPage({ embedded = false }: Props) {
 
         {!embedded ? (
           <div className="mt-8">
-            <Button type="button" variant="ghost" className="text-slate-600" onClick={() => void navigate('/therapist-dashboard')}>
+            <Button type="button" variant="ghost" className="text-muted-foreground" onClick={() => void navigate('/therapist-dashboard')}>
               ← Back to dashboard
             </Button>
           </div>

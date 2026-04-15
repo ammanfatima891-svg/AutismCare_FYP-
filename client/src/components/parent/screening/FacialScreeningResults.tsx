@@ -24,63 +24,140 @@ interface FacialScreeningResultsProps {
 }
 
 export function FacialScreeningResults({ results, child }: FacialScreeningResultsProps) {
-  const getRiskColor = (risk: string) => {
+  const getRiskTone = (risk: string): 'good' | 'warn' | 'bad' | 'neutral' => {
     switch (risk) {
       case 'low':
-        return 'green';
+        return 'good';
       case 'medium':
       case 'moderate':
-        return 'yellow';
+        return 'warn';
       case 'high':
       case 'atypical':
-        return 'red';
+        return 'bad';
       default:
-        return 'blue';
+        return 'neutral';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'normal':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-primary" />;
       case 'moderate':
-        return <AlertTriangle className="w-5 h-5 text-yellow-600" />;
+        return <AlertTriangle className="w-5 h-5 text-accent" />;
       case 'atypical':
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
+        return <AlertCircle className="w-5 h-5 text-destructive" />;
       default:
         return null;
     }
   };
 
-  const color = getRiskColor(results.riskLevel);
+  const getFeatureTone = (status: string): 'good' | 'warn' | 'bad' | 'neutral' => {
+    switch (status) {
+      case 'normal':
+      case 'low':
+        return 'good';
+      case 'moderate':
+      case 'medium':
+        return 'warn';
+      case 'atypical':
+      case 'high':
+        return 'bad';
+      default:
+        return 'neutral';
+    }
+  };
+
+  const featureToneStyles = (tone: 'good' | 'warn' | 'bad' | 'neutral') => {
+    switch (tone) {
+      case 'good':
+        return {
+          iconWrap: 'bg-secondary text-primary',
+          title: 'text-foreground',
+          badge: 'bg-primary text-primary-foreground',
+        };
+      case 'warn':
+        return {
+          iconWrap: 'bg-accent/15 text-accent',
+          title: 'text-foreground',
+          badge: 'bg-accent text-accent-foreground',
+        };
+      case 'bad':
+        return {
+          iconWrap: 'bg-muted text-destructive',
+          title: 'text-foreground',
+          badge: 'bg-destructive text-destructive-foreground',
+        };
+      default:
+        return {
+          iconWrap: 'bg-muted text-foreground',
+          title: 'text-foreground',
+          badge: 'bg-muted text-foreground',
+        };
+    }
+  };
+
+  const tone = getRiskTone(results.riskLevel);
+  const headerClass =
+    tone === 'good'
+      ? 'border-primary/30 bg-secondary/50'
+      : tone === 'warn'
+        ? 'border-accent/50 bg-accent/10'
+        : tone === 'bad'
+          ? 'border-destructive/40 bg-muted'
+          : 'border-border bg-card';
+  const badgeClass =
+    tone === 'good'
+      ? 'bg-primary text-primary-foreground'
+      : tone === 'warn'
+        ? 'bg-accent text-accent-foreground'
+        : tone === 'bad'
+          ? 'bg-destructive text-destructive-foreground'
+          : 'bg-muted text-foreground';
 
   return (
     <div className="space-y-6">
       {/* Results Header */}
-      <Card className={`border-2 border-${color}-300 bg-gradient-to-br from-${color}-50 to-purple-50`}>
+      <Card className={`border-2 ${headerClass}`}>
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 rounded-full bg-${color}-100 flex items-center justify-center`}>
-                <Camera className={`w-8 h-8 text-${color}-600`} />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card shadow-sm">
+                <Camera className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <CardTitle className={`text-${color}-900 flex items-center gap-2`}>
-                  Facial Screening Complete! 🎉
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  Facial Screening Complete
                 </CardTitle>
                 <CardDescription className="mt-1">
                   AI Analysis for {child?.firstName} {child?.lastName}
                 </CardDescription>
               </div>
             </div>
-            <div className="text-right">
-              <Badge className={`bg-${color}-600 text-white mb-2`}>
+            <div className="text-right space-y-2">
+              {results.classification && (
+                <div>
+                  <Badge
+                    className={
+                      results.classification === 'ASD'
+                        ? 'bg-amber-100 text-amber-950 border-amber-200/80 mb-1'
+                        : 'bg-emerald-100 text-emerald-950 border-emerald-200/80 mb-1'
+                    }
+                  >
+                    Screening: {results.classification}
+                  </Badge>
+                  <p className="text-[11px] text-muted-foreground max-w-[220px] ml-auto leading-snug">
+                    Not a diagnosis — model-based screening signal only.
+                  </p>
+                </div>
+              )}
+              <Badge className={`${badgeClass} mb-2`}>
                 {results.riskLevel.toUpperCase()} RISK
               </Badge>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 Confidence: {results.confidence}%
               </p>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 {new Date(results.date).toLocaleDateString()}
               </p>
             </div>
@@ -88,7 +165,7 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-lg overflow-hidden border-2 border-purple-200">
+            <div className="rounded-lg overflow-hidden border-2">
               <img
                 src={results.image}
                 alt="Analyzed photo"
@@ -97,17 +174,17 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
             </div>
             <div className="flex flex-col justify-center space-y-3">
               <div>
-                <p className="text-sm text-gray-600 mb-2">Overall Analysis Score</p>
+                <p className="text-sm text-muted-foreground mb-2">Overall Analysis Score</p>
                 <div className="flex items-center gap-3">
                   <Progress value={results.overallScore} className="h-3 flex-1" />
-                  <span className={`text-xl font-bold text-${color}-700`}>
+                  <span className="text-xl font-bold text-foreground">
                     {results.overallScore}%
                   </span>
                 </div>
               </div>
-              <Alert className={`bg-${color}-100 border-${color}-300`}>
-                <Sparkles className={`h-4 w-4 text-${color}-600`} />
-                <AlertDescription className={`text-${color}-900 text-sm`}>
+              <Alert className="border-border bg-card">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <AlertDescription className="text-foreground text-sm">
                   AI analysis complete with {results.confidence}% confidence level
                 </AlertDescription>
               </Alert>
@@ -120,7 +197,7 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-600" />
+            <TrendingUp className="w-5 h-5 text-primary" />
             Detailed Feature Analysis
           </CardTitle>
           <CardDescription>
@@ -129,7 +206,8 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
         </CardHeader>
         <CardContent className="space-y-4">
           {Object.entries(results.features).map(([key, feature]: [string, any]) => {
-            const featureColor = getRiskColor(feature.status);
+            const featureTone = getFeatureTone(feature.status);
+            const styles = featureToneStyles(featureTone);
             const icons: { [key: string]: any } = {
               eyeContact: Eye,
               facialSymmetry: Smile,
@@ -139,24 +217,24 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
             const Icon = icons[key] || CheckCircle;
 
             return (
-              <div key={key} className="p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+              <div key={key} className="p-4 rounded-lg border hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full bg-${featureColor}-100 flex items-center justify-center`}>
-                      <Icon className={`w-5 h-5 text-${featureColor}-600`} />
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${styles.iconWrap}`}>
+                      <Icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <h4 className={`text-${featureColor}-900 capitalize`}>
+                      <h4 className={`${styles.title} capitalize`}>
                         {key.replace(/([A-Z])/g, ' $1').trim()}
                       </h4>
-                      <p className="text-sm text-gray-600">{feature.description}</p>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <Badge className={`bg-${featureColor}-500 mb-1`}>
+                    <Badge className={`${styles.badge} mb-1`}>
                       {feature.status}
                     </Badge>
-                    <p className="text-sm text-gray-900">{feature.score}%</p>
+                    <p className="text-sm text-foreground">{feature.score}%</p>
                   </div>
                 </div>
                 <Progress value={feature.score} className="h-2" />
@@ -167,21 +245,21 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
       </Card>
 
       {/* AI Insights */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
+      <Card className="border-2 border-border bg-secondary/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-600">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Sparkles className="w-5 h-5" />
             AI-Powered Recommendations
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <h4 className="text-blue-900">Recommendations:</h4>
+            <h4 className="text-foreground">Recommendations:</h4>
             <ul className="space-y-2">
               {results.recommendations.map((rec: string, index: number) => (
-                <li key={index} className="flex gap-2 text-gray-700">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs text-blue-600">{index + 1}</span>
+                <li key={index} className="flex gap-2 text-foreground">
+                  <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-card">
+                    <span className="text-xs text-primary">{index + 1}</span>
                   </div>
                   <span>{rec}</span>
                 </li>
@@ -189,9 +267,9 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
             </ul>
           </div>
 
-          <Alert className="bg-blue-100 border-blue-300 mt-4">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-900 text-sm">
+          <Alert className="mt-4 border-border bg-card">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <AlertDescription className="text-foreground text-sm">
               This facial analysis is a screening tool and not a diagnostic assessment. 
               Please consult with a healthcare professional for comprehensive evaluation.
             </AlertDescription>
@@ -202,14 +280,15 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
       {/* Action Buttons */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-600">
+          <CardTitle className="flex items-center gap-2 text-primary">
             Next Steps
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Button
-              className="h-auto py-6 flex-col gap-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+              variant="accent"
+              className="h-auto py-6 flex-col gap-2"
             >
               <Calendar className="w-6 h-6" />
               <span>Schedule Appointment</span>
@@ -217,7 +296,7 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
             </Button>
 
             <Button
-              className="h-auto py-6 flex-col gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="h-auto py-6 flex-col gap-2 rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
             >
               <TrendingUp className="w-6 h-6" />
               <span>Complete Full Screening</span>

@@ -15,9 +15,9 @@ const normalizeStatus = (value: string | undefined) =>
     .toLowerCase();
 
 const priorityBadgeClass: Record<string, string> = {
-  high: 'bg-red-100 text-red-800 border-red-200',
-  medium: 'bg-orange-100 text-orange-800 border-orange-200',
-  low: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  high: 'bg-muted text-destructive border',
+  medium: 'bg-accent/10 text-accent-foreground border-border',
+  low: 'bg-secondary text-primary border-border',
 };
 
 const assignedChipBtn =
@@ -55,9 +55,9 @@ function statusDisplayLabel(normalized: string): string {
 }
 
 function statusBadgeClassForCard(normalized: string): string {
-  if (normalized === 'in-progress') return 'rounded-full border-0 bg-slate-900 px-3 py-2 text-xs font-medium text-white';
-  if (normalized === 'accepted') return 'rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800';
-  return 'rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700';
+  if (normalized === 'in-progress') return 'rounded-full border-0 bg-primary px-3 py-2 text-xs font-medium text-white';
+  if (normalized === 'accepted') return 'rounded-full border bg-card px-3 py-2 text-xs font-medium text-foreground';
+  return 'rounded-full border bg-muted px-3 py-2 text-xs font-medium text-foreground';
 }
 
 type StatusFilter = 'all' | 'pending' | 'accepted' | 'in-progress';
@@ -155,12 +155,12 @@ export function TherapistAssignedCases() {
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 pb-10 pt-2">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Assigned Cases</h1>
-        <p className="text-base text-slate-600">Manage your assigned children and their therapy programs</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">Assigned Cases</h1>
+        <p className="text-base text-muted-foreground">Manage your assigned children and their therapy programs</p>
       </header>
 
       {error ? (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="flex items-center gap-2 rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -171,8 +171,8 @@ export function TherapistAssignedCases() {
           <Label htmlFor="assigned-cases-search" className="sr-only">
             Search cases
           </Label>
-          <div className="flex h-11 w-full min-w-0 items-center gap-2.5 rounded-lg border border-slate-200 bg-[#f5f5f5] px-3 shadow-sm transition-[color,box-shadow] focus-within:border-slate-300 focus-within:ring-2 focus-within:ring-slate-200/80">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          <div className="flex h-11 w-full min-w-0 items-center gap-2.5 rounded-lg border border-border bg-background px-3 shadow-sm transition-[color,box-shadow] focus-within:border focus-within:ring-2 focus-within:ring-ring/40">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             <Input
               id="assigned-cases-search"
               type="search"
@@ -180,7 +180,7 @@ export function TherapistAssignedCases() {
               placeholder="Search by name, age, or therapy domain..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-slate-900 shadow-none placeholder:text-slate-500 focus-visible:ring-0 md:text-sm"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-sm"
             />
           </div>
         </div>
@@ -189,17 +189,17 @@ export function TherapistAssignedCases() {
             <Button
               type="button"
               variant="outline"
-              className="h-11 shrink-0 border-slate-300 bg-white px-4 text-slate-800 shadow-sm hover:bg-slate-50"
+              className="h-11 shrink-0 border bg-card px-4 text-foreground shadow-sm hover:bg-background"
             >
-              <Filter className="mr-2 h-4 w-4 text-slate-600" aria-hidden />
+              <Filter className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden />
               Filters
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-72 p-0" align="end">
-            <div className="border-b border-slate-100 px-3 py-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Status</p>
-              <p className="text-sm text-slate-600">
-                Current: <span className="font-medium text-slate-900">{activeFilterLabel}</span>
+            <div className="border-b border px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
+              <p className="text-sm text-muted-foreground">
+                Current: <span className="font-medium text-foreground">{activeFilterLabel}</span>
               </p>
             </div>
             <div className="flex flex-col p-1">
@@ -211,8 +211,8 @@ export function TherapistAssignedCases() {
                   className={cn(
                     'rounded-md px-3 py-2 text-left text-sm transition-colors',
                     statusFilter === opt.value
-                      ? 'bg-slate-100 font-medium text-slate-900'
-                      : 'text-slate-700 hover:bg-slate-50'
+                      ? 'bg-muted font-medium text-foreground'
+                      : 'text-foreground hover:bg-background'
                   )}
                 >
                   {opt.label}
@@ -225,14 +225,14 @@ export function TherapistAssignedCases() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+          <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center text-sm text-slate-600">
+        <div className="rounded-xl border-dashed border bg-muted/80 px-6 py-12 text-center text-sm text-muted-foreground">
           No assigned referrals at the moment.
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center text-sm text-slate-600">
+        <div className="rounded-xl border-dashed border bg-muted/80 px-6 py-12 text-center text-sm text-muted-foreground">
           No cases match your search or filters.
         </div>
       ) : (
@@ -256,56 +256,56 @@ export function TherapistAssignedCases() {
             return (
               <li
                 key={item._id}
-                className="flex flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                className="flex flex-col rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1">
-                    <h2 className="text-lg font-bold text-slate-900">{childName}</h2>
-                    <p className="text-sm text-slate-500">{ageGenderLine || '—'}</p>
+                    <h2 className="text-lg font-bold text-foreground">{childName}</h2>
+                    <p className="text-sm text-muted-foreground">{ageGenderLine || '—'}</p>
                   </div>
                   <span className={cn('shrink-0', statusBadgeClassForCard(normalizedStatus))}>
                     {statusDisplayLabel(normalizedStatus)}
                   </span>
                 </div>
 
-                <div className="mt-5 space-y-4 border-t border-slate-100 pt-5">
+                <div className="mt-5 space-y-4 border-t border pt-5">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Parent contact</p>
-                    <p className="mt-1 text-sm text-slate-900">{parentContact}</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Parent contact</p>
+                    <p className="mt-1 text-sm text-foreground">{parentContact}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Therapy domains</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Therapy domains</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800">
+                      <span className="inline-flex rounded-full border bg-muted px-3 py-1 text-xs font-medium text-foreground">
                         {domainLabel}
                       </span>
                     </div>
                   </div>
                   {item.priority ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">Priority</span>
+                      <span className="text-xs text-muted-foreground">Priority</span>
                       <Badge
                         variant="outline"
-                        className={cn('text-xs', priorityBadgeClass[item.priority] || 'border-slate-200 bg-slate-50')}
+                        className={cn('text-xs', priorityBadgeClass[item.priority] || 'border bg-background')}
                       >
                         {item.priority}
                       </Badge>
                     </div>
                   ) : null}
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Last session</p>
-                    <p className="mt-1 text-sm text-slate-900">{lastSessionLabel}</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Last session</p>
+                    <p className="mt-1 text-sm text-foreground">{lastSessionLabel}</p>
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-5">
+                <div className="mt-6 flex flex-col gap-2 border-t border pt-5">
                   {normalizedStatus === 'pending' ? (
                     <>
                       <Button
                         type="button"
                         className={cn(
                           assignedChipBtn,
-                          'w-full border border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+                          'w-full border bg-card text-foreground hover:bg-background'
                         )}
                         onClick={() => accept(item._id)}
                         disabled={actingId === item._id}
@@ -319,7 +319,7 @@ export function TherapistAssignedCases() {
                           variant="outline"
                           className={cn(
                             assignedChipBtn,
-                            'w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+                            'w-full border bg-card text-foreground hover:bg-background'
                           )}
                           onClick={() => navigate(`/therapist/case/${caseIdForRoute}`)}
                         >
@@ -334,7 +334,7 @@ export function TherapistAssignedCases() {
                         type="button"
                         className={cn(
                           assignedChipBtn,
-                          'w-full border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white'
+                          'w-full border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
                         )}
                         onClick={() => start(item._id)}
                         disabled={actingId === item._id}
@@ -345,7 +345,7 @@ export function TherapistAssignedCases() {
                       <Button
                         type="button"
                         variant="outline"
-                        className={cn(assignedChipBtn, 'w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50')}
+                        className={cn(assignedChipBtn, 'w-full border bg-card text-foreground hover:bg-background')}
                         onClick={() => navigate(`/therapist/case/${caseIdForRoute}`)}
                       >
                         View Case File
@@ -356,7 +356,7 @@ export function TherapistAssignedCases() {
                     <Button
                       type="button"
                       variant="outline"
-                      className={cn(assignedChipBtn, 'w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50')}
+                      className={cn(assignedChipBtn, 'w-full border bg-card text-foreground hover:bg-background')}
                       onClick={() => navigate(`/therapist/case/${caseIdForRoute}`)}
                     >
                       View Case File

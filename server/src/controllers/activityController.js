@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const Activity = require('../models/Activity');
 const TherapyPlan = require('../models/TherapyPlan');
@@ -12,6 +13,7 @@ const {
   ACTIVITY_DOMAIN_OPTIONS,
   DIFFICULTY_OPTIONS,
 } = require('../utils/activityShared');
+const { invalidateProgressEngineCache } = require('../services/progressEngine');
 
 function applyActivityFields(doc, n) {
   doc.name = n.name;
@@ -227,7 +229,7 @@ exports.assignActivity = async (req, res) => {
       return res.status(400).json({ success: false, message: 'assignTo must be "plan" or "home"' });
     }
 
-    const activeTherapyCase = await TherapyCase.findOne({ caseId, therapistId, status: 'active' }).lean();
+    const activeTherapyCase = await TherapyCase.findOne({ caseId, therapistId, status: 'ACTIVE' }).lean();
     if (!activeTherapyCase) {
       return res.status(400).json({
         success: false,
@@ -241,12 +243,12 @@ exports.assignActivity = async (req, res) => {
     }
 
     if (assignTo === 'home') {
-      let due = dueDate ? new Date(dueDate) : new Date();
+      let due = dueDate ? new Date(dueDate) : getCurrentTime();
       if (dueDate && Number.isNaN(due.getTime())) {
         return res.status(400).json({ success: false, message: 'Invalid dueDate' });
       }
       if (!dueDate) {
-        due = new Date();
+        due = getCurrentTime();
         due.setDate(due.getDate() + 7);
       }
 
@@ -265,6 +267,12 @@ exports.assignActivity = async (req, res) => {
         activityId: activity._id,
         sourceActivityId: activity._id,
       });
+
+      try {
+        invalidateProgressEngineCache(caseId);
+      } catch (_) {
+        /* ignore */
+      }
 
       return res.status(201).json({
         success: true,
@@ -302,6 +310,12 @@ exports.assignActivity = async (req, res) => {
       libraryActivityId: activity._id,
     });
     await plan.save();
+
+    try {
+      invalidateProgressEngineCache(caseId);
+    } catch (_) {
+      /* ignore */
+    }
 
     return res.status(200).json({
       success: true,

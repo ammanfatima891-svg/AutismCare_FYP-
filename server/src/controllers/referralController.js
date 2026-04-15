@@ -1,3 +1,4 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const mongoose = require('mongoose');
 const { Referral, THERAPIST_TYPES, REFERRAL_PRIORITY } = require('../models/Referral');
 const { ChildCase } = require('../models/ChildCase');
@@ -7,6 +8,8 @@ const TherapyCase = require('../models/TherapyCase');
 const SessionLog = require('../models/SessionLog');
 const { createNotificationIfNotExists, createNotification } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
+const { REFERRAL_STATUS, EVALUATION_STATUS, THERAPY_STATUS } = require('../constants/workflowEnums');
+const { recordAuditEvent } = require('../utils/auditLog');
 
 function normalizeText(value) {
   return String(value || '')
@@ -118,9 +121,25 @@ async function mapCaseDetails(caseDoc) {
 exports.createReferral = async (req, res) => {
   try {
     const clinicianId = req.user._id;
-    const { caseId, therapistType, priority, notes } = req.body || {};
+    const { caseId, therapistType, priority, notes, specialists, diagnosis, childId } = req.body || {};
 
-    if (!caseId || !therapistType || !priority) {
+    // Compatibility: accept either the legacy referral payload:
+    // { caseId, therapistType, priority, notes }
+    // or CDSS-style payload:
+    // { childId, diagnosis, notes, specialists[] } (caseId preferred when available)
+    const specialistList = Array.isArray(specialists)
+      ? specialists.map((s) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean)
+      : [];
+
+    // If CDSS payload is used, map to the first specialist + default priority.
+    // (Frontend uses the legacy endpoint by creating one referral per specialist.)
+    const effectiveTherapistType =
+      therapistType ||
+      (specialistList.length > 0 ? specialistList[0] : '');
+    const effectivePriority = priority || 'medium';
+    const effectiveCaseId = caseId;
+
+    if (!effectiveCaseId || !effectiveTherapistType || !effectivePriority) {
       return res.status(400).json({
         success: false,
         message: 'caseId, therapistType and priority are required',
@@ -129,10 +148,10 @@ exports.createReferral = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(caseId)) {
       return res.status(400).json({ success: false, message: 'Invalid caseId' });
     }
-    if (!THERAPIST_TYPES.includes(therapistType)) {
+    if (!THERAPIST_TYPES.includes(effectiveTherapistType)) {
       return res.status(400).json({ success: false, message: 'Invalid therapistType' });
     }
-    if (!REFERRAL_PRIORITY.includes(priority)) {
+    if (!REFERRAL_PRIORITY.includes(effectivePriority)) {
       return res.status(400).json({ success: false, message: 'Invalid priority' });
     }
 
@@ -144,19 +163,20 @@ exports.createReferral = async (req, res) => {
     const finalEval = await ClinicalEvaluation.findOne({
       caseId,
       clinicianId,
-      status: 'final',
+      status: EVALUATION_STATUS.FINALIZED,
     }).lean();
     if (!finalEval) {
       return res.status(400).json({
         success: false,
         message: 'Finalize clinical evaluation first',
+        errorCode: 'EVALUATION_REQUIRED',
       });
     }
 
     const duplicateActive = await Referral.findOne({
       caseId,
-      therapistType,
-      status: { $in: ['pending', 'accepted', 'in-progress'] },
+      therapistType: effectiveTherapistType,
+      status: { $in: [REFERRAL_STATUS.CREATED, REFERRAL_STATUS.SENT, REFERRAL_STATUS.ACCEPTED] },
     }).lean();
 
     if (duplicateActive) {
@@ -169,20 +189,35 @@ exports.createReferral = async (req, res) => {
     const created = await Referral.create({
       caseId,
       clinicianId,
-      therapistType,
-      priority,
+      therapistType: effectiveTherapistType,
+      priority: effectivePriority,
       notes: typeof notes === 'string' ? notes.trim() : '',
-      status: 'pending',
+      status: REFERRAL_STATUS.CREATED,
     });
 
     try {
-      const therapistIds = await getTherapistUserIdsForReferralType(therapistType);
+      await recordAuditEvent({
+        req,
+        actorId: clinicianId,
+        action: 'referral_created',
+        entityType: 'Referral',
+        entityId: created._id,
+        caseId,
+        summary: `${effectiveTherapistType} priority=${effectivePriority}`,
+        after: { status: created.status, therapistType: created.therapistType, priority: created.priority },
+      });
+    } catch (e) {
+      console.error('audit referral_created:', e);
+    }
+
+    try {
+      const therapistIds = await getTherapistUserIdsForReferralType(effectiveTherapistType);
       for (const rid of therapistIds) {
         await createNotification({
           recipientId: rid,
           type: NOTIFICATION_TYPES.THERAPIST_NEW_REFERRAL,
           title: 'New referral assigned',
-          message: `A new ${therapistType} referral is available (priority: ${priority}).`,
+          message: `A new ${effectiveTherapistType} referral is available (priority: ${effectivePriority}).`,
           relatedResourceType: 'Referral',
           relatedResourceId: created._id,
           relatedCaseId: caseId,
@@ -196,6 +231,13 @@ exports.createReferral = async (req, res) => {
       success: true,
       message: 'Referral created successfully',
       data: created,
+      meta: {
+        cdss: {
+          childId: childId || null,
+          diagnosis: diagnosis || null,
+          specialists: specialistList,
+        },
+      },
     });
   } catch (error) {
     console.error('createReferral:', error);
@@ -228,7 +270,7 @@ exports.getReferralsByCase = async (req, res) => {
     const finalEvalExists = !!(await ClinicalEvaluation.findOne({
       caseId,
       clinicianId,
-      status: 'final',
+      status: EVALUATION_STATUS.FINALIZED,
     }).lean());
 
     return res.status(200).json({
@@ -290,6 +332,15 @@ exports.getAssignedReferrals = async (req, res) => {
       lastSessionByCaseId = new Map(lastAgg.map((row) => [String(row._id), row.lastSessionDate]));
     }
 
+    const toApiReferralStatus = (status) => {
+      const v = String(status || '').trim().toUpperCase();
+      if (v === REFERRAL_STATUS.CREATED) return 'pending';
+      if (v === REFERRAL_STATUS.SENT) return 'sent';
+      if (v === REFERRAL_STATUS.ACCEPTED) return 'accepted';
+      if (v === REFERRAL_STATUS.REJECTED) return 'rejected';
+      return String(status || '').trim().toLowerCase() || '';
+    };
+
     const enriched = [];
     for (const ref of referrals) {
       const caseDoc = caseMap.get(ref.caseId.toString());
@@ -297,6 +348,7 @@ exports.getAssignedReferrals = async (req, res) => {
       const details = await mapCaseDetails(caseDoc);
       enriched.push({
         ...ref,
+        status: toApiReferralStatus(ref.status),
         case: details,
         lastSessionDate: lastSessionByCaseId.get(ref.caseId.toString()) || null,
       });
@@ -315,7 +367,7 @@ exports.getAssignedReferrals = async (req, res) => {
 
 /**
  * PATCH /api/referrals/:id/accept
- * Therapist accepts referral: pending -> accepted
+ * Therapist accepts referral: CREATED -> ACCEPTED
  */
 exports.acceptReferral = async (req, res) => {
   try {
@@ -334,12 +386,30 @@ exports.acceptReferral = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized for this referral type' });
     }
 
-    if (referral.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'Only pending referrals can be accepted' });
+    if (referral.status !== REFERRAL_STATUS.CREATED && referral.status !== REFERRAL_STATUS.SENT) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Only CREATED/SENT referrals can be accepted' });
     }
 
-    referral.status = 'accepted';
+    referral.status = REFERRAL_STATUS.ACCEPTED;
     await referral.save();
+
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: req.user._id,
+        action: 'referral_accepted',
+        entityType: 'Referral',
+        entityId: referral._id,
+        caseId: referral.caseId,
+        summary: 'Referral accepted by therapist',
+        before: { status: REFERRAL_STATUS.CREATED },
+        after: { status: referral.status },
+      });
+    } catch (e) {
+      console.error('audit referral_accepted:', e);
+    }
 
     const caseDoc = await ChildCase.findById(referral.caseId).select('clinicianId').lean();
     if (caseDoc?.clinicianId) {
@@ -362,7 +432,7 @@ exports.acceptReferral = async (req, res) => {
 
 /**
  * PATCH /api/referrals/:id/start
- * Therapist starts therapy: accepted -> in-progress
+ * Therapist starts therapy: ACCEPTED -> (referral stays ACCEPTED); therapy case becomes ACTIVE
  */
 exports.startReferral = async (req, res) => {
   try {
@@ -381,12 +451,11 @@ exports.startReferral = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized for this referral type' });
     }
 
-    if (referral.status !== 'accepted') {
-      return res.status(400).json({ success: false, message: 'Only accepted referrals can start therapy' });
+    if (referral.status !== REFERRAL_STATUS.ACCEPTED) {
+      return res.status(400).json({ success: false, message: 'Only ACCEPTED referrals can start therapy' });
     }
 
-    referral.status = 'in-progress';
-    await referral.save();
+    // Referral remains ACCEPTED; therapy lifecycle is tracked on TherapyCase.
 
     // Extend flow (without modifying referral schema): create/update therapy case activation record.
     const therapyCase = await TherapyCase.findOneAndUpdate(
@@ -395,17 +464,33 @@ exports.startReferral = async (req, res) => {
         caseId: referral.caseId,
         therapistId: req.user._id,
         referralId: referral._id,
-        status: 'active',
-        startedAt: new Date(),
+        status: THERAPY_STATUS.ACTIVE,
+        startedAt: getCurrentTime(),
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: req.user._id,
+        action: 'therapy_started',
+        entityType: 'TherapyCase',
+        entityId: therapyCase._id,
+        caseId: referral.caseId,
+        summary: `TherapyCase status=${THERAPY_STATUS.ACTIVE} from referral=${String(referral._id)}`,
+        after: { status: THERAPY_STATUS.ACTIVE, referralId: String(referral._id) },
+      });
+    } catch (e) {
+      console.error('audit therapy_started:', e);
+    }
 
     // PATCH /api/referrals/:id/start and PATCH /api/therapist/referrals/:id/start-therapy both use this handler.
     return res.status(200).json({
       success: true,
       message: 'Therapy started',
-      data: referral,
+      // API/UI expects a visible transition to "in-progress" once therapy begins.
+      data: { ...referral.toJSON(), status: 'in-progress' },
       therapyCase,
       caseId: referral.caseId,
     });

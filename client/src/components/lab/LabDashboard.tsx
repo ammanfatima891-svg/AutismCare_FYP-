@@ -14,9 +14,9 @@ interface LabDashboardProps {
 }
 
 const navigation = [
-    { id: 'home', label: 'Dashboard', icon: Home, color: 'text-teal-600' },
-    { id: 'requests', label: 'Test Requests', icon: ClipboardList, color: 'text-blue-600' },
-    { id: 'reports', label: 'Reports', icon: FileText, color: 'text-purple-600' },
+    { id: 'home', label: 'Dashboard', icon: Home, color: 'text-primary' },
+    { id: 'requests', label: 'Test Requests', icon: ClipboardList, color: 'text-primary' },
+    { id: 'reports', label: 'Reports', icon: FileText, color: 'text-primary' },
 ];
 
 export function LabDashboard({ user, onLogout }: LabDashboardProps) {

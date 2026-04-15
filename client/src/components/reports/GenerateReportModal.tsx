@@ -57,18 +57,18 @@ export function GenerateReportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="z-[1301] gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 sm:max-w-md">
-        <DialogHeader className="border-b border-slate-100 bg-sky-50/40 px-6 py-5 text-left">
-          <DialogTitle className="text-lg font-semibold text-slate-900">Generate report</DialogTitle>
-          <DialogDescription className="text-sm text-slate-600">
+      <DialogContent className="z-[1301] gap-0 overflow-hidden rounded-2xl border p-0 sm:max-w-md">
+        <DialogHeader className="border-b border bg-blue-50/40 px-6 py-5 text-left">
+          <DialogTitle className="text-lg font-semibold text-foreground">Generate report</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
             Choose a child and report type. The document is built from existing case data and analytics.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 px-6 py-5">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-500">Child</label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Child</label>
             <Select value={caseId} onValueChange={setCaseId}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-200">
+              <SelectTrigger className="h-11 rounded-xl border">
                 <SelectValue placeholder={loadingCases ? 'Loading…' : 'Select child'} />
               </SelectTrigger>
               <SelectContent>
@@ -81,9 +81,9 @@ export function GenerateReportModal({
             </Select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-500">Report type</label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Report type</label>
             <Select value={reportType} onValueChange={setReportType}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-200">
+              <SelectTrigger className="h-11 rounded-xl border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-[min(320px,50vh)]">
@@ -94,14 +94,14 @@ export function GenerateReportModal({
                 ))}
               </SelectContent>
             </Select>
-            {typeHelp ? <p className="mt-1.5 text-xs text-slate-500">{typeHelp}</p> : null}
+            {typeHelp ? <p className="mt-1.5 text-xs text-muted-foreground">{typeHelp}</p> : null}
           </div>
         </div>
-        <DialogFooter className="gap-2 border-t border-slate-100 bg-slate-50/50 px-6 py-4 sm:justify-end">
+        <DialogFooter className="gap-2 border-t border bg-background/50 px-6 py-4 sm:justify-end">
           <Button
             type="button"
             variant="outline"
-            className="rounded-xl border-slate-200"
+            className="rounded-xl border"
             onClick={() => onOpenChange(false)}
             disabled={submitting}
           >
@@ -109,7 +109,7 @@ export function GenerateReportModal({
           </Button>
           <Button
             type="button"
-            className="rounded-xl border-2 border-amber-200/90 bg-sky-600 text-white shadow-sm hover:bg-sky-700"
+            className="rounded-xl border-2 border-yellow-200 bg-blue-600 text-white shadow-sm hover:bg-blue-700"
             disabled={submitting || !caseId}
             onClick={() => void handleSubmit()}
           >

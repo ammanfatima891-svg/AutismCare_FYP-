@@ -7,6 +7,7 @@ const {
   createCaseForClinician,
   syncCasesForClinicianFromApprovedAppointments,
 } = require('../services/childCase.service');
+const { getLabRequestsForCase } = require('../utils/labCaseIntegration');
 
 function childDisplayName(childSub) {
   if (!childSub) return 'Unknown child';
@@ -127,6 +128,8 @@ exports.getCaseById = async (req, res) => {
       if (appt) appointment = appt;
     }
 
+    const labRequests = await getLabRequestsForCase(doc, 'clinician');
+
     res.status(200).json({
       success: true,
       data: {
@@ -134,6 +137,7 @@ exports.getCaseById = async (req, res) => {
         childProfile,
         parentInfo,
         appointment,
+        labRequests,
         statusOptions: Object.values(CASE_STATUS),
       },
     });

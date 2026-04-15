@@ -1,8 +1,13 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const { User } = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
 const sendEmail = require('../utils/email');
+
+function shouldLogAuthRegistrationDebug() {
+  return process.env.DEBUG_AUTH_REGISTRATION === 'true';
+}
 
 // Helper: Generate JWT
 const signToken = (user) => {
@@ -16,7 +21,9 @@ const signToken = (user) => {
 // ---------------- REGISTER ----------------
 exports.register = async (req, res) => {
   try {
-    console.log('Registration request body:', req.body);
+    if (shouldLogAuthRegistrationDebug()) {
+      console.log('Registration request body:', req.body);
+    }
 
     // 1. Explicitly destructure fields to prevent mass-assignment vulnerabilities
     // We do NOT use ...req.body here to prevent malicious injection (e.g., injecting isEmailVerified: true)
@@ -44,7 +51,9 @@ exports.register = async (req, res) => {
     // 3. Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('Email already registered:', email);
+      if (shouldLogAuthRegistrationDebug()) {
+        console.log('Email already registered:', email);
+      }
       return res.status(400).json({ message: 'Email already registered' });
     }
 
@@ -77,7 +86,7 @@ exports.register = async (req, res) => {
     // 5. Generate email verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     newUser.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
-    newUser.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    newUser.emailVerificationExpires = getCurrentTimeMs() + 24 * 60 * 60 * 1000; // 24 hours
 
     await newUser.save();
 
@@ -112,12 +121,19 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ message: 'Invalid credential format' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password;
+
     // Find user and explicitly select password
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     // Check password
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await user.comparePassword(normalizedPassword);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
     // Check verification status
@@ -131,7 +147,7 @@ exports.login = async (req, res) => {
     }
 
     // Update audit fields
-    user.lastLogin = new Date();
+    user.lastLogin = getCurrentTime();
     user.loginAttempts = 0;
     await user.save({ validateBeforeSave: false }); // Skip validation for login updates
 
@@ -158,7 +174,7 @@ exports.verifyEmail = async (req, res) => {
 
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
-      emailVerificationExpires: { $gt: Date.now() }
+      emailVerificationExpires: { $gt: getCurrentTimeMs() }
     });
 
     if (!user) return res.status(400).json({ message: 'Token is invalid or has expired' });
@@ -187,7 +203,7 @@ exports.resendVerificationEmail = async (req, res) => {
     // Generate new verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     user.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
-    user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    user.emailVerificationExpires = getCurrentTimeMs() + 24 * 60 * 60 * 1000; // 24 hours
 
     await user.save({ validateBeforeSave: false });
 
@@ -242,7 +258,7 @@ exports.resetPassword = async (req, res) => {
 
     const user = await User.findOne({
       passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: Date.now() }
+      passwordResetExpires: { $gt: getCurrentTimeMs() }
     });
 
     if (!user) return res.status(400).json({ message: 'Token is invalid or has expired' });

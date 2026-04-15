@@ -55,7 +55,7 @@ export function ClinicalNotesForm({ appointmentId, onSuccess, onCancel }: Clinic
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm">{error}</div>
+            <div className="text-destructive text-sm">{error}</div>
           )}
 
           <div className="flex gap-4">

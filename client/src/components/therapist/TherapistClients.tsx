@@ -124,7 +124,7 @@ export function TherapistClients() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <h2 className="text-purple-600 text-xl font-semibold">
+      <h2 className="text-primary text-xl font-semibold">
         My Clients
       </h2>
 
@@ -135,11 +135,11 @@ export function TherapistClients() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle>{client.name}</CardTitle>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {client.age} years • {client.therapyType}
                   </p>
                 </div>
-                <Badge className="bg-purple-600">Active</Badge>
+                <Badge className="bg-primary">Active</Badge>
               </div>
             </CardHeader>
 
@@ -159,7 +159,7 @@ export function TherapistClients() {
                 (a) => a.clientId === client.id
               ).length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-600">
+                  <p className="text-sm font-semibold text-muted-foreground">
                     Assigned Activities
                   </p>
 
@@ -171,7 +171,7 @@ export function TherapistClients() {
                         className="flex justify-between items-center border rounded-md p-2"
                       >
                         <span className="text-sm">{activity.title}</span>
-                        <Badge className="bg-green-500">Assigned</Badge>
+                        <Badge className="bg-primary/200">Assigned</Badge>
                       </div>
                     ))}
                 </div>
@@ -179,7 +179,7 @@ export function TherapistClients() {
 
               <div className="flex gap-2">
                 <Button
-                  className="flex-1 bg-green-600"
+                  className="flex-1 bg-primary"
                   onClick={() =>
                     navigate(`/therapist/clients/${client.id}`)
                   }
@@ -222,10 +222,10 @@ export function TherapistClients() {
                 >
                   <div>
                     <p className="font-semibold">{activity.title}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {activity.description}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       Duration: {activity.duration}
                     </p>
                   </div>

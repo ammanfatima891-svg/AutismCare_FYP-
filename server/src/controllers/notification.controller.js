@@ -7,6 +7,7 @@ const {
     deleteNotification,
     createFollowUpDueNotifications
 } = require('../utils/notification');
+const mongoose = require('mongoose');
 
 function isClinician(req) {
     const role = String(req.user?.role ?? req.jwtRole ?? '').trim().toLowerCase();
@@ -69,6 +70,13 @@ const markNotificationAsRead = async (req, res) => {
     try {
         const userId = authUserId(req);
         const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(String(id))) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid notification id'
+            });
+        }
 
         const notification = await markAsRead(id, userId);
 
@@ -141,6 +149,14 @@ const removeNotification = async (req, res) => {
     try {
         const userId = authUserId(req);
         const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(String(id))) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid notification id'
+            });
+        }
+
         const deleted = await deleteNotification(id, userId);
 
         if (!deleted) {

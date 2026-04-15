@@ -48,8 +48,8 @@ export function TherapistCommunicationTopBar({
         className={cn(
           'relative flex h-10 w-10 items-center justify-center rounded-full transition-colors',
           clinical
-            ? 'text-sky-800 hover:bg-sky-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-sky-400/40'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'text-primary hover:bg-muted focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring/50'
+            : 'text-muted-foreground hover:bg-muted'
         )}
         aria-label="Open messages"
         title="Messages"
@@ -59,7 +59,7 @@ export function TherapistCommunicationTopBar({
           <span
             className={cn(
               'absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold',
-              clinical ? 'bg-sky-600 text-white' : 'bg-slate-700 text-white'
+              clinical ? 'bg-primary text-primary-foreground' : 'bg-primary text-primary-foreground'
             )}
           >
             {threadCount > 99 ? '99+' : threadCount}

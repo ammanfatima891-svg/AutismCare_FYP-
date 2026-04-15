@@ -1,8 +1,11 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 /**
  * Auto-generated therapy reports (monthly, IEP, clinician, parent) from plan + sessions + assignments + analytics.
  * No manual editing — data is derived from existing collections only.
  */
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 const { ChildCase } = require('../models/ChildCase');
 const { User } = require('../models/User');
 const TherapyPlan = require('../models/TherapyPlan');
@@ -12,14 +15,19 @@ const { ClinicalEvaluation } = require('../models/ClinicalEvaluation');
 const { Report, REPORT_TYPES } = require('../models/Report');
 const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
 const { assertUserCaseAccess } = require('../utils/caseAccess');
-const { buildCaseAnalyticsSnapshot } = require('../services/caseAnalyticsSnapshot');
+const { buildUnifiedCaseAnalytics } = require('../services/caseAnalyticsSnapshot');
+const { buildProgressEnginePayload } = require('../services/progressEngine');
+const { buildIntegratedTherapyReport } = require('../services/reportGenerator');
+const { writeIntegratedReportPdf, writeGenericReportPdf } = require('../services/reportPdfService');
 const { parseResponseScore } = require('../utils/sessionResponseScore');
+const TherapyCase = require('../models/TherapyCase');
+const { THERAPY_STATUS } = require('../constants/workflowEnums');
 
 function ageFromDob(dob) {
   if (!dob) return null;
   const d = new Date(dob);
   if (Number.isNaN(d.getTime())) return null;
-  const diff = Date.now() - d.getTime();
+  const diff = getCurrentTimeMs() - d.getTime();
   return Math.max(0, Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000)));
 }
 
@@ -65,6 +73,7 @@ function normalizeReportType(input) {
   if (raw === 'session-summary') return 'session';
   if (raw === 'progress-report') return 'progress';
   if (raw === 'therapy-report') return 'therapy';
+  if (raw === 'integrated' || raw === 'integrated-report') return 'integrated';
   return raw;
 }
 
@@ -154,7 +163,7 @@ function buildIepPayload(ctx) {
   const reviewTimelineWeeks = { min: 4, max: 6 };
   const suggestedReviewBy = nextReview
     ? nextReview.toISOString()
-    : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
+    : new Date(getCurrentTimeMs() + 28 * 24 * 60 * 60 * 1000).toISOString();
 
   return {
     longTermGoals,
@@ -327,7 +336,7 @@ function buildTherapyPayload(ctx) {
 }
 
 function assembleReportData(type, ctx) {
-  const generatedAt = new Date().toISOString();
+  const generatedAt = getCurrentTime().toISOString();
   const base = {
     type,
     generatedAt,
@@ -349,10 +358,116 @@ function assembleReportData(type, ctx) {
       return { ...base, ...buildSessionPayload(ctx) };
     case 'therapy':
       return { ...base, ...buildTherapyPayload(ctx) };
+    case 'integrated': {
+      const progressEngine = buildProgressEnginePayload({
+        caseId: String(ctx.caseDoc._id),
+        plan: ctx.plan,
+        sessions: ctx.sessionsAsc,
+        assignments: ctx.assignments,
+      });
+      return {
+        ...base,
+        ...buildIntegratedTherapyReport({
+          childInfo: ctx.childInfo,
+          caseDoc: ctx.caseDoc,
+          plan: ctx.plan,
+          sessionsAsc: ctx.sessionsAsc,
+          assignments: ctx.assignments,
+          progressEngine,
+          evaluation: ctx.evaluation,
+        }),
+      };
+    }
     default:
       return base;
   }
 }
+
+/**
+ * POST /api/reports/generate/:caseId
+ * Progress-engine–aware integrated report (type: integrated).
+ */
+exports.generateReportByCaseId = async (req, res) => {
+  try {
+    const { caseId } = req.params || {};
+    if (!mongoose.Types.ObjectId.isValid(caseId)) {
+      return res.status(400).json({ success: false, message: 'Invalid caseId' });
+    }
+
+    const therapistId = req.user._id;
+    const access = await assertTherapistCaseAccess(req, caseId, therapistId);
+    if (!access.ok) {
+      return res.status(access.status || 403).json({ success: false, message: access.message || 'Access denied' });
+    }
+
+    // Strict workflow dependency: reports can only be generated for valid therapy states.
+    const therapyCase = await TherapyCase.findOne({
+      caseId,
+      therapistId,
+      status: { $in: [THERAPY_STATUS.ACTIVE, THERAPY_STATUS.COMPLETED] },
+    })
+      .select('_id status')
+      .lean();
+    if (!therapyCase) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reports can only be generated for ACTIVE or COMPLETED therapy cases.',
+        errorCode: 'INVALID_THERAPY_STATE',
+      });
+    }
+
+    const caseDoc = await ChildCase.findById(caseId).lean();
+    if (!caseDoc) {
+      return res.status(404).json({ success: false, message: 'Case not found' });
+    }
+
+    const [plan, sessions, assignments, evaluation] = await Promise.all([
+      TherapyPlan.findOne({ caseId, therapistId }).lean(),
+      SessionLog.find({ caseId, therapistId }).sort({ sessionDate: 1 }).lean(),
+      HomeAssignment.find({ caseId, therapistId }).lean(),
+      ClinicalEvaluation.findOne({ caseId, status: 'FINALIZED' }).sort({ createdAt: -1 }).lean(),
+    ]);
+
+    const sessionsAsc = [...sessions];
+    const progressEngine = buildProgressEnginePayload({
+      caseId: String(caseId),
+      plan,
+      sessions: sessionsAsc,
+      assignments,
+    });
+    const childInfo = await loadChildDisplay(caseDoc);
+
+    const data = buildIntegratedTherapyReport({
+      childInfo,
+      caseDoc,
+      plan: plan || {},
+      sessionsAsc,
+      assignments,
+      progressEngine,
+      evaluation,
+    });
+
+    const doc = await Report.create({
+      caseId,
+      therapistId,
+      type: 'integrated',
+      data,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        reportId: doc._id,
+        type: 'integrated',
+        generatedAt: doc.data.generatedAt,
+        data: doc.data,
+      },
+    });
+  } catch (error) {
+    console.error('generateReportByCaseId:', error);
+    return res.status(500).json({ success: false, message: 'Failed to generate integrated report' });
+  }
+};
 
 /**
  * POST /api/reports/generate
@@ -374,6 +489,21 @@ exports.generateReport = async (req, res) => {
       return res.status(access.status || 403).json({ success: false, message: access.message || 'Access denied' });
     }
 
+    const therapyCase = await TherapyCase.findOne({
+      caseId,
+      therapistId,
+      status: { $in: [THERAPY_STATUS.ACTIVE, THERAPY_STATUS.COMPLETED] },
+    })
+      .select('_id status')
+      .lean();
+    if (!therapyCase) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reports can only be generated for ACTIVE or COMPLETED therapy cases.',
+        errorCode: 'INVALID_THERAPY_STATE',
+      });
+    }
+
     const caseDoc = await ChildCase.findById(caseId).lean();
     if (!caseDoc) {
       return res.status(404).json({ success: false, message: 'Case not found' });
@@ -383,11 +513,11 @@ exports.generateReport = async (req, res) => {
       TherapyPlan.findOne({ caseId, therapistId }).lean(),
       SessionLog.find({ caseId, therapistId }).sort({ sessionDate: 1 }).lean(),
       HomeAssignment.find({ caseId, therapistId }).lean(),
-      ClinicalEvaluation.findOne({ caseId, status: 'final' }).sort({ createdAt: -1 }).lean(),
+      ClinicalEvaluation.findOne({ caseId, status: 'FINALIZED' }).sort({ createdAt: -1 }).lean(),
     ]);
 
     const sessionsAsc = [...sessions];
-    const analytics = buildCaseAnalyticsSnapshot({ plan, sessions: sessionsAsc, assignments });
+    const analytics = buildUnifiedCaseAnalytics({ plan, sessions: sessionsAsc, assignments });
     const childInfo = await loadChildDisplay(caseDoc);
 
     const ctx = {
@@ -400,7 +530,7 @@ exports.generateReport = async (req, res) => {
       childInfo,
     };
 
-    const duplicateWindow = new Date(Date.now() - 45 * 1000);
+    const duplicateWindow = new Date(getCurrentTimeMs() - 45 * 1000);
     const recent = await Report.findOne({
       caseId,
       therapistId,
@@ -534,7 +664,7 @@ exports.listReportsByCase = async (req, res) => {
     if (role === 'parent') {
       filter.type = 'parent';
     } else if (role === 'clinician') {
-      filter.type = 'clinician';
+      filter.type = { $in: ['clinician', 'integrated'] };
     }
 
     const rows = await Report.find(filter).sort({ createdAt: -1 }).limit(80).lean();
@@ -581,7 +711,7 @@ exports.getReportById = async (req, res) => {
     if (role === 'parent' && t !== 'parent') {
       return res.status(403).json({ success: false, message: 'Not allowed to view this report type' });
     }
-    if (role === 'clinician' && t !== 'clinician') {
+    if (role === 'clinician' && t !== 'clinician' && t !== 'integrated') {
       return res.status(403).json({ success: false, message: 'Not allowed to view this report type' });
     }
 
@@ -600,5 +730,82 @@ exports.getReportById = async (req, res) => {
   } catch (error) {
     console.error('getReportById:', error);
     return res.status(500).json({ success: false, message: 'Failed to load report' });
+  }
+};
+
+/**
+ * GET /api/reports/:reportId/download
+ * Generates PDF on first request, caches path on the report document.
+ */
+exports.downloadReportPdf = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(reportId)) {
+      return res.status(400).json({ success: false, message: 'Invalid report id' });
+    }
+
+    const report = await Report.findById(reportId).lean();
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    const role = String(req.user.role || req.jwtRole || '').toLowerCase();
+
+    if (role === 'therapist') {
+      if (String(report.therapistId) !== String(req.user._id)) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      const access = await assertTherapistCaseAccess(req, String(report.caseId), req.user._id);
+      if (!access.ok) {
+        return res.status(access.status || 403).json({ success: false, message: access.message || 'Access denied' });
+      }
+    } else {
+      const gate = await assertUserCaseAccess(req, report.caseId);
+      if (!gate.ok) {
+        return res.status(gate.status || 403).json({ success: false, message: gate.message || 'Access denied' });
+      }
+      const t = report.type;
+      if (role === 'parent' && t !== 'parent') {
+        return res.status(403).json({ success: false, message: 'Not allowed to download this report type' });
+      }
+      if (role === 'clinician' && t !== 'clinician' && t !== 'integrated') {
+        return res.status(403).json({ success: false, message: 'Not allowed to download this report type' });
+      }
+    }
+
+    let rel = report.pdfRelativePath && String(report.pdfRelativePath).trim();
+    const ensurePdf = async () => {
+      if (report.type === 'integrated') {
+        return writeIntegratedReportPdf(report._id, report.data || {});
+      }
+      return writeGenericReportPdf(report._id, report.type, report.data || {});
+    };
+
+    if (!rel) {
+      rel = await ensurePdf();
+      await Report.updateOne({ _id: report._id }, { $set: { pdfRelativePath: rel } });
+    }
+
+    const safeRel = String(rel).replace(/^\/+/, '');
+    const absPath = path.join(process.cwd(), safeRel);
+    if (!fs.existsSync(absPath)) {
+      rel = await ensurePdf();
+      await Report.updateOne({ _id: report._id }, { $set: { pdfRelativePath: rel } });
+      const safe2 = String(rel).replace(/^\/+/, '');
+      const abs2 = path.join(process.cwd(), safe2);
+      if (!fs.existsSync(abs2)) {
+        return res.status(500).json({ success: false, message: 'PDF file could not be created' });
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="therapy-report-${reportId}.pdf"`);
+      return res.sendFile(abs2);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="therapy-report-${reportId}.pdf"`);
+    return res.sendFile(absPath);
+  } catch (error) {
+    console.error('downloadReportPdf:', error);
+    return res.status(500).json({ success: false, message: 'Failed to download report' });
   }
 };

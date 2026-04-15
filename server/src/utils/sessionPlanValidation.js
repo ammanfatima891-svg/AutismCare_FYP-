@@ -10,12 +10,16 @@ const { templateBaseQuery } = require('./activityShared');
 async function loadAllowedGoals(caseId, therapistId) {
   const plan = await TherapyPlan.findOne({ caseId, therapistId }).lean();
   if (!plan) {
-    return { allowedGoals: [], plan: null };
+    return { allowedGoals: [], allowedGoalKeys: [], allowedGoalIds: [], plan: null };
   }
   const allowed = new Set();
+  const allowedKeys = new Set();
+  const allowedGoalIds = new Set();
   for (const g of plan.shortTermGoals || []) {
     if (g?.title) allowed.add(String(g.title).trim());
     if (g?._id) allowed.add(String(g._id));
+    if (g?.goalKey) allowedKeys.add(String(g.goalKey).trim());
+    if (g?.goalId) allowedGoalIds.add(String(g.goalId).trim());
   }
   for (const g of plan.goals || []) {
     if (g && g.type !== 'long-term' && g.title) allowed.add(String(g.title).trim());
@@ -23,7 +27,7 @@ async function loadAllowedGoals(caseId, therapistId) {
   if (plan.longTermGoal?.title) {
     allowed.add(String(plan.longTermGoal.title).trim());
   }
-  return { allowedGoals: [...allowed], plan };
+  return { allowedGoals: [...allowed], allowedGoalKeys: [...allowedKeys], allowedGoalIds: [...allowedGoalIds], plan };
 }
 
 async function loadAllowedActivityNames(therapistId) {
@@ -80,8 +84,53 @@ async function validateSessionGoalsAndActivities(caseId, therapistId, goalsTarge
   return { ok: true };
 }
 
+/**
+ * Validates optional per-goal clinical rows against the active therapy plan.
+ * @param {string} caseId
+ * @param {import('mongoose').Types.ObjectId} therapistId
+ * @param {object[]} goalData
+ * @returns {Promise<{ ok: boolean, message?: string }>}
+ */
+async function validateSessionGoalData(caseId, therapistId, goalData) {
+  if (!goalData || goalData.length === 0) return { ok: true };
+  const { allowedGoals, allowedGoalKeys, allowedGoalIds, plan } = await loadAllowedGoals(caseId, therapistId);
+  if (!plan) {
+    return { ok: false, message: 'A therapy plan is required before logging sessions for this case' };
+  }
+  const keySet = new Set(allowedGoalKeys);
+  const idSet = new Set(allowedGoalIds || []);
+  const titleSet = new Set(allowedGoals);
+  for (let i = 0; i < goalData.length; i += 1) {
+    const row = goalData[i];
+    const gid = String(row.goalId || '').trim();
+    const gk = String(row.goalKey || '').trim();
+    const gt = String(row.goalTitleMatch || '').trim();
+    if (gid) {
+      if (!idSet.has(gid)) {
+        return { ok: false, message: `goalData[${i}]: goalId is not on the current therapy plan` };
+      }
+      continue;
+    }
+    if (gk) {
+      if (!keySet.has(gk)) {
+        return { ok: false, message: `goalData[${i}]: goalKey is not on the current therapy plan` };
+      }
+      continue;
+    }
+    if (gt) {
+      if (!titleSet.has(gt)) {
+        return { ok: false, message: `goalData[${i}]: goalTitleMatch must match a goal on the therapy plan` };
+      }
+      continue;
+    }
+    return { ok: false, message: `goalData[${i}]: goalId, goalKey, or goalTitleMatch is required` };
+  }
+  return { ok: true };
+}
+
 module.exports = {
   loadAllowedGoals,
   loadAllowedActivityNames,
   validateSessionGoalsAndActivities,
+  validateSessionGoalData,
 };

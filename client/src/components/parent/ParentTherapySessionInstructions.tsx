@@ -41,9 +41,9 @@ export function ParentTherapySessionInstructions({ childId }: { childId: string 
 
   if (loading) {
     return (
-      <Card className="border-slate-200">
-        <CardContent className="flex items-center gap-2 py-8 text-sm text-slate-600">
-          <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
+      <Card className="border">
+        <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
           Loading therapist instructions…
         </CardContent>
       </Card>
@@ -51,7 +51,7 @@ export function ParentTherapySessionInstructions({ childId }: { childId: string 
   }
 
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <p className="text-sm text-destructive">{error}</p>;
   }
 
   if (items.length === 0) {
@@ -59,18 +59,18 @@ export function ParentTherapySessionInstructions({ childId }: { childId: string 
   }
 
   return (
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardHeader className="border-b border-slate-100 bg-sky-50/40">
-        <CardTitle className="text-base text-sky-950">Instructions from therapy sessions</CardTitle>
+    <Card className="border bg-card shadow-sm">
+      <CardHeader className="border-b border bg-blue-50/40">
+        <CardTitle className="text-base text-blue-950">Instructions from therapy sessions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
         {items.map((row) => (
-          <div key={String(row._id)} className="rounded-lg border border-slate-200 bg-slate-50/30 p-4">
-            <p className="text-xs text-slate-500">
+          <div key={String(row._id)} className="rounded-lg border bg-background/30 p-4">
+            <p className="text-xs text-muted-foreground">
               {row.sessionDate ? new Date(row.sessionDate).toLocaleString() : '—'}
               {row.status ? ` · ${row.status}` : ''}
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{row.parentInstructions}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{row.parentInstructions}</p>
           </div>
         ))}
       </CardContent>

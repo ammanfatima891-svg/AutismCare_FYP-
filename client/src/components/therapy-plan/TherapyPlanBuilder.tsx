@@ -5,7 +5,6 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
-import { Checkbox } from '../ui/checkbox';
 import {
   Table,
   TableBody,
@@ -28,7 +27,9 @@ import { toast } from 'sonner';
 import { cn } from '../ui/utils';
 
 const DOMAIN_OPTIONS = ['Speech', 'OT', 'Sensory', 'Behavioral', 'Behavioral (ABA)', 'AAC', 'PECS'] as const;
-const STATUS_OPTIONS = ['Active', 'Achieved', 'Modified'] as const;
+const STATUS_OPTIONS = ['Active', 'Achieved', 'Modified', 'OnHold', 'Retired'] as const;
+const MEASUREMENT_OPTIONS = ['rating_1_5', 'accuracy_trials'] as const;
+const MASTERY_RULE_OPTIONS = ['threshold_out_of_n_sessions', 'threshold_consecutive_sessions'] as const;
 const FREQUENCY_OPTIONS = ['Daily', 'Weekly', '2x/week', '3x/week', 'Monthly', 'As needed'] as const;
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'] as const;
 
@@ -55,11 +56,18 @@ function buildPlanDescriptionFromActivityDoc(a: {
 }
 
 export type ShortGoalRow = {
+  /** Preserved from server for session goalData linkage */
+  goalKey: string;
   title: string;
   measurableCriteria: string;
   reviewDate: string;
   status: (typeof STATUS_OPTIONS)[number];
   domain: (typeof DOMAIN_OPTIONS)[number];
+  measurementType: (typeof MEASUREMENT_OPTIONS)[number];
+  ruleType: (typeof MASTERY_RULE_OPTIONS)[number];
+  masteryThreshold: number;
+  masteryWindow: number;
+  masteryMinSessions: number;
 };
 
 type Props = {
@@ -71,11 +79,17 @@ type Props = {
 
 function emptyShortGoal(): ShortGoalRow {
   return {
+    goalKey: '',
     title: '',
     measurableCriteria: '',
     reviewDate: '',
     status: 'Active',
     domain: 'Speech',
+    measurementType: 'rating_1_5',
+    ruleType: 'threshold_out_of_n_sessions',
+    masteryThreshold: 80,
+    masteryWindow: 5,
+    masteryMinSessions: 3,
   };
 }
 
@@ -98,7 +112,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
   const [libraryItems, setLibraryItems] = useState<ActivityTemplate[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeAction, setActiveAction] = useState<'draft' | 'submit' | null>(null);
+  const [activeAction, setActiveAction] = useState<'draft' | 'submit' | 'approval' | 'revision' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   /** Custom activity form (POST /activities) — design aligned */
@@ -158,13 +172,36 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
     const st = Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [];
     if (st.length > 0) {
       setShortGoals(
-        st.map((g: Record<string, unknown>) => ({
-          title: String(g.title || ''),
-          measurableCriteria: String(g.measurableCriteria || ''),
-          reviewDate: g.reviewDate ? new Date(String(g.reviewDate)).toISOString().slice(0, 10) : '',
-          status: (STATUS_OPTIONS.includes(g.status as never) ? g.status : 'Active') as ShortGoalRow['status'],
-          domain: (DOMAIN_OPTIONS.includes(g.domain as never) ? g.domain : 'Speech') as ShortGoalRow['domain'],
-        }))
+        st.map((g: Record<string, unknown>) => {
+          const mr = (g.masteryRule && typeof g.masteryRule === 'object' ? g.masteryRule : {}) as Record<
+            string,
+            unknown
+          >;
+          const meas = (g.measurement && typeof g.measurement === 'object' ? g.measurement : {}) as Record<
+            string,
+            unknown
+          >;
+          const mt = String(meas.type || 'rating_1_5');
+          const rt = String(mr.ruleType || 'threshold_out_of_n_sessions');
+          return {
+            goalKey: String(g.goalKey || ''),
+            title: String(g.title || ''),
+            measurableCriteria: String(g.measurableCriteria || ''),
+            reviewDate: g.reviewDate ? new Date(String(g.reviewDate)).toISOString().slice(0, 10) : '',
+            status: (STATUS_OPTIONS.includes(g.status as never) ? g.status : 'Active') as ShortGoalRow['status'],
+            domain: (DOMAIN_OPTIONS.includes(g.domain as never) ? g.domain : 'Speech') as ShortGoalRow['domain'],
+            measurementType: (MEASUREMENT_OPTIONS.includes(mt as never)
+              ? mt
+              : 'rating_1_5') as ShortGoalRow['measurementType'],
+            ruleType: (MASTERY_RULE_OPTIONS.includes(rt as never)
+              ? rt
+              : 'threshold_out_of_n_sessions') as ShortGoalRow['ruleType'],
+            masteryThreshold: Number.isFinite(Number(mr.threshold)) ? Number(mr.threshold) : 80,
+            masteryWindow: Number.isFinite(Number(mr.window)) && Number(mr.window) > 0 ? Number(mr.window) : 5,
+            masteryMinSessions:
+              Number.isFinite(Number(mr.minSessions)) && Number(mr.minSessions) > 0 ? Number(mr.minSessions) : 3,
+          };
+        })
       );
     } else {
       setShortGoals([emptyShortGoal()]);
@@ -327,11 +364,19 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
       shortTermGoals: shortGoals
         .filter((g) => g.title.trim())
         .map((g) => ({
+          ...(g.goalKey.trim() ? { goalKey: g.goalKey.trim() } : {}),
           title: g.title.trim(),
           measurableCriteria: g.measurableCriteria.trim(),
           reviewDate: g.reviewDate || null,
           status: g.status,
           domain: g.domain,
+          measurement: { type: g.measurementType, unit: '' },
+          masteryRule: {
+            ruleType: g.ruleType,
+            threshold: g.masteryThreshold,
+            window: g.masteryWindow,
+            minSessions: g.masteryMinSessions,
+          },
         })),
       activities: activities
         .filter((a) => a.title.trim())
@@ -418,55 +463,132 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
     }
   };
 
+  const submitForClinicianApproval = async () => {
+    if (!planId) return;
+    try {
+      setLoading(true);
+      setActiveAction('approval');
+      setError(null);
+      await therapyPlanAPI.submitForApproval(planId);
+      toast.success('Plan submitted for clinician approval');
+      await onSaved();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to submit for approval';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+      setActiveAction(null);
+    }
+  };
+
+  const publishPlanRevision = async () => {
+    if (!planId) return;
+    if (
+      !window.confirm(
+        'Publish a new plan revision? This increments the plan version and clears approval status so stakeholders can align analytics with the new episode.'
+      )
+    ) {
+      return;
+    }
+    try {
+      setLoading(true);
+      setActiveAction('revision');
+      setError(null);
+      await therapyPlanAPI.update(planId, { publishRevision: true });
+      toast.success('Plan revision published');
+      await onSaved();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to publish revision';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+      setActiveAction(null);
+    }
+  };
+
   const planStatusLabel =
     hasPlan && plan
       ? String((plan as { status?: string }).status || ((plan as { draft?: boolean }).draft ? 'draft' : 'final'))
       : null;
 
+  const approvalStatus = hasPlan && plan ? String((plan as { approval?: { status?: string } }).approval?.status || 'none') : 'none';
+  const planVersion = hasPlan && plan ? Number((plan as { planVersion?: number }).planVersion || 1) : 1;
+
   return (
     <div className="space-y-6">
-      {planStatusLabel ? (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-600">Plan status:</span>
-          <Badge
-            variant={planStatusLabel === 'final' ? 'default' : 'secondary'}
-            className={planStatusLabel === 'final' ? 'bg-sky-600' : ''}
-          >
-            {planStatusLabel === 'final' ? 'Submitted' : 'Draft'}
-          </Badge>
-        </div>
-      ) : null}
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="space-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="text-base text-foreground">Therapy plan</CardTitle>
+              <CardDescription className="text-sm">
+                Define domains, goals, and optional activities. Save a draft anytime, then submit when complete.
+              </CardDescription>
+            </div>
+            {planStatusLabel ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={planStatusLabel === 'final' ? 'default' : 'secondary'}>
+                  {planStatusLabel === 'final' ? 'Submitted' : 'Draft'}
+                </Badge>
+                {hasPlan ? <Badge variant="outline">v{planVersion}</Badge> : null}
+                {approvalStatus !== 'none' ? (
+                  <Badge variant="outline" className="capitalize">
+                    approval: {approvalStatus}
+                  </Badge>
+                ) : null}
+              </div>
+            ) : (
+              <Badge variant="secondary">New plan</Badge>
+            )}
+          </div>
+        </CardHeader>
+      </Card>
+
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+        <div className="rounded-lg border bg-muted px-4 py-3 text-sm text-destructive">{error}</div>
       ) : null}
 
-      <Card className="border-slate-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100 bg-sky-50/60">
-          <CardTitle className="text-sky-900">Therapy domains</CardTitle>
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b">
+          <CardTitle className="text-foreground">Therapy domains</CardTitle>
           <CardDescription>Select all areas addressed in this plan</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
-            {DOMAIN_OPTIONS.map((d) => (
-              <label key={d} className="flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox checked={domains.includes(d)} onCheckedChange={() => toggleDomain(d)} />
-                <span>{d}</span>
-              </label>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {DOMAIN_OPTIONS.map((d) => {
+              const selected = domains.includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => toggleDomain(d)}
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    selected
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  )}
+                >
+                  {d}
+                </button>
+              );
+            })}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {domains.map((d) => (
-              <Badge key={d} variant="outline" className="border-sky-200 bg-sky-50 text-sky-900">
-                {d}
-              </Badge>
-            ))}
-          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Tip: domain labels are used by clinician progress analytics and reports.
+          </p>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100 bg-sky-50/60">
-          <CardTitle className="text-sky-900">Long-term goal</CardTitle>
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b">
+          <CardTitle className="text-foreground">Long-term goal</CardTitle>
           <CardDescription>One overarching goal for this episode of care</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 pt-6 md:grid-cols-1">
@@ -489,10 +611,10 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 bg-sky-50/60">
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between border-b">
           <div>
-            <CardTitle className="text-sky-900">Short-term goals</CardTitle>
+            <CardTitle className="text-foreground">Short-term goals</CardTitle>
             <CardDescription>Linked to domains with status for progress tracking</CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" onClick={addShortGoal}>
@@ -501,43 +623,55 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
           </Button>
         </CardHeader>
         <CardContent className="pt-4">
-          <div className="overflow-x-auto rounded-md border border-slate-200">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50/80">
-                  <TableHead>Goal title</TableHead>
-                  <TableHead>Measurable criteria</TableHead>
-                  <TableHead>Domain</TableHead>
-                  <TableHead>Review date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[60px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shortGoals.map((row, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <Input
-                        value={row.title}
-                        onChange={(e) => updateShortGoal(idx, { title: e.target.value })}
-                        placeholder="Goal title"
-                        className="min-w-[140px]"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.measurableCriteria}
-                        onChange={(e) => updateShortGoal(idx, { measurableCriteria: e.target.value })}
-                        placeholder="Observable criteria"
-                        className="min-w-[160px]"
-                      />
-                    </TableCell>
-                    <TableCell>
+          {/* Mobile-first responsive layout: cards on small screens, table on desktop */}
+          <div className="space-y-3 md:hidden">
+            {shortGoals.map((row, idx) => (
+              <div key={idx} className="rounded-lg border bg-card p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Goal {idx + 1}</p>
+                    <p className="text-xs text-muted-foreground">Define measurable criteria and tracking rules</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeShortGoal(idx)}
+                    aria-label="Remove goal"
+                  >
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Goal title</Label>
+                    <Input
+                      value={row.title}
+                      onChange={(e) => updateShortGoal(idx, { title: e.target.value })}
+                      placeholder="Goal title"
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Measurable criteria</Label>
+                    <Input
+                      value={row.measurableCriteria}
+                      onChange={(e) => updateShortGoal(idx, { measurableCriteria: e.target.value })}
+                      placeholder="Observable criteria"
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Domain</Label>
                       <Select
                         value={row.domain}
                         onValueChange={(v) => updateShortGoal(idx, { domain: v as ShortGoalRow['domain'] })}
                       >
-                        <SelectTrigger className="w-[160px]">
+                        <SelectTrigger className="h-11">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -548,21 +682,15 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                           ))}
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="date"
-                        value={row.reviewDate}
-                        onChange={(e) => updateShortGoal(idx, { reviewDate: e.target.value })}
-                        className="w-[150px]"
-                      />
-                    </TableCell>
-                    <TableCell>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Status</Label>
                       <Select
                         value={row.status}
                         onValueChange={(v) => updateShortGoal(idx, { status: v as ShortGoalRow['status'] })}
                       >
-                        <SelectTrigger className="w-[130px]">
+                        <SelectTrigger className="h-11">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -573,33 +701,279 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                           ))}
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeShortGoal(idx)}>
-                        <Trash2 className="h-4 w-4 text-slate-500" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Review date</Label>
+                      <Input
+                        type="date"
+                        value={row.reviewDate}
+                        onChange={(e) => updateShortGoal(idx, { reviewDate: e.target.value })}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Measure</Label>
+                      <Select
+                        value={row.measurementType}
+                        onValueChange={(v) =>
+                          updateShortGoal(idx, { measurementType: v as ShortGoalRow['measurementType'] })
+                        }
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rating_1_5">Rating (1–5)</SelectItem>
+                          <SelectItem value="accuracy_trials">Accuracy (trials)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Mastery rule</Label>
+                    <Select
+                      value={row.ruleType}
+                      onValueChange={(v) => updateShortGoal(idx, { ruleType: v as ShortGoalRow['ruleType'] })}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="threshold_out_of_n_sessions">Average in window</SelectItem>
+                        <SelectItem value="threshold_consecutive_sessions">Consecutive sessions</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Threshold %</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={row.masteryThreshold}
+                        className="h-11"
+                        onChange={(e) =>
+                          updateShortGoal(idx, { masteryThreshold: Math.max(0, Math.min(100, Number(e.target.value))) })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Window</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={row.masteryWindow}
+                        className="h-11"
+                        onChange={(e) =>
+                          updateShortGoal(idx, { masteryWindow: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Min sessions</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={row.masteryMinSessions}
+                        className="h-11"
+                        onChange={(e) =>
+                          updateShortGoal(idx, {
+                            masteryMinSessions: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
+
+          <div className="hidden rounded-md border md:block">
+            <div className="max-h-[min(55vh,520px)] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="sticky top-0 z-10 bg-muted/90 backdrop-blur supports-[backdrop-filter]:bg-muted/70">
+                    <TableHead className="min-w-[220px]">Goal</TableHead>
+                    <TableHead className="min-w-[260px]">Measurable criteria</TableHead>
+                    <TableHead className="min-w-[170px]">Domain</TableHead>
+                    <TableHead className="min-w-[150px]">Review date</TableHead>
+                    <TableHead className="min-w-[140px]">Status</TableHead>
+                    <TableHead className="min-w-[170px] whitespace-nowrap">Measure</TableHead>
+                    <TableHead className="min-w-[220px] whitespace-nowrap">Mastery rule</TableHead>
+                    <TableHead className="w-[84px] whitespace-nowrap">Thr %</TableHead>
+                    <TableHead className="w-[74px] whitespace-nowrap">Win</TableHead>
+                    <TableHead className="w-[84px] whitespace-nowrap">Min n</TableHead>
+                    <TableHead className="w-[60px]" aria-label="Actions" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shortGoals.map((row, idx) => (
+                    <TableRow key={idx} className="align-top">
+                      <TableCell>
+                        <Input
+                          value={row.title}
+                          onChange={(e) => updateShortGoal(idx, { title: e.target.value })}
+                          placeholder="Goal title"
+                          className="h-10"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={row.measurableCriteria}
+                          onChange={(e) => updateShortGoal(idx, { measurableCriteria: e.target.value })}
+                          placeholder="Observable criteria"
+                          className="h-10"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.domain}
+                          onValueChange={(v) => updateShortGoal(idx, { domain: v as ShortGoalRow['domain'] })}
+                        >
+                          <SelectTrigger className="h-10 w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DOMAIN_OPTIONS.map((d) => (
+                              <SelectItem key={d} value={d}>
+                                {d}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="date"
+                          value={row.reviewDate}
+                          onChange={(e) => updateShortGoal(idx, { reviewDate: e.target.value })}
+                          className="h-10 w-[150px]"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.status}
+                          onValueChange={(v) => updateShortGoal(idx, { status: v as ShortGoalRow['status'] })}
+                        >
+                          <SelectTrigger className="h-10 w-[130px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.measurementType}
+                          onValueChange={(v) =>
+                            updateShortGoal(idx, { measurementType: v as ShortGoalRow['measurementType'] })
+                          }
+                        >
+                          <SelectTrigger className="h-10 w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="rating_1_5">Rating (1–5)</SelectItem>
+                            <SelectItem value="accuracy_trials">Accuracy (trials)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.ruleType}
+                          onValueChange={(v) => updateShortGoal(idx, { ruleType: v as ShortGoalRow['ruleType'] })}
+                        >
+                          <SelectTrigger className="h-10 w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="threshold_out_of_n_sessions">Avg in window</SelectItem>
+                            <SelectItem value="threshold_consecutive_sessions">Consecutive sessions</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          className="h-10 w-[72px]"
+                          value={row.masteryThreshold}
+                          onChange={(e) =>
+                            updateShortGoal(idx, { masteryThreshold: Math.max(0, Math.min(100, Number(e.target.value))) })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={50}
+                          className="h-10 w-[64px]"
+                          value={row.masteryWindow}
+                          onChange={(e) =>
+                            updateShortGoal(idx, { masteryWindow: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={50}
+                          className="h-10 w-[64px]"
+                          value={row.masteryMinSessions}
+                          onChange={(e) =>
+                            updateShortGoal(idx, {
+                              masteryMinSessions: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeShortGoal(idx)}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Required for submission: select domains, add a long‑term goal title, and add at least one short‑term goal with measurable criteria.
+          </p>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-slate-100 bg-sky-50/60">
-          <CardTitle className="text-sky-900">Activity assignment</CardTitle>
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b">
+          <CardTitle className="text-foreground">Activity assignment</CardTitle>
           <CardDescription>Optional — add activities from your library or create and save new ones to this plan</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8 pt-8">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-slate-800">Select from Activity Library</Label>
+            <Label className="text-sm font-medium text-foreground">Select from Activity Library</Label>
             <Button
               type="button"
               variant="outline"
               disabled={libraryLoading}
-              className="h-12 w-full border-slate-300 bg-white text-base font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+              className="h-11 w-full border bg-card text-base font-medium text-foreground shadow-sm hover:bg-background"
               onClick={openLibraryPicker}
             >
               {libraryLoading ? <Loader2 className="mr-2 h-5 w-5 shrink-0 animate-spin" /> : null}
@@ -608,23 +982,23 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
             {libraryOpen ? (
               <div
                 ref={libraryPanelRef}
-                className="mt-3 rounded-lg border border-slate-200 bg-slate-50/90 p-4 shadow-inner ring-2 ring-sky-200/80"
+                className="mt-3 rounded-lg border bg-background/90 p-4 shadow-inner ring-1 ring-border"
                 role="region"
                 aria-label="Activity library results"
               >
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-slate-900">Add from activity library</p>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 text-slate-600" onClick={() => setLibraryOpen(false)}>
+                  <p className="text-sm font-medium text-foreground">Add from activity library</p>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 text-muted-foreground" onClick={() => setLibraryOpen(false)}>
                     Hide
                   </Button>
                 </div>
                 {libraryLoading ? (
                   <div className="flex flex-col items-center justify-center gap-2 py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" aria-hidden />
-                    <p className="text-sm text-slate-600">Loading activities…</p>
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
+                    <p className="text-sm text-muted-foreground">Loading activities…</p>
                   </div>
                 ) : libraryItems.length === 0 ? (
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-muted-foreground">
                     No templates found. Create activities under <strong>Activity library</strong> on the dashboard or case
                     file, then use Refresh here.
                   </p>
@@ -633,13 +1007,13 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                     {libraryItems.slice(0, 500).map((lib) => (
                       <li
                         key={lib._id}
-                        className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900">{lib.name}</p>
-                          <p className="text-xs text-slate-500">{lib.domain}</p>
+                          <p className="font-medium text-foreground">{lib.name}</p>
+                          <p className="text-xs text-muted-foreground">{lib.domain}</p>
                         </div>
-                        <Button type="button" size="sm" className="shrink-0 bg-sky-600 hover:bg-sky-700" onClick={() => addFromLibrary(lib)}>
+                        <Button type="button" size="sm" className="shrink-0" onClick={() => addFromLibrary(lib)}>
                           Add
                         </Button>
                       </li>
@@ -652,24 +1026,24 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
 
           <div className="relative py-1">
             <div className="absolute inset-0 flex items-center" aria-hidden>
-              <span className="w-full border-t border-slate-200" />
+              <span className="w-full border-t border" />
             </div>
-            <div className="relative flex justify-center text-xs font-medium uppercase tracking-wide text-slate-500">
-              <span className="bg-white px-4">OR</span>
+            <div className="relative flex justify-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="bg-card px-4">OR</span>
             </div>
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium text-slate-800">Add custom activity</Label>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 shadow-inner">
+            <Label className="text-sm font-medium text-foreground">Add custom activity</Label>
+            <div className="rounded-xl border bg-muted/40 p-5">
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Domain</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Domain</Label>
                   <Select
                     value={customDomain}
                     onValueChange={(v) => setCustomDomain(v as (typeof DOMAIN_OPTIONS)[number])}
                   >
-                    <SelectTrigger className="h-11 border-slate-200 bg-[#f5f5f5]">
+                    <SelectTrigger className="h-11 border bg-background">
                       <SelectValue placeholder="Domain" />
                     </SelectTrigger>
                     <SelectContent className="z-[1100]" position="popper" onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -682,7 +1056,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Activity name</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Activity name</Label>
                   <Input
                     value={customName}
                     onChange={(e) => {
@@ -691,14 +1065,14 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                     }}
                     placeholder="Activity name"
                     className={cn(
-                      'h-11 border-slate-200 bg-[#f5f5f5] placeholder:text-slate-400',
+                      'h-11 border bg-background placeholder:text-muted-foreground',
                       customErrors.name && 'border-red-400 ring-1 ring-red-200'
                     )}
                   />
-                  {customErrors.name ? <p className="text-xs text-red-600">{customErrors.name}</p> : null}
+                  {customErrors.name ? <p className="text-xs text-destructive">{customErrors.name}</p> : null}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Instructions</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Instructions</Label>
                   <Textarea
                     value={customInstructions}
                     onChange={(e) => {
@@ -708,26 +1082,26 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                     placeholder="Instructions"
                     rows={5}
                     className={cn(
-                      'min-h-[120px] resize-y border-slate-200 bg-[#f5f5f5] placeholder:text-slate-400',
+                      'min-h-[120px] resize-y border bg-background placeholder:text-muted-foreground',
                       customErrors.instructions && 'border-red-400 ring-1 ring-red-200'
                     )}
                   />
-                  {customErrors.instructions ? <p className="text-xs text-red-600">{customErrors.instructions}</p> : null}
+                  {customErrors.instructions ? <p className="text-xs text-destructive">{customErrors.instructions}</p> : null}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Materials required</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Materials required</Label>
                   <Input
                     value={customMaterials}
                     onChange={(e) => setCustomMaterials(e.target.value)}
                     placeholder="Materials required"
-                    className="h-11 border-slate-200 bg-[#f5f5f5] placeholder:text-slate-400"
+                    className="h-11 border bg-background placeholder:text-muted-foreground"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Frequency</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Frequency</Label>
                     <Select value={customFrequency} onValueChange={setCustomFrequency}>
-                      <SelectTrigger className="h-11 border-slate-200 bg-[#f5f5f5]">
+                      <SelectTrigger className="h-11 border bg-background">
                         <SelectValue placeholder="Frequency" />
                       </SelectTrigger>
                       <SelectContent className="z-[1100]" position="popper" onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -740,12 +1114,12 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Difficulty</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Difficulty</Label>
                     <Select
                       value={customDifficulty}
                       onValueChange={(v) => setCustomDifficulty(v as (typeof DIFFICULTY_OPTIONS)[number])}
                     >
-                      <SelectTrigger className="h-11 border-slate-200 bg-[#f5f5f5]">
+                      <SelectTrigger className="h-11 border bg-background">
                         <SelectValue placeholder="Difficulty" />
                       </SelectTrigger>
                       <SelectContent className="z-[1100]" position="popper" onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -762,7 +1136,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                   type="button"
                   variant="outline"
                   disabled={creatingActivity}
-                  className="h-11 w-full border-slate-300 bg-white text-base font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+                  className="h-11 w-full border bg-card text-base font-medium text-foreground shadow-sm hover:bg-background"
                   onClick={() => void submitCustomActivity()}
                 >
                   {creatingActivity ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
@@ -773,18 +1147,18 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
           </div>
 
           {activities.length > 0 ? (
-            <div className="space-y-3 border-t border-slate-100 pt-6">
-              <h4 className="text-sm font-semibold text-slate-900">Activities in this plan</h4>
+            <div className="space-y-3 border-t border pt-6">
+              <h4 className="text-sm font-semibold text-foreground">Activities in this plan</h4>
               <ul className="space-y-3">
                 {activities.map((a, idx) => (
                   <li
                     key={`${a.libraryActivityId ?? 'row'}-${idx}`}
-                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    className="rounded-lg border bg-card p-4 shadow-sm"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0 flex-1 space-y-2">
                         {a.libraryActivityId ? (
-                          <Badge variant="outline" className="border-sky-200 bg-sky-50 text-xs text-sky-900">
+                          <Badge variant="outline" className="border-blue-200 bg-blue-50 text-xs text-blue-900">
                             Saved activity
                           </Badge>
                         ) : (
@@ -792,23 +1166,23 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                             Plan only
                           </Badge>
                         )}
-                        <p className="font-medium text-slate-900">{a.title || 'Untitled activity'}</p>
+                        <p className="font-medium text-foreground">{a.title || 'Untitled activity'}</p>
                         <Input
                           placeholder="Linked goal (optional)"
                           value={a.linkedGoal}
                           onChange={(e) => updateActivity(idx, { linkedGoal: e.target.value })}
-                          className="max-w-md border-slate-200 bg-slate-50 text-sm"
+                          className="max-w-md border bg-background text-sm"
                         />
                         <Textarea
                           value={a.description}
                           onChange={(e) => updateActivity(idx, { description: e.target.value })}
                           rows={3}
-                          className="border-slate-200 bg-slate-50 text-sm"
+                          className="border bg-background text-sm"
                           placeholder="Description shown in plan"
                         />
                       </div>
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeActivity(idx)} aria-label="Remove activity">
-                        <Trash2 className="h-4 w-4 text-slate-500" />
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     </div>
                   </li>
@@ -816,47 +1190,69 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
               </ul>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">No activities in this plan yet. Use the library or the form above.</p>
+            <p className="text-sm text-muted-foreground">No activities in this plan yet. Use the library or the form above.</p>
           )}
         </CardContent>
       </Card>
 
-      <div
-        className="mt-2 flex w-full max-w-full flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
-        role="group"
-        aria-label="Therapy plan actions"
-      >
-        <Button
-          type="button"
-          variant="outline"
-          className={cn(
-            'h-11 min-w-[140px] shrink-0 border-slate-300 bg-white px-4 text-slate-900',
-            'hover:bg-slate-50'
-          )}
-          disabled={loading}
-          onClick={saveDraft}
-        >
-          {loading && activeAction === 'draft' ? (
-            <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
-          ) : null}
-          Save Draft
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className={cn(
-            'h-11 min-w-[200px] shrink-0 border-slate-300 bg-white px-4 text-slate-900',
-            'hover:bg-slate-50 sm:min-w-[220px]'
-          )}
-          disabled={loading}
-          onClick={submitTherapyPlan}
-        >
-          {loading && activeAction === 'submit' ? (
-            <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin text-slate-900" aria-hidden />
-          ) : null}
-          Submit Therapy Plan
-        </Button>
+      <div className="sticky bottom-0 z-20 -mx-1 border-t bg-background/80 px-1 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex w-full max-w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            disabled={loading}
+            onClick={saveDraft}
+          >
+            {loading && activeAction === 'draft' ? <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" /> : null}
+            Save draft
+          </Button>
+          <Button
+            type="button"
+            className="h-11"
+            disabled={loading}
+            onClick={submitTherapyPlan}
+          >
+            {loading && activeAction === 'submit' ? (
+              <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            ) : null}
+            Submit plan
+          </Button>
+        </div>
       </div>
+
+      {hasPlan && planId ? (
+        <Card className="border bg-muted/40 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-foreground">Compliance &amp; revisions</CardTitle>
+            <CardDescription>
+              Request supervising clinician approval, or publish a numbered revision after material goal changes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-10 shrink-0"
+              disabled={loading || approvalStatus === 'pending'}
+              onClick={() => void submitForClinicianApproval()}
+            >
+              {loading && activeAction === 'approval' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Request clinician approval
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 shrink-0 border"
+              disabled={loading}
+              onClick={() => void publishPlanRevision()}
+            >
+              {loading && activeAction === 'revision' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Publish plan revision
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

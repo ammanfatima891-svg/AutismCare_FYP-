@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const { calculateScreening, getQuestionnaireByType, getAvailableQuestionnaires, getScreeningHistory, getSubmissionById, getChildScreeningStatus, getChildScreeningsCount, getChildScreenings, getAvailableCliniciansAndTherapists, getScreeningStats, downloadSubmissionReport, sendReportByEmail } = require("../controllers/screening.controller");
-const { protect } = require("../middleware/auth.middleware");
+const { protect, requireRole } = require("../middleware/auth.middleware");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -31,15 +31,19 @@ function sendReportWithUpload(req, res, next) {
 
 // All screening routes require authentication
 router.use(protect);
+router.use(requireRole('parent', 'clinician', 'admin'));
 
-router.post("/calculate-screening", calculateScreening);
-router.post("/send-report", sendReportWithUpload, sendReportByEmail);
+// Parent-only: submit/view own screening history and child screening dashboards.
+router.post("/calculate-screening", requireRole('parent'), calculateScreening);
+router.post("/send-report", requireRole('parent'), sendReportWithUpload, sendReportByEmail);
+router.get("/available-questionnaires", requireRole('parent'), getAvailableQuestionnaires);
+router.get("/screening-history", requireRole('parent'), getScreeningHistory);
+router.get("/submission/:id", requireRole('parent', 'clinician', 'admin'), getSubmissionById);
+router.get("/submission/:id/download", requireRole('parent'), downloadSubmissionReport);
+router.get("/child/:childId/screening-status", requireRole('parent'), getChildScreeningStatus);
+router.get("/stats", requireRole('parent'), getScreeningStats);
+
+// Clinician/admin: questionnaire metadata + directory for appointments.
 router.get("/questionnaires/:type", getQuestionnaireByType);
-router.get("/available-questionnaires", getAvailableQuestionnaires);
-router.get("/screening-history", getScreeningHistory);
-router.get("/submission/:id", getSubmissionById);
-router.get("/submission/:id/download", downloadSubmissionReport);
-router.get("/child/:childId/screening-status", getChildScreeningStatus);
-router.get("/stats", getScreeningStats);
 router.get("/available-clinicians-therapists", getAvailableCliniciansAndTherapists);
 module.exports = router;

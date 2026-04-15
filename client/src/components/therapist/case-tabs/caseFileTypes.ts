@@ -1,3 +1,5 @@
+import type { CaseLabRequestRow } from '../../case/CaseLabRequestsPanel';
+
 export type TherapistCaseFileData = {
   case: {
     _id: string;
@@ -34,4 +36,5 @@ export type TherapistCaseFileData = {
     goalsTotal: number;
     domainsCount: number;
   };
+  labRequests?: CaseLabRequestRow[];
 };

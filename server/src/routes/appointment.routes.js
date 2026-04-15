@@ -1,7 +1,9 @@
+const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const { validateFileStrict, wrapMulter } = require('../middleware/uploadValidation');
 const {
     createAppointment,
     getParentAppointments,
@@ -18,31 +20,30 @@ const {
 const { protect, restrictTo } = require('../middleware/auth.middleware');
 const { auditContext } = require('../utils/audit');
 
-// ─── Multer config for appointment document uploads (25MB max) ───────────────
+// ─── Multer config for appointment document uploads ─────────────────────────
+// Global rule: Images (jpeg/png/webp) <=5MB, PDFs <=10MB. No doc/docx.
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, path.join(process.cwd(), 'uploads/appointment-documents/'));
     },
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const uniqueSuffix = getCurrentTimeMs() + '-' + Math.round(Math.random() * 1E9);
         cb(null, 'appt-doc-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
 const upload = multer({
     storage,
-    limits: { fileSize: 25 * 1024 * 1024 },
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb(new Error('Only images (jpeg, jpg, png), PDF, and Word documents are allowed'));
+        const v = validateFileStrict({ ...file, size: 0 }, ['image', 'pdf']);
+        if (v.ok) return cb(null, true);
+        cb(new Error('Only jpeg/png/webp images or PDFs are allowed'));
     }
 });
+
+const uploadDocuments = wrapMulter(upload.array('documents', 5));
 
 // All routes require authentication + audit context
 router.use(protect);
@@ -51,7 +52,18 @@ router.use(auditContext);
 // ─── Parent Routes ───────────────────────────────────────────────────────────
 
 // Create new appointment (parent only)
-router.post('/', restrictTo('parent'), upload.array('documents', 5), createAppointment);
+router.post('/', restrictTo('parent'), uploadDocuments, (req, res, next) => {
+    // Enforce stricter per-type size (images <= 5MB, pdf <= 10MB)
+    if (Array.isArray(req.files)) {
+        for (const f of req.files) {
+            const v = validateFileStrict(f, ['image', 'pdf']);
+            if (!v.ok) {
+                return res.status(400).json({ success: false, message: v.message, errorCode: v.errorCode });
+            }
+        }
+    }
+    return next();
+}, createAppointment);
 
 // Get parent's own appointments
 router.get('/my', restrictTo('parent'), getParentAppointments);

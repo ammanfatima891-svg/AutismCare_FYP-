@@ -22,7 +22,8 @@ const { HomeAssignment } = require('../models/HomeAssignment');
 
 const { resolveTherapistTypes } = require('./referralController');
 
-const { buildCaseAnalyticsSnapshot } = require('../services/caseAnalyticsSnapshot');
+const { computeProgressEngineForCase } = require('../services/progressEngine');
+const { buildUnifiedCaseAnalytics } = require('../services/caseAnalyticsSnapshot');
 
 
 
@@ -64,7 +65,7 @@ exports.getCaseAnalytics = async (req, res) => {
 
     const therapistTypes = await resolveTherapistTypes(req);
 
-    const therapyCaseActive = await TherapyCase.findOne({ caseId, therapistId, status: 'active' }).lean();
+    const therapyCaseActive = await TherapyCase.findOne({ caseId, therapistId, status: 'ACTIVE' }).lean();
 
 
 
@@ -78,7 +79,7 @@ exports.getCaseAnalytics = async (req, res) => {
 
         therapistType: { $in: therapistTypes },
 
-        status: { $in: ['pending', 'accepted', 'in-progress'] },
+        status: { $in: ['CREATED', 'SENT', 'ACCEPTED'] },
 
       })
 
@@ -108,9 +109,16 @@ exports.getCaseAnalytics = async (req, res) => {
 
     ]);
 
+    const engineResult = await computeProgressEngineForCase(caseId, { therapistId, useCache: true });
+    if (!engineResult.success) {
+      return res.status(400).json({ success: false, message: engineResult.message || 'Failed to compute progress' });
+    }
 
-
-    const data = buildCaseAnalyticsSnapshot({ plan, sessions, assignments });
+    /** Same shape as report generation — legacy charts + stakeholder KPIs + progress engine (see caseAnalyticsSnapshot). */
+    const data = buildUnifiedCaseAnalytics(
+      { plan, sessions, assignments },
+      engineResult.data || null
+    );
 
 
 

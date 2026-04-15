@@ -137,8 +137,8 @@ export function CommunicationSection() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
-        <h2 className="text-indigo-600 mb-2">Messages & Notifications</h2>
-        <p className="text-gray-600">Stay connected with your care team</p>
+        <h2 className="mb-2 text-foreground">Messages & Notifications</h2>
+        <p className="text-muted-foreground">Stay connected with your care team</p>
       </div>
 
       <Tabs defaultValue="messages" className="space-y-6">
@@ -146,7 +146,7 @@ export function CommunicationSection() {
           <TabsTrigger value="messages">
             Messages
             {threads.reduce((sum, t) => sum + t.unread, 0) > 0 && (
-              <Badge className="ml-2 bg-red-500">
+              <Badge className="ml-2 bg-destructive">
                 {threads.reduce((sum, t) => sum + t.unread, 0)}
               </Badge>
             )}
@@ -154,7 +154,7 @@ export function CommunicationSection() {
           <TabsTrigger value="notifications">
             Notifications
             {notifications.filter(n => n.unread).length > 0 && (
-              <Badge className="ml-2 bg-red-500">
+              <Badge className="ml-2 bg-destructive">
                 {notifications.filter(n => n.unread).length}
               </Badge>
             )}
@@ -167,7 +167,7 @@ export function CommunicationSection() {
             {/* Threads List */}
             <Card className="md:col-span-1">
               <CardHeader>
-                <CardTitle className="text-indigo-600">Conversations</CardTitle>
+                <CardTitle className="text-blue-600">Conversations</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[500px]">
@@ -175,31 +175,31 @@ export function CommunicationSection() {
                     <div
                       key={thread.id}
                       onClick={() => setSelectedThread(thread.id)}
-                      className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
+                      className={`p-4 border-b border cursor-pointer transition-colors ${
                         selectedThread === thread.id
-                          ? 'bg-indigo-50 border-l-4 border-l-indigo-600'
-                          : 'hover:bg-gray-50'
+                          ? 'bg-blue-50 border-l-4 border-l-blue-600'
+                          : 'hover:bg-muted'
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         <Avatar>
                           <AvatarImage src="" />
-                          <AvatarFallback className="bg-indigo-600 text-white">
+                          <AvatarFallback className="bg-blue-600 text-white">
                             {thread.avatar}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-indigo-600 truncate">{thread.provider}</h4>
+                            <h4 className="text-blue-600 truncate">{thread.provider}</h4>
                             {thread.unread > 0 && (
-                              <Badge className="bg-red-500 w-5 h-5 p-0 flex items-center justify-center">
+                              <Badge className="bg-destructive w-5 h-5 p-0 flex items-center justify-center">
                                 {thread.unread}
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-gray-600 mb-1">{thread.role}</p>
-                          <p className="text-sm text-gray-700 truncate">{thread.lastMessage}</p>
-                          <p className="text-xs text-gray-500 mt-1">{thread.time}</p>
+                          <p className="text-xs text-muted-foreground mb-1">{thread.role}</p>
+                          <p className="text-sm text-foreground truncate">{thread.lastMessage}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{thread.time}</p>
                         </div>
                       </div>
                     </div>
@@ -216,12 +216,12 @@ export function CommunicationSection() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarImage src="" />
-                        <AvatarFallback className="bg-indigo-600 text-white">
+                        <AvatarFallback className="bg-blue-600 text-white">
                           {threads.find(t => t.id === selectedThread)?.avatar}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <CardTitle className="text-indigo-600">
+                        <CardTitle className="text-blue-600">
                           {threads.find(t => t.id === selectedThread)?.provider}
                         </CardTitle>
                         <CardDescription>
@@ -243,14 +243,14 @@ export function CommunicationSection() {
                             <div
                               className={`max-w-[70%] rounded-lg p-3 ${
                                 message.isProvider
-                                  ? 'bg-gray-100 text-gray-900'
-                                  : 'bg-indigo-600 text-white'
+                                  ? 'bg-muted text-foreground'
+                                  : 'bg-blue-600 text-white'
                               }`}
                             >
                               <p className="text-sm mb-1">{message.text}</p>
                               <p
                                 className={`text-xs ${
-                                  message.isProvider ? 'text-gray-500' : 'text-indigo-100'
+                                  message.isProvider ? 'text-muted-foreground' : 'text-blue-100'
                                 }`}
                               >
                                 {message.time}
@@ -275,7 +275,7 @@ export function CommunicationSection() {
                       />
                       <Button
                         onClick={handleSendMessage}
-                        className="bg-indigo-600 hover:bg-indigo-700"
+                        className="bg-blue-600 hover:bg-blue-700"
                       >
                         <Send className="w-4 h-4" />
                       </Button>
@@ -283,9 +283,9 @@ export function CommunicationSection() {
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-500">
+                <div className="flex-1 flex items-center justify-center text-muted-foreground">
                   <div className="text-center">
-                    <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <MessageSquare className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
                     <p>Select a conversation to start messaging</p>
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export function CommunicationSection() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-indigo-600" />
+                <Bell className="w-5 h-5 text-blue-600" />
                 All Notifications
               </CardTitle>
             </CardHeader>
@@ -311,20 +311,20 @@ export function CommunicationSection() {
                     key={notification.id}
                     className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${
                       notification.unread
-                        ? 'bg-indigo-50 border-indigo-200'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'bg-card border hover:bg-muted'
                     }`}
                   >
                     <div className={`w-10 h-10 rounded-full bg-${notification.color}-100 flex items-center justify-center flex-shrink-0`}>
                       <Icon className={`w-5 h-5 text-${notification.color}-600`} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-gray-900 mb-1">{notification.title}</h4>
-                      <p className="text-sm text-gray-600">{notification.message}</p>
-                      <p className="text-xs text-gray-500 mt-2">{notification.time}</p>
+                      <h4 className="text-foreground mb-1">{notification.title}</h4>
+                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{notification.time}</p>
                     </div>
                     {notification.unread && (
-                      <div className="w-2 h-2 rounded-full bg-indigo-600"></div>
+                      <div className="w-2 h-2 rounded-full bg-blue-600"></div>
                     )}
                   </div>
                 );
