@@ -1,22 +1,39 @@
-const nodemailer = require('nodemailer');
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS // Use app password for Gmail
-    }
-  });
+function assertResendConfigured() {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('Email not configured. Set RESEND_API_KEY in environment variables.');
+  }
+  const fromRaw = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  const from = (fromRaw || '').replace(/^["']|["']$/g, '').trim();
+  if (!from) {
+    throw new Error('Email not configured. Set EMAIL_FROM (preferred) or EMAIL_USER.');
+  }
+  return { from };
 }
 
-const sendEmail = async ({ to, subject, text }) => {
-  const transporter = getTransporter();
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to,
+async function resendSend(payload) {
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`Resend email failed (${resp.status}): ${body}`);
+  }
+}
+
+const sendEmail = async ({ to, subject, text, html }) => {
+  const { from } = assertResendConfigured();
+  await resendSend({
+    from,
+    to: [to],
     subject,
-    text
+    text: text || (html ? ' ' : ''),
+    html: html || undefined,
   });
 };
 
@@ -26,24 +43,25 @@ const sendEmail = async ({ to, subject, text }) => {
  * content must be Buffer (nodemailer accepts Buffer for attachments).
  */
 const sendEmailWithAttachments = async ({ to, subject, text, html, attachments }) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error('Email not configured. Set EMAIL_USER and EMAIL_PASS in server .env (use Gmail app password for Gmail).');
-  }
-  const transporter = getTransporter();
-  const fromRaw = process.env.EMAIL_FROM || process.env.EMAIL_USER;
-  const from = (fromRaw || '').replace(/^["']|["']$/g, '').trim() || process.env.EMAIL_USER;
-  const mailOptions = {
-    from,
-    to,
-    subject,
-    text: text || (html ? 'Please see the attached report.' : ''),
-    html: html || undefined,
-    attachments: (attachments || []).map((a) => ({
+  const { from } = assertResendConfigured();
+
+  const normalizedAttachments = (attachments || []).map((a) => {
+    const contentBuf = Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content);
+    return {
       filename: a.filename || 'attachment.pdf',
-      content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),
-    })),
-  };
-  await transporter.sendMail(mailOptions);
+      // Resend expects base64 string content
+      content: contentBuf.toString('base64'),
+    };
+  });
+
+  await resendSend({
+    from,
+    to: [to],
+    subject,
+    text: text || (html ? 'Please see the attached report.' : 'Please see the attached file.'),
+    html: html || undefined,
+    attachments: normalizedAttachments.length ? normalizedAttachments : undefined,
+  });
 };
 
 module.exports = sendEmail;

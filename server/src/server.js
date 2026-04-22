@@ -8,9 +8,13 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+const connectDB = require('./config/database.js');
+
 const app = express();
 
-// Ensure upload directories exist
+/* ─────────────────────────────────────────────
+   1. Ensure upload directories exist
+───────────────────────────────────────────── */
 const uploadDirs = [
   'uploads/documents',
   'uploads/lab-reports',
@@ -19,6 +23,7 @@ const uploadDirs = [
   'uploads/facial-screening',
   'uploads/reports',
 ];
+
 uploadDirs.forEach(dir => {
   const fullPath = path.join(process.cwd(), dir);
   if (!fs.existsSync(fullPath)) {
@@ -26,59 +31,61 @@ uploadDirs.forEach(dir => {
   }
 });
 
-// Configure multer for file uploads
+/* ─────────────────────────────────────────────
+   2. Multer config
+───────────────────────────────────────────── */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(process.cwd(), 'uploads/documents/'));
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = getCurrentTimeMs() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = getCurrentTimeMs() + '-' + Math.round(Math.random() * 1e9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Invalid file type'));
-    }
+    if (extname && mimetype) cb(null, true);
+    else cb(new Error('Invalid file type'));
   }
 });
 
-// Middleware
+/* ─────────────────────────────────────────────
+   3. Middleware
+───────────────────────────────────────────── */
 
-// Dev: reflect request origin so http://127.0.0.1, LAN IP (Vite host: true), and localhost all work with credentials
 const isProd = process.env.NODE_ENV === 'production';
-const corsOptions = {
+
+app.use(cors({
   origin: isProd
-    ? (process.env.CLIENT_URL ? [process.env.CLIENT_URL] : ['http://localhost:4173', 'http://localhost:5173'])
+    ? (process.env.CLIENT_URL
+        ? [process.env.CLIENT_URL]
+        : ['http://localhost:4173', 'http://localhost:5173'])
     : true,
   credentials: true,
-};
-
-app.use(cors(corsOptions));
+}));
 
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// ─── Targeted rate limits ─────────────────────────────────────────────────────
-// Keep limits conservative to avoid breaking demo usage; tighten for production.
+/* Rate limiter */
 const messagingLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  limit: 60, // 60 req/min per IP
+  windowMs: 60 * 1000,
+  limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Import routes
+/* ─────────────────────────────────────────────
+   4. Routes
+───────────────────────────────────────────── */
 const authRoutes = require('./routes/auth.routes.js');
 const adminRoutes = require('./routes/admin.routes.js');
 const childRoutes = require('./routes/child.routes.js');
@@ -109,30 +116,33 @@ const reportRoutes = require('./routes/reportRoutes.js');
 const { scheduleRouter, sessionSlotRouter } = require('./routes/scheduleRoutes.js');
 const facialScreeningRoutes = require('./routes/facialScreening.routes.js');
 
-
-const connectDB = require('./config/database.js');
-
-/** Liveness for load balancers, CI, and Playwright webServer readiness checks. */
+/* ─────────────────────────────────────────────
+   5. Healthcheck (CRITICAL for Railway)
+───────────────────────────────────────────── */
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ ok: true, ts: getCurrentTime().toISOString() });
+  res.status(200).json({
+    ok: true,
+    time: getCurrentTime().toISOString(),
+  });
 });
 
-// Register routes
+/* ─────────────────────────────────────────────
+   6. Register routes
+───────────────────────────────────────────── */
 app.use("/api/auth", authRoutes);
 app.use("/api/child", childRoutes);
 app.use("/api/parent", parentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/screening", screeningRoutes);
 app.use("/api/lab", labRoutes);
-app.use('/api/lab-tests', labTestRoutes);
-app.use('/api/lab-requests', labRequestRoutes);
+app.use("/api/lab-tests", labTestRoutes);
+app.use("/api/lab-requests", labRequestRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/therapist", therapistRoutes);
 app.use("/api/therapist", therapistCaseRoutes);
 app.use("/api/clinician", clinicianRoutes);
 app.use("/api/cases", caseRoutes);
-/** Case-centric progress + summary (parent / clinician / therapist with case access). */
 app.use('/api/case', integrationRoutes);
 app.use('/api/schedules', scheduleRouter);
 app.use('/api/sessionslots', sessionSlotRouter);
@@ -150,21 +160,51 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/assignments", homeAssignmentRoutes);
 app.use('/api/messaging', messagingLimiter, messageRoutes);
 
+/* ─────────────────────────────────────────────
+   7. Server + DB startup (FIXED FLOW)
+───────────────────────────────────────────── */
 
 const port = process.env.PORT || 4000;
 
-const startServer = () => {
+/**
+ * Start server ONLY after DB is connected
+ */
+const startServer = async () => {
   try {
-    return app.listen(port, () => {
-      connectDB();
-      console.log('Server is running on port: ' + port);
+    console.log('⏳ Connecting to MongoDB...');
+
+    await connectDB();
+
+    console.log('✅ MongoDB connected');
+
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${port}`);
     });
+
+    return server;
+
   } catch (error) {
-    console.error('Error starting server:', error);
-    return null;
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
 };
 
+/* ─────────────────────────────────────────────
+   8. Crash protection (important for Railway)
+───────────────────────────────────────────── */
+process.on('unhandledRejection', (err) => {
+  console.error('🔥 Unhandled Rejection:', err);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
+  process.exit(1);
+});
+
+/* ─────────────────────────────────────────────
+   9. Boot app
+───────────────────────────────────────────── */
 if (require.main === module) {
   startServer();
 }

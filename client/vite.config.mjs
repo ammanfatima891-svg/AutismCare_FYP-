@@ -4,12 +4,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
 export default defineConfig({
-   server: {
+  server: {
     host: true,
     port: 4173,
     historyApiFallback: true
   },
-    plugins: [
+  plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -41,7 +41,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, './src'),
+      "@": path.resolve(import.meta.dirname, './src'),
     },
   },
 })
+
