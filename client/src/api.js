@@ -1,7 +1,15 @@
 import axios from 'axios';
 
+function normalizeApiBaseUrl(raw) {
+  const value = String(raw || '').trim().replace(/\/+$/, '');
+  if (!value) return '';
+  // If user sets VITE_API_BASE_URL to the origin only, append `/api`.
+  // If they already include `/api`, keep it.
+  return value.endsWith('/api') ? value : `${value}/api`;
+}
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
+  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL) || 'http://localhost:4000/api',
   withCredentials: true
 });
 
