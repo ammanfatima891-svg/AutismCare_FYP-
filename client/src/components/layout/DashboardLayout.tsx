@@ -69,6 +69,14 @@ export function DashboardLayout({
   const user = auth?.user ?? null;
   const location = useLocation();
 
+  // TEMP DEBUG HELPERS: if a stale overlay ever disables clicks, recover immediately.
+  useEffect(() => {
+    console.log('DashboardLayout mounted');
+    if (typeof document !== 'undefined') {
+      document.body.style.pointerEvents = 'auto';
+    }
+  }, []);
+
   const linkItemActive = (item: NavigationItem) => {
     if (!item.to) return false;
     if (item.activePathPrefix) return location.pathname.startsWith(item.activePathPrefix);

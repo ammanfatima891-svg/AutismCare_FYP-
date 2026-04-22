@@ -93,6 +93,14 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // TEMP DEBUG HELPERS: restore interactivity if something disabled it.
+  useEffect(() => {
+    console.log('ParentDashboard mounted');
+    if (typeof document !== 'undefined') {
+      document.body.style.pointerEvents = 'auto';
+    }
+  }, []);
+
   useEffect(() => {
     const st = (location.state || {}) as { section?: string; openConversationId?: string };
     if (!st.section && !st.openConversationId) return;

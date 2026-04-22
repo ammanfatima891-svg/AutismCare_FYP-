@@ -102,6 +102,19 @@ export function ParentWelcomeWizard({
 }: ParentWelcomeWizardProps) {
   const [stepIndex, setStepIndex] = useState(0);
 
+  // TEMP DEBUG HELPERS: recover if a modal teardown leaves pointer-events disabled.
+  useEffect(() => {
+    console.log("ParentWelcomeWizard mounted");
+    if (typeof document !== "undefined") {
+      document.body.style.pointerEvents = "auto";
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.style.pointerEvents = "auto";
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (open) setStepIndex(0);
   }, [open]);
