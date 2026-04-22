@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Badge } from '../ui/badge';
 import { cn } from '../ui/utils';
 import { AlertTriangle, ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { activityAPI, scheduleAPI } from '../../api';
@@ -123,6 +124,28 @@ function filterPlanActivityTitlesForDomain(plan: TherapyPlanLike, domain: string
 }
 
 type GoalOptionRow = { key: string; label: string; goalKey?: string; measurementType?: string; goalId?: string };
+
+/** Plan activity titles whose `linkedGoal` matches a selected goal label or goalKey. */
+function planActivitiesMatchingSelectedGoals(
+  plan: TherapyPlanLike | null | undefined,
+  selectedRows: GoalOptionRow[]
+): string[] {
+  if (!plan?.activities?.length || !selectedRows.length) return [];
+  const tokens = new Set<string>();
+  for (const g of selectedRows) {
+    if (g.label) tokens.add(g.label.trim());
+    if (g.goalKey) tokens.add(g.goalKey.trim());
+  }
+  const out: string[] = [];
+  for (const a of plan.activities) {
+    const title = String(a.title || '').trim();
+    const lg = String(a.linkedGoal || '').trim();
+    if (!title || !lg) continue;
+    const hit = [...tokens].some((tok) => lg === tok || lg.includes(tok) || tok.includes(lg));
+    if (hit) out.push(title);
+  }
+  return [...new Set(out)];
+}
 
 /**
  * When the plan defines `shortTermGoals`, therapists must pick from those rows (with stable `goalId` when present).
@@ -238,12 +261,27 @@ export function SessionForm({
     [therapyPlan, effectiveDomain]
   );
 
-  const activityOptions = useMemo(() => {
-    const merged = [...new Set([...libraryNames, ...filteredPlanActivityTitles])];
-    return merged.sort((a, b) => a.localeCompare(b));
-  }, [libraryNames, filteredPlanActivityTitles]);
+  const selectedGoalRows = useMemo(
+    () => goalOptions.filter((g) => selectedGoals[g.key]),
+    [goalOptions, selectedGoals]
+  );
 
-  const allowManualActivityList = activityOptions.length === 0;
+  const prioritizedActivityOptions = useMemo(() => {
+    const goalLinked = planActivitiesMatchingSelectedGoals(therapyPlan, selectedGoalRows);
+    const domainPlan = filteredPlanActivityTitles.filter((t) => !goalLinked.includes(t));
+    const lib = libraryNames.filter((n) => !goalLinked.includes(n) && !domainPlan.includes(n));
+    return [...new Set([...goalLinked, ...domainPlan, ...lib])];
+  }, [therapyPlan, selectedGoalRows, filteredPlanActivityTitles, libraryNames]);
+
+  const planActivityTitleSet = useMemo(
+    () =>
+      new Set(
+        (therapyPlan?.activities || []).map((a) => String(a.title || '').trim()).filter(Boolean)
+      ),
+    [therapyPlan]
+  );
+
+  const allowManualActivityList = prioritizedActivityOptions.length === 0;
 
   const loadLibrary = useCallback(async () => {
     try {
@@ -265,11 +303,11 @@ export function SessionForm({
     setSelectedActivities((prev) => {
       const next = { ...prev };
       for (const k of Object.keys(next)) {
-        if (!activityOptions.includes(k)) delete next[k];
+        if (!prioritizedActivityOptions.includes(k)) delete next[k];
       }
       return next;
     });
-  }, [activityOptions]);
+  }, [prioritizedActivityOptions]);
 
   useEffect(() => {
     if (planDomains.length) setDomainUi(planDomains[0]);
@@ -367,7 +405,8 @@ export function SessionForm({
     const targets = new Set((initialSession.goalsTargeted || []).map((x) => String(x).trim()));
     const gMap: Record<string, boolean> = {};
     for (const g of goalOptions) {
-      gMap[g.key] = targets.has(g.label);
+      const tokens = [g.label, g.goalKey].filter(Boolean).map((x) => String(x).trim());
+      gMap[g.key] = tokens.some((t) => targets.has(t));
     }
     setSelectedGoals(gMap);
   }, [open, isPage, mode, initialSession, goalOptions]);
@@ -375,12 +414,12 @@ export function SessionForm({
   useEffect(() => {
     if ((!open && !isPage) || mode !== 'edit' || !initialSession?._id) return;
     const used = initialSession.activitiesUsed || [];
-    if (activityOptions.length === 0) {
+    if (prioritizedActivityOptions.length === 0) {
       setSelectedActivities({});
       setManualActivitiesOnly(used.join(', '));
       return;
     }
-    const known = new Set(activityOptions);
+    const known = new Set(prioritizedActivityOptions);
     const aMap: Record<string, boolean> = {};
     const unknown: string[] = [];
     for (const a of used) {
@@ -389,7 +428,7 @@ export function SessionForm({
     }
     setSelectedActivities(aMap);
     setManualActivitiesOnly(unknown.join(', '));
-  }, [open, isPage, mode, initialSession, activityOptions]);
+  }, [open, isPage, mode, initialSession, prioritizedActivityOptions]);
 
   const validate = (): boolean => {
     const next: FieldErrors = {};
@@ -409,7 +448,7 @@ export function SessionForm({
         .filter(Boolean);
       if (activities.length === 0) next.activitiesUsed = 'Enter at least one activity (or add items to your library / plan)';
     } else {
-      activities = activityOptions.filter((a) => selectedActivities[a]);
+      activities = prioritizedActivityOptions.filter((a) => selectedActivities[a]);
       if (activities.length === 0) next.activitiesUsed = 'Select at least one activity';
     }
 
@@ -442,7 +481,9 @@ export function SessionForm({
         toast.warning('Parent instructions are empty — families rely on this for home follow-up. Consider adding guidance before saving.');
       }
 
-      const goalsTargeted = goalOptions.filter((g) => selectedGoals[g.key]).map((g) => g.label);
+      const goalsTargeted = goalOptions
+        .filter((g) => selectedGoals[g.key])
+        .map((g) => (g.goalKey ? String(g.goalKey).trim() : g.label));
       let activitiesUsed: string[] = [];
       if (allowManualActivityList) {
         activitiesUsed = manualActivitiesOnly
@@ -450,7 +491,7 @@ export function SessionForm({
           .map((x) => x.trim())
           .filter(Boolean);
       } else {
-        activitiesUsed = activityOptions.filter((a) => selectedActivities[a]);
+        activitiesUsed = prioritizedActivityOptions.filter((a) => selectedActivities[a]);
       }
 
       const childResponse = buildChildResponseString('scale', scaleVal, 0);
@@ -753,19 +794,26 @@ export function SessionForm({
                 />
                 <p className="text-xs text-muted-foreground">Add templates to the activity library for this domain, or embed activities on the therapy plan.</p>
               </div>
-            ) : activityOptions.length === 0 ? (
+            ) : prioritizedActivityOptions.length === 0 ? (
               <p className="rounded-md border bg-background px-3 py-3 text-sm text-muted-foreground">
                 No activities available for this therapy domain.
               </p>
             ) : (
               <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border bg-background/50 p-3">
-                {activityOptions.map((a) => (
+                {prioritizedActivityOptions.map((a) => (
                   <label key={a} className="flex cursor-pointer items-start gap-3 rounded-md px-1 py-2 text-sm hover:bg-card">
                     <Checkbox
                       checked={!!selectedActivities[a]}
                       onCheckedChange={(c) => setSelectedActivities((prev) => ({ ...prev, [a]: c === true }))}
                     />
-                    <span className="leading-snug text-foreground">{a}</span>
+                    <span className="flex flex-1 flex-col gap-1">
+                      <span className="leading-snug text-foreground">{a}</span>
+                      {!planActivityTitleSet.has(a) ? (
+                        <Badge variant="secondary" className="w-fit text-xs font-normal">
+                          Custom Activity (Not in Plan)
+                        </Badge>
+                      ) : null}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -994,7 +1042,7 @@ export function SessionForm({
                       Add templates to the activity library for this domain, or embed activities on the therapy plan.
                     </p>
                   </div>
-                ) : activityOptions.length === 0 ? (
+                ) : prioritizedActivityOptions.length === 0 ? (
                   <Alert>
                     <Info className="text-muted-foreground" />
                     <AlertTitle>No activities for this domain</AlertTitle>
@@ -1004,7 +1052,7 @@ export function SessionForm({
                   </Alert>
                 ) : (
                   <div className="max-h-72 space-y-1 overflow-y-auto rounded-xl border-2 border-border/80 bg-muted/20 p-3 shadow-inner">
-                    {activityOptions.map((a) => (
+                    {prioritizedActivityOptions.map((a) => (
                       <label
                         key={a}
                         className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-background"
@@ -1014,7 +1062,14 @@ export function SessionForm({
                           onCheckedChange={(c) => setSelectedActivities((prev) => ({ ...prev, [a]: c === true }))}
                           className="mt-0.5"
                         />
-                        <span className="leading-snug text-foreground">{a}</span>
+                        <span className="flex flex-1 flex-col gap-1">
+                          <span className="leading-snug text-foreground">{a}</span>
+                          {!planActivityTitleSet.has(a) ? (
+                            <Badge variant="secondary" className="w-fit text-xs font-normal">
+                              Custom Activity (Not in Plan)
+                            </Badge>
+                          ) : null}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -1101,11 +1156,11 @@ export function SessionForm({
             </CardContent>
           </Card>
 
-          <div className="sticky bottom-0 z-10 mt-10 flex flex-col gap-3 border-t border-border/80 bg-background/95 py-6 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:items-center sm:justify-end">
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => handleCancel()} disabled={saving}>
+          <div className="mt-10 flex flex-wrap items-center justify-end gap-3 border-t border-border/80 bg-background/95 py-6">
+            <Button type="button" variant="outline" className="min-w-[112px]" onClick={() => handleCancel()} disabled={saving}>
               Cancel
             </Button>
-            <Button type="button" className="w-full sm:w-auto" onClick={() => void handleSubmit()} disabled={saving}>
+            <Button type="button" className="min-w-[140px]" onClick={() => void handleSubmit()} disabled={saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save session
             </Button>

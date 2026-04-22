@@ -124,6 +124,15 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
   const handleNavigate = (section: string) => {
     if (isSection(section)) setCurrentSection(section);
   };
+  const handleOpenWelcomeTour = useCallback(() => {
+    // Force a closed -> open transition so replay is reliable across all browsers.
+    setWelcomeOpen(false);
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => setWelcomeOpen(true), 0);
+      return;
+    }
+    setWelcomeOpen(true);
+  }, []);
 
   const clearOpenConversation = useCallback(() => setOpenConversationId(null), []);
 
@@ -131,7 +140,7 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
     switch (currentSection) {
       case 'home':
         return (
-          <DashboardHome onNavigate={handleNavigate} onOpenWelcomeTour={() => setWelcomeOpen(true)} />
+          <DashboardHome onNavigate={handleNavigate} onOpenWelcomeTour={handleOpenWelcomeTour} />
         );
       case 'children':
         return (

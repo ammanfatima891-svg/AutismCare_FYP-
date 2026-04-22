@@ -38,6 +38,18 @@ const SessionGoalDataSchema = new Schema(
 
 const NOTE_STATES = ['draft', 'signed', 'locked'];
 
+const ActivityUsageSchema = new Schema(
+  {
+    /** Original label as entered or from library */
+    displayName: { type: String, trim: true, default: '' },
+    normalizedName: { type: String, trim: true, lowercase: true, default: '' },
+    /** Kept for backward compatibility — mirrors displayName when set. */
+    name: { type: String, trim: true, default: '' },
+    isCustomActivity: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const SessionLogSchema = new Schema(
   {
     caseId: {
@@ -67,6 +79,11 @@ const SessionLogSchema = new Schema(
     },
     activitiesUsed: {
       type: [String],
+      default: [],
+    },
+    /** Per-activity flag: true when name was not from plan or activity library at log time. */
+    activityUsage: {
+      type: [ActivityUsageSchema],
       default: [],
     },
     childResponse: {
@@ -127,6 +144,13 @@ const SessionLogSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'SessionSlot',
       default: undefined,
+    },
+    /** Active therapy episode when session was logged. */
+    episodeId: {
+      type: Schema.Types.ObjectId,
+      ref: 'TherapyEpisode',
+      default: undefined,
+      index: true,
     },
   },
   { timestamps: true }

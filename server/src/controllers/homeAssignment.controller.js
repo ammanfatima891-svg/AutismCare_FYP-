@@ -104,8 +104,12 @@ exports.createHomeAssignment = async (req, res) => {
       instructions,
       dueDate,
       materials,
+      frequency,
+      duration,
       sourceActivityId,
       activityId: bodyActivityId,
+      goalKey,
+      domain,
     } = body;
 
     if (!mongoose.Types.ObjectId.isValid(caseId)) {
@@ -145,6 +149,12 @@ exports.createHomeAssignment = async (req, res) => {
       || (activityDoc ? buildInstructionsFromActivity(activityDoc) : '');
     const resolvedMaterials = String(materials ?? '').trim()
       || (activityDoc ? String(activityDoc.materials || '').trim() : '');
+    const resolvedFrequency = String(frequency ?? '').trim()
+      || (activityDoc ? String(activityDoc.frequency || '').trim() : '');
+    const resolvedDuration = String(duration ?? '').trim();
+
+    const gk = goalKey != null ? String(goalKey).trim() : '';
+    const dom = domain != null ? String(domain).trim() : '';
 
     const payload = {
       caseId,
@@ -152,8 +162,12 @@ exports.createHomeAssignment = async (req, res) => {
       title: resolvedTitle,
       instructions: resolvedInstructions,
       materials: resolvedMaterials,
+      frequency: resolvedFrequency,
+      duration: resolvedDuration,
       dueDate: due,
       status: 'pending',
+      ...(gk ? { goalKey: gk } : {}),
+      ...(dom ? { domain: dom } : {}),
     };
 
     if (activityDoc) {
@@ -188,7 +202,19 @@ exports.createHomeAssignment = async (req, res) => {
  * POST /api/assignments — body: { caseId, activityId?, title?, instructions?, materials?, dueDate }
  */
 exports.createAssignmentPost = async (req, res) => {
-  const { caseId, activityId, title, instructions, materials, dueDate, sourceActivityId } = req.body || {};
+  const {
+    caseId,
+    activityId,
+    title,
+    instructions,
+    materials,
+    frequency,
+    duration,
+    dueDate,
+    sourceActivityId,
+    goalKey,
+    domain,
+  } = req.body || {};
   if (!caseId || !mongoose.Types.ObjectId.isValid(String(caseId))) {
     return res.status(400).json({ success: false, message: 'Valid caseId is required in body' });
   }
@@ -197,9 +223,13 @@ exports.createAssignmentPost = async (req, res) => {
     title,
     instructions,
     materials,
+    frequency,
+    duration,
     dueDate,
     activityId: activityId || sourceActivityId,
     sourceActivityId: sourceActivityId || activityId,
+    goalKey,
+    domain,
   };
   return exports.createHomeAssignment(req, res);
 };

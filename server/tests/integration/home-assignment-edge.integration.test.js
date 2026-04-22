@@ -85,6 +85,8 @@ describe('Home Assignment Edge Matrix', () => {
       childId,
       parentId,
       clinicianId: new mongoose.Types.ObjectId(),
+      therapistId: new mongoose.Types.ObjectId(therapistDoc._id),
+      status: 'THERAPY_ACTIVE',
     });
     caseId = String(createdCase._id);
 

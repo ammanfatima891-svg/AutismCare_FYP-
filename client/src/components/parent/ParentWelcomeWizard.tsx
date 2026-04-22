@@ -149,6 +149,7 @@ export function ParentWelcomeWizard({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         hideCloseButton
+        onInteractOutside={(event) => event.preventDefault()}
         className={cn(
           "gap-0 overflow-hidden p-0 sm:max-w-lg",
           "max-h-[min(92dvh,720px)] grid-rows-[auto_1fr_auto]",

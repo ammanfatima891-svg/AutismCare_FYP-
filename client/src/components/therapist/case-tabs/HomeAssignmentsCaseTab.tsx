@@ -23,6 +23,8 @@ type AssignmentRow = {
   title?: string;
   instructions?: string;
   materials?: string;
+  frequency?: string;
+  duration?: string;
   dueDate?: string;
   status?: string;
   activityId?: ActivityRef | string | null;
@@ -138,6 +140,18 @@ export function HomeAssignmentsCaseTab({ caseId, data, onRefresh }: Props) {
                     </div>
                     {a.instructions ? (
                       <p className="mt-3 text-sm leading-relaxed text-foreground">{a.instructions}</p>
+                    ) : null}
+                    {a.frequency ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Frequency: </span>
+                        {a.frequency}
+                      </p>
+                    ) : null}
+                    {a.duration ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Duration: </span>
+                        {a.duration}
+                      </p>
                     ) : null}
                     {a.materials ? (
                       <p className="mt-2 text-sm text-muted-foreground">

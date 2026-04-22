@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { referralAPI } from '../../services/api';
+import { referralAPI, caseAPI } from '../../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -46,23 +46,33 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [finalEvaluationExists, setFinalEvaluationExists] = useState(false);
+  const [caseStatus, setCaseStatus] = useState<string>('');
 
   const [therapistType, setTherapistType] = useState('');
   const [priority, setPriority] = useState('');
   const [notes, setNotes] = useState('');
 
   const canCreate = useMemo(
-    () => finalEvaluationExists && !!therapistType && !!priority,
-    [finalEvaluationExists, therapistType, priority]
+    () =>
+      finalEvaluationExists &&
+      (caseStatus === 'DIAGNOSIS_READY' || caseStatus === 'THERAPY') &&
+      !!therapistType &&
+      !!priority,
+    [finalEvaluationExists, caseStatus, therapistType, priority]
   );
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await referralAPI.getByCase(caseId);
+      const [refRes, caseRes] = await Promise.all([
+        referralAPI.getByCase(caseId),
+        caseAPI.getById(caseId),
+      ]);
+      const data = refRes.data;
       setItems(data?.data || []);
       setFinalEvaluationExists(!!data?.meta?.finalEvaluationExists);
+      setCaseStatus(String(caseRes.data?.data?.status || '').toUpperCase());
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to load referrals');
     } finally {
@@ -111,6 +121,11 @@ export function ReferralTab({ caseId }: ReferralTabProps) {
               Finalize clinical evaluation first
             </div>
           )}
+          {caseStatus && !['DIAGNOSIS_READY', 'THERAPY'].includes(caseStatus) ? (
+            <div className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
+              Not available in current stage
+            </div>
+          ) : null}
           {error && (
             <div className="rounded-lg border bg-muted px-4 py-3 text-sm text-destructive flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />

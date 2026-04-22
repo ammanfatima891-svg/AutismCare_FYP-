@@ -109,6 +109,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/lab-tests"
+            element={
+              <ProtectedRoute roles={["lab"]}>
+                <LabDashboard initialSection="my-tests" />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/therapist-dashboard"

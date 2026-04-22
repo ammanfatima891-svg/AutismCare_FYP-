@@ -6,6 +6,7 @@ const { ChildCase } = require('../models/ChildCase');
 const Submission = require('../models/Submission');
 const { evaluateDecision } = require('../utils/decisionEngine');
 const { recordAuditEvent } = require('../utils/auditLog');
+const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
 
 function sanitizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -136,6 +137,7 @@ exports.createEvaluation = async (req, res) => {
       comorbidConditions,
       recommendations,
       status,
+      finalDisposition,
     } = req.body || {};
 
     if (!caseId) {
@@ -150,6 +152,22 @@ exports.createEvaluation = async (req, res) => {
     const normStatus = normalizeEvaluationStatus(status) || status;
     if (!normStatus || !Object.values(EVALUATION_STATUS).includes(normStatus)) {
       return res.status(400).json({ success: false, message: 'status must be DRAFT or FINALIZED' });
+    }
+
+    const disposition = String(finalDisposition || '').trim().toUpperCase();
+    if (normStatus === EVALUATION_STATUS.FINALIZED) {
+      if (!disposition) {
+        return res.status(400).json({
+          success: false,
+          message: 'finalDisposition is required when finalizing (MONITORING or REFER_THERAPY)',
+        });
+      }
+      if (!['MONITORING', 'REFER_THERAPY'].includes(disposition)) {
+        return res.status(400).json({
+          success: false,
+          message: 'finalDisposition must be MONITORING or REFER_THERAPY',
+        });
+      }
     }
 
     const payload = {
@@ -176,7 +194,23 @@ exports.createEvaluation = async (req, res) => {
       ...(decision ? { decision } : {}),
       status: normStatus,
       sourceEvaluationId: null,
+      ...(normStatus === EVALUATION_STATUS.FINALIZED ? { finalDisposition: disposition } : {}),
     });
+
+    let childCaseSyncWarning = null;
+    if (normStatus === EVALUATION_STATUS.FINALIZED) {
+      try {
+        await transitionCase({
+          caseId,
+          eventType: CASE_EVENTS.CLINICIAN_FINAL_EVALUATION_DECIDED,
+          payload: { disposition },
+          triggeredBy: clinicianId,
+        });
+      } catch (e) {
+        console.error('case lifecycle sync (final evaluation):', e);
+        childCaseSyncWarning = 'Evaluation finalized, but case lifecycle status did not update.';
+      }
+    }
 
     try {
       await recordAuditEvent({
@@ -196,6 +230,7 @@ exports.createEvaluation = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Evaluation created successfully',
+      childCaseSyncWarning,
       data: created,
     });
   } catch (error) {
@@ -281,6 +316,7 @@ exports.versionEvaluation = async (req, res) => {
       comorbidConditions,
       recommendations,
       status,
+      finalDisposition,
     } = req.body || {};
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -289,6 +325,22 @@ exports.versionEvaluation = async (req, res) => {
     const normStatus = normalizeEvaluationStatus(status) || status;
     if (!normStatus || !Object.values(EVALUATION_STATUS).includes(normStatus)) {
       return res.status(400).json({ success: false, message: 'status must be DRAFT or FINALIZED' });
+    }
+
+    const disposition = String(finalDisposition || '').trim().toUpperCase();
+    if (normStatus === EVALUATION_STATUS.FINALIZED) {
+      if (!disposition) {
+        return res.status(400).json({
+          success: false,
+          message: 'finalDisposition is required when finalizing (MONITORING or REFER_THERAPY)',
+        });
+      }
+      if (!['MONITORING', 'REFER_THERAPY'].includes(disposition)) {
+        return res.status(400).json({
+          success: false,
+          message: 'finalDisposition must be MONITORING or REFER_THERAPY',
+        });
+      }
     }
 
     const current = await ClinicalEvaluation.findById(id);
@@ -339,7 +391,23 @@ exports.versionEvaluation = async (req, res) => {
       ...(decision ? { decision } : {}),
       status: normStatus,
       sourceEvaluationId: current._id,
+      ...(normStatus === EVALUATION_STATUS.FINALIZED ? { finalDisposition: disposition } : {}),
     });
+
+    let childCaseSyncWarning = null;
+    if (normStatus === EVALUATION_STATUS.FINALIZED) {
+      try {
+        await transitionCase({
+          caseId: current.caseId,
+          eventType: CASE_EVENTS.CLINICIAN_FINAL_EVALUATION_DECIDED,
+          payload: { disposition },
+          triggeredBy: clinicianId,
+        });
+      } catch (e) {
+        console.error('case lifecycle sync (final evaluation version):', e);
+        childCaseSyncWarning = 'Evaluation finalized, but case lifecycle status did not update.';
+      }
+    }
 
     try {
       await recordAuditEvent({
@@ -363,6 +431,7 @@ exports.versionEvaluation = async (req, res) => {
         current.status === EVALUATION_STATUS.FINALIZED
           ? 'Final evaluation locked. New version created.'
           : 'Evaluation updated as a new version.',
+      childCaseSyncWarning,
       data: versioned,
     });
   } catch (error) {

@@ -83,6 +83,7 @@ describe('Clinical Evaluation Lifecycle Integration', () => {
       childId,
       parentId,
       clinicianId: new mongoose.Types.ObjectId(clinicianDoc._id),
+      status: 'REVIEW',
     });
     caseId = String(createdCase._id);
   });
@@ -136,6 +137,7 @@ describe('Clinical Evaluation Lifecycle Integration', () => {
       .send({
         recommendations: 'Add parent coaching and monitor speech gains closely.',
         status: 'final',
+        finalDisposition: 'MONITORING',
       });
 
     expect(versionRes.statusCode).toBe(201);

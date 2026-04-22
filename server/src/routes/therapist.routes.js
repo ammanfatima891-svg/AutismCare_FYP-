@@ -15,6 +15,7 @@ const {
   getAssignmentsByCaseForTherapist,
 } = require('../controllers/homeAssignment.controller');
 const { protect, restrictTo } = require('../middleware/auth.middleware');
+const { validateCaseState } = require('../middleware/validateCaseState');
 
 // All therapist routes require authentication and therapist role
 router.use(protect);
@@ -34,7 +35,16 @@ router.patch('/referrals/:id/start-therapy', startReferral);
 router.post('/recommendations', addTherapistRecommendation);
 
 // Therapy assignments linked by caseId
-router.post('/cases/:caseId/assignments', createHomeAssignment);
+router.post(
+  '/cases/:caseId/assignments',
+  validateCaseState({
+    childCaseId: 'params.caseId',
+    requiredStatuses: ['THERAPY_ACTIVE'],
+    actionName: 'CREATE_HOME_ASSIGNMENT',
+    message: 'Home assignments can only be created during active therapy (THERAPY_ACTIVE).',
+  }),
+  createHomeAssignment
+);
 router.get('/cases/:caseId/assignments', getAssignmentsByCaseForTherapist);
 
 module.exports = router;

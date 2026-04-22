@@ -51,6 +51,7 @@ function statusDisplayLabel(normalized: string): string {
   if (normalized === 'in-progress') return 'Active';
   if (normalized === 'accepted') return 'Accepted';
   if (normalized === 'pending') return 'Pending';
+  if (normalized === 'sent') return 'Sent';
   return normalized || '—';
 }
 
@@ -98,7 +99,11 @@ export function TherapistAssignedCases() {
   const filteredItems = useMemo(() => {
     let list = items;
     if (statusFilter !== 'all') {
-      list = list.filter((item) => normalizeStatus(item.status) === statusFilter);
+      list = list.filter((item) => {
+        const n = normalizeStatus(item.status);
+        if (statusFilter === 'pending') return n === 'pending' || n === 'sent';
+        return n === statusFilter;
+      });
     }
     const q = searchQuery.trim().toLowerCase();
     if (!q) return list;
@@ -299,7 +304,7 @@ export function TherapistAssignedCases() {
                 </div>
 
                 <div className="mt-6 flex flex-col gap-2 border-t border pt-5">
-                  {normalizedStatus === 'pending' ? (
+                  {normalizedStatus === 'pending' || normalizedStatus === 'sent' ? (
                     <>
                       <Button
                         type="button"

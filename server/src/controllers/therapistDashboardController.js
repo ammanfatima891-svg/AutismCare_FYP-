@@ -30,6 +30,20 @@ function hasAnyToken(haystack, tokens) {
   return tokens.some((token) => haystack.includes(token));
 }
 
+/** Match Referral JSON transform + GET /referrals/assigned (lean() skips mongoose transforms). */
+function toApiReferralStatus(status) {
+  const v = String(status || '')
+    .trim()
+    .toUpperCase();
+  if (v === REFERRAL_STATUS.CREATED) return 'pending';
+  if (v === REFERRAL_STATUS.SENT) return 'sent';
+  if (v === REFERRAL_STATUS.ACCEPTED) return 'accepted';
+  if (v === REFERRAL_STATUS.REJECTED) return 'rejected';
+  return String(status || '')
+    .trim()
+    .toLowerCase() || '';
+}
+
 function therapistTypesFromSpecialization(specialization) {
   const value = normalizeText(specialization);
   if (!value) return [];
@@ -228,7 +242,7 @@ async function loadTherapistDashboardData(req) {
         childName: childNameFromParentChildren(parent, c.childId),
         caseStatus: c.status,
         riskLevel: c.riskLevel,
-        referralStatus: ref.status,
+        referralStatus: toApiReferralStatus(ref.status),
         therapistType: ref.therapistType,
         updatedAt: c.updatedAt,
       };

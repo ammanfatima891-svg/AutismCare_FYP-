@@ -57,7 +57,7 @@ exports.getParentCases = async (req, res) => {
     }
 
     const cases = await ChildCase.find({ parentId })
-      .select('_id childId status riskLevel createdAt')
+      .select('_id childId status riskLevel screeningProgress createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -71,6 +71,7 @@ exports.getParentCases = async (req, res) => {
         childId: c.childId,
         status: c.status,
         riskLevel: c.riskLevel,
+        screeningProgress: c.screeningProgress || { mchatCompleted: false, asqCompleted: false, skippedMchat: false },
         childName: `${firstName} ${lastName}`.trim() || 'Child',
       };
     });

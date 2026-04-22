@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { Loader2, RefreshCw, UserCircle2 } from 'lucide-react';
+import { CaseStatusBadge } from '../CaseStatusBadge';
 
 export interface ChildCaseListProps {
   onOpenCase: (caseId: string) => void;
@@ -32,13 +33,6 @@ const riskBadgeClass: Record<string, string> = {
   medium: 'bg-warning-yellow/10 text-warning-yellow border-warning-yellow/20 font-medium',
   high: 'bg-destructive/10 text-destructive border-destructive/20 font-medium',
   unknown: 'bg-muted text-muted-foreground border-muted font-medium',
-};
-
-const statusBadgeClass: Record<string, string> = {
-  Active: 'bg-accent/10 text-accent-foreground border-accent/20 font-medium',
-  'Under Evaluation': 'bg-primary/10 text-primary border-primary/20 font-medium',
-  Referred: 'bg-secondary text-secondary-foreground border-secondary font-medium',
-  'Ongoing Therapy': 'bg-success-green/10 text-success-green border-success-green/20 font-medium',
 };
 
 type Row = {
@@ -125,10 +119,12 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={STATUS_ALL}>All statuses</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Under Evaluation">Under Evaluation</SelectItem>
-                    <SelectItem value="Referred">Referred</SelectItem>
-                    <SelectItem value="Ongoing Therapy">Ongoing Therapy</SelectItem>
+                    <SelectItem value="REVIEW">REVIEW</SelectItem>
+                    <SelectItem value="DIAGNOSIS">DIAGNOSIS</SelectItem>
+                    <SelectItem value="DIAGNOSIS_READY">DIAGNOSIS_READY</SelectItem>
+                    <SelectItem value="THERAPY">THERAPY</SelectItem>
+                    <SelectItem value="THERAPY_ACTIVE">THERAPY_ACTIVE</SelectItem>
+                    <SelectItem value="MONITORING">MONITORING</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -183,12 +179,7 @@ export function ChildCaseList({ onOpenCase }: ChildCaseListProps) {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={statusBadgeClass[row.status] || 'bg-muted text-foreground'}
-                        >
-                          {row.status}
-                        </Badge>
+                        <CaseStatusBadge status={row.status} showMeaning={false} />
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {new Date(row.updatedAt).toLocaleString()}

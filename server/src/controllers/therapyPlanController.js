@@ -10,6 +10,7 @@ const { recordAuditEvent } = require('../utils/auditLog');
 const { mergeShortTermGoalsPreservingLockedBaselines } = require('../utils/planBaselineLock');
 const { invalidateProgressEngineCache } = require('../services/progressEngine');
 const { THERAPY_STATUS } = require('../constants/workflowEnums');
+const { startNewEpisode } = require('../services/therapyEpisodeService');
 
 const THERAPY_DOMAIN_OPTIONS = TherapyPlan.THERAPY_DOMAIN_OPTIONS;
 const SHORT_TERM_GOAL_STATUS = TherapyPlan.SHORT_TERM_GOAL_STATUS;
@@ -129,6 +130,10 @@ function validateFinalPlan({ domains, longTermGoal, shortTermGoals }) {
 function applyStatusToDoc(planDoc, status) {
   planDoc.status = status;
   planDoc.draft = status === 'draft';
+  const locked = ['approved', 'active', 'archived'].includes(String(planDoc.planStatus || ''));
+  if (!locked) {
+    planDoc.planStatus = status === 'draft' ? 'draft' : 'final';
+  }
 }
 
 async function assertActiveTherapyCase(caseId, therapistId) {
@@ -201,12 +206,13 @@ exports.listTherapyPlansForTherapist = async (req, res) => {
         success: true,
         data: [],
         meta: {
-        domainOptions: THERAPY_DOMAIN_OPTIONS,
-        shortTermStatuses: SHORT_TERM_GOAL_STATUS,
-        measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
-        masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
-        planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
-      },
+          domainOptions: THERAPY_DOMAIN_OPTIONS,
+          shortTermStatuses: SHORT_TERM_GOAL_STATUS,
+          measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
+          masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
+          planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
+          planLifecycleStatuses: TherapyPlan.PLAN_LIFECYCLE_STATUSES,
+        },
       });
     }
 
@@ -228,6 +234,7 @@ exports.listTherapyPlansForTherapist = async (req, res) => {
         measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
         masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
         planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
+        planLifecycleStatuses: TherapyPlan.PLAN_LIFECYCLE_STATUSES,
       },
     });
   } catch (error) {
@@ -286,6 +293,11 @@ exports.duplicateTherapyPlan = async (req, res) => {
     src.therapistId = therapistId;
     src.status = 'draft';
     src.draft = true;
+    src.planStatus = 'draft';
+    src.submittedAt = null;
+    src.approvedAt = null;
+    src.approvedBy = undefined;
+    src.approval = { status: 'none', requestedAt: null, approvedAt: null, approvedBy: undefined, rejectionReason: '' };
 
     if (Array.isArray(src.shortTermGoals)) {
       src.shortTermGoals = src.shortTermGoals.map((g) => {
@@ -364,6 +376,11 @@ exports.duplicateTherapyPlanPost = async (req, res) => {
     src.therapistId = therapistId;
     src.status = 'draft';
     src.draft = true;
+    src.planStatus = 'draft';
+    src.submittedAt = null;
+    src.approvedAt = null;
+    src.approvedBy = undefined;
+    src.approval = { status: 'none', requestedAt: null, approvedAt: null, approvedBy: undefined, rejectionReason: '' };
 
     if (Array.isArray(src.shortTermGoals)) {
       src.shortTermGoals = src.shortTermGoals.map((g) => {
@@ -471,6 +488,7 @@ exports.createTherapyPlan = async (req, res) => {
       goals: Array.isArray(goals) ? goals : [],
       status,
       draft: status === 'draft',
+      planStatus: status === 'draft' ? 'draft' : 'final',
     });
 
     try {
@@ -520,15 +538,17 @@ exports.getTherapyPlanByCase = async (req, res) => {
     const plan = await TherapyPlan.findOne({ caseId, therapistId })
       .sort({ updatedAt: -1 })
       .lean();
+    const { attachEffectivePlanStatus } = require('../utils/therapyPlanLifecycle');
     return res.status(200).json({
       success: true,
-      data: plan || null,
+      data: plan ? attachEffectivePlanStatus(plan) : null,
       meta: {
         domainOptions: THERAPY_DOMAIN_OPTIONS,
         shortTermStatuses: SHORT_TERM_GOAL_STATUS,
         measurementTypes: TherapyPlan.MEASUREMENT_TYPES,
         masteryRuleTypes: TherapyPlan.MASTERY_RULE_TYPES,
         planApprovalStatuses: TherapyPlan.PLAN_APPROVAL_STATUS,
+        planLifecycleStatuses: TherapyPlan.PLAN_LIFECYCLE_STATUSES,
       },
     });
   } catch (error) {
@@ -631,6 +651,14 @@ exports.assignTherapyPlan = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid caseId' });
     }
 
+    const plan = await TherapyPlan.findOne({ _id: planId, therapistId });
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Therapy plan not found' });
+    }
+    if (String(plan.caseId) !== String(caseId)) {
+      return res.status(400).json({ success: false, message: 'Plan does not belong to this case file' });
+    }
+
     const active = await assertActiveTherapyCase(caseId, therapistId);
     if (!active) {
       return res.status(403).json({ success: false, message: 'Access denied' });
@@ -647,12 +675,16 @@ exports.assignTherapyPlan = async (req, res) => {
       });
     }
 
-    const plan = await TherapyPlan.findOne({ _id: planId, therapistId });
-    if (!plan) {
-      return res.status(404).json({ success: false, message: 'Therapy plan not found' });
-    }
-    if (String(plan.caseId) !== String(caseId)) {
-      return res.status(400).json({ success: false, message: 'Plan does not belong to this case file' });
+    const assignability = validateFinalPlan({
+      domains: Array.isArray(plan.domains) ? plan.domains : [],
+      longTermGoal: plan.longTermGoal || {},
+      shortTermGoals: Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [],
+    });
+    if (!assignability.ok) {
+      return res.status(400).json({
+        success: false,
+        message: assignability.message || 'Plan must include valid domains, a long-term goal, and short-term goals before assignment',
+      });
     }
 
     if (plan.assignedChildId && String(plan.assignedChildId) === String(childId)) {
@@ -665,15 +697,7 @@ exports.assignTherapyPlan = async (req, res) => {
     plan.assignedBy = therapistId;
     plan.assignedChildId = childId;
 
-    const finalizeCheck = validateFinalPlan({
-      domains: Array.isArray(plan.domains) ? plan.domains : [],
-      longTermGoal: plan.longTermGoal || {},
-      shortTermGoals: Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [],
-    });
-
-    if (finalizeCheck.ok) {
-      applyStatusToDoc(plan, 'final');
-    }
+    applyStatusToDoc(plan, 'final');
 
     await plan.save();
     try {
@@ -846,6 +870,16 @@ exports.updateTherapyPlan = async (req, res) => {
             caseId: plan.caseId,
             summary: `planVersion=${plan.planVersion}`,
           });
+          try {
+            await startNewEpisode({
+              caseId: plan.caseId,
+              therapistId: plan.therapistId,
+              planId: plan._id,
+              planVersion: plan.planVersion,
+            });
+          } catch (epErr) {
+            console.error('therapy episode on revision:', epErr);
+          }
         }
         return res.status(200).json({ success: true, data: plan.toObject() });
       } catch (saveError) {
@@ -891,9 +925,24 @@ exports.submitTherapyPlanForApproval = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Plan is already pending approval' });
     }
 
+    const domainList = Array.isArray(plan.domains) ? plan.domains.filter((d) => THERAPY_DOMAIN_OPTIONS.includes(d)) : [];
+    const vf = validateFinalPlan({
+      domains: domainList,
+      longTermGoal: plan.longTermGoal || {},
+      shortTermGoals: Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [],
+    });
+    if (!vf.ok) {
+      return res.status(400).json({ success: false, message: vf.message });
+    }
+
+    const now = getCurrentTime();
+    plan.planStatus = 'final';
+    plan.submittedAt = now;
+    plan.status = 'final';
+    plan.draft = false;
     plan.approval = {
       status: 'pending',
-      requestedAt: getCurrentTime(),
+      requestedAt: now,
       approvedAt: null,
       approvedBy: undefined,
       rejectionReason: '',
@@ -919,5 +968,101 @@ exports.submitTherapyPlanForApproval = async (req, res) => {
   } catch (error) {
     console.error('submitTherapyPlanForApproval:', error);
     return res.status(500).json({ success: false, message: 'Failed to submit plan for approval' });
+  }
+};
+
+/**
+ * POST /api/therapy-plan/:id/approve (clinician only)
+ * Validates plan content and records approval; plan becomes session-eligible after therapy start sets `active`.
+ */
+exports.approveTherapyPlanByClinician = async (req, res) => {
+  try {
+    const clinicianId = req.user._id;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid plan id' });
+    }
+
+    const plan = await TherapyPlan.findById(id);
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Therapy plan not found' });
+    }
+
+    const caseDoc = await ChildCase.findById(plan.caseId).lean();
+    if (!caseDoc || String(caseDoc.clinicianId) !== String(clinicianId)) {
+      return res.status(403).json({ success: false, message: 'Only the assigned clinician can approve this plan' });
+    }
+
+    if (String(plan.approval?.status || '') !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Plan is not pending clinician approval' });
+    }
+
+    const domainList = Array.isArray(plan.domains) ? plan.domains.filter((d) => THERAPY_DOMAIN_OPTIONS.includes(d)) : [];
+    const vf = validateFinalPlan({
+      domains: domainList,
+      longTermGoal: plan.longTermGoal || {},
+      shortTermGoals: Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [],
+    });
+    if (!vf.ok) {
+      return res.status(400).json({ success: false, message: vf.message });
+    }
+
+    await TherapyPlan.updateMany(
+      { caseId: plan.caseId, planStatus: 'approved', _id: { $ne: plan._id } },
+      { $set: { planStatus: 'archived' } }
+    );
+
+    const now = getCurrentTime();
+    plan.planStatus = 'approved';
+    plan.status = 'final';
+    plan.draft = false;
+    plan.approvedAt = now;
+    plan.approvedBy = clinicianId;
+    plan.approval = {
+      status: 'approved',
+      requestedAt: plan.approval?.requestedAt || plan.submittedAt || now,
+      approvedAt: now,
+      approvedBy: clinicianId,
+      rejectionReason: '',
+    };
+
+    await plan.save();
+
+    try {
+      await startNewEpisode({
+        caseId: plan.caseId,
+        therapistId: plan.therapistId,
+        planId: plan._id,
+        planVersion: plan.planVersion || 1,
+      });
+    } catch (epErr) {
+      console.error('therapy episode on approve:', epErr);
+    }
+
+    try {
+      invalidateProgressEngineCache(plan.caseId);
+    } catch (_) {
+      /* ignore */
+    }
+
+    try {
+      await recordAuditEvent({
+        req,
+        actorId: clinicianId,
+        action: 'therapy_plan_approved',
+        entityType: 'TherapyPlan',
+        entityId: plan._id,
+        caseId: plan.caseId,
+        summary: `approvedBy=${String(clinicianId)}`,
+      });
+    } catch (e) {
+      console.error('audit therapy_plan_approved:', e);
+    }
+
+    return res.status(200).json({ success: true, data: plan.toObject() });
+  } catch (error) {
+    console.error('approveTherapyPlanByClinician:', error);
+    return res.status(500).json({ success: false, message: 'Failed to approve therapy plan' });
   }
 };

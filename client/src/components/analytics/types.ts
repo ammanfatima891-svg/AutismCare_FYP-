@@ -114,11 +114,16 @@ export type ProgressEngineWeeklyPoint = {
 export type ProgressEnginePayload = {
   engineVersion?: number;
   overallScore: number;
+  rawBlendScore?: number;
+  confidence?: { overall: number; label: 'low' | 'medium' | 'high' };
   improvementRate: number;
   consistency: number;
   activityCompletionRate?: number | null;
   domains: ClinicalDomainRow[];
-  goals: ProgressEngineGoalRow[];
+  goals: (ProgressEngineGoalRow & {
+    linkedAssignmentsCount?: number;
+    assignmentRatingAvg?: number | null;
+  })[];
   weeklyTrend: ProgressEngineWeeklyPoint[];
   weakAreas: Array<{ type?: string; goalId?: string; reason?: string } | string>;
   smartAlerts?: Array<{ severity?: string; code?: string; message?: string }>;

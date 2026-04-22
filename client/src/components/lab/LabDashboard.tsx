@@ -1,26 +1,29 @@
 import { useState } from 'react';
-import { Home, ClipboardList, FileText } from 'lucide-react';
+import { Home, ClipboardList, FileText, FlaskConical } from 'lucide-react';
 import { DashboardLayout } from '../layout/DashboardLayout';
-import { LabHome } from './LabHome';
 import { LabTestRequests } from './LabTestRequests';
 import { LabTestRequestDetail } from './LabTestRequestDetail';
 import { LabReports } from './LabReports';
+import { LabRequestsBoard } from './LabRequestsBoard';
+import { LabMyTests } from './LabMyTests';
 
-type Section = 'home' | 'requests' | 'request-detail' | 'reports';
+type Section = 'home' | 'requests' | 'request-detail' | 'reports' | 'my-tests';
 
 interface LabDashboardProps {
     user?: any;
     onLogout?: () => void;
+    initialSection?: Section;
 }
 
 const navigation = [
-    { id: 'home', label: 'Dashboard', icon: Home, color: 'text-primary' },
-    { id: 'requests', label: 'Test Requests', icon: ClipboardList, color: 'text-primary' },
+    { id: 'home', label: 'Lab Workflow', icon: Home, color: 'text-primary' },
+    { id: 'my-tests', label: 'My Tests', icon: FlaskConical, color: 'text-primary' },
+    { id: 'requests', label: 'Legacy Requests', icon: ClipboardList, color: 'text-primary' },
     { id: 'reports', label: 'Reports', icon: FileText, color: 'text-primary' },
 ];
 
-export function LabDashboard({ user, onLogout }: LabDashboardProps) {
-    const [currentSection, setCurrentSection] = useState<Section>('home');
+export function LabDashboard({ user: _user, onLogout, initialSection = 'home' }: LabDashboardProps) {
+    const [currentSection, setCurrentSection] = useState<Section>(initialSection);
     const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
     const handleSectionChange = (section: string) => {
@@ -36,14 +39,12 @@ export function LabDashboard({ user, onLogout }: LabDashboardProps) {
         setCurrentSection('request-detail');
     };
 
-    const handleNavigate = (section: string) => {
-        setCurrentSection(section as Section);
-    };
-
     const renderSection = () => {
         switch (currentSection) {
             case 'home':
-                return <LabHome onNavigate={handleNavigate} />;
+                return <LabRequestsBoard />;
+            case 'my-tests':
+                return <LabMyTests />;
             case 'requests':
                 return <LabTestRequests onViewRequest={handleViewRequest} />;
             case 'request-detail':
@@ -56,7 +57,7 @@ export function LabDashboard({ user, onLogout }: LabDashboardProps) {
             case 'reports':
                 return <LabReports />;
             default:
-                return <LabHome onNavigate={handleNavigate} />;
+                return <LabRequestsBoard />;
         }
     };
 

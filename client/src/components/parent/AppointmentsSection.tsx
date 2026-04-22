@@ -5,9 +5,10 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, Filter, X, ChevronLeft, ChevronRight, FileText, Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { appointmentAPI } from '../../api';
+import { appointmentAPI, parentAPI } from '../../api';
 import { childAPI } from '../../api';
 import { APPOINTMENT_STATUS, normalizeAppointmentStatus } from '../../utils/workflowStatus';
+import { CaseStatusBadge } from '../CaseStatusBadge';
 
 // ─── Status Config ───────────────────────────────────────────────────────────
 
@@ -100,10 +101,28 @@ function BookingForm({ children, onClose, onSuccess }: {
     additionalNotes: '',
   });
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [casesByChildId, setCasesByChildId] = useState<Record<string, { caseId: string; status: string }>>({});
   const [files, setFiles] = useState<FileList | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [loadingProfessionals, setLoadingProfessionals] = useState(false);
+
+  useEffect(() => {
+    parentAPI.getCases()
+      .then((res) => {
+        const rows = (res.data?.data || []) as Array<{ caseId: string; childId: string; status?: string }>;
+        const map: Record<string, { caseId: string; status: string }> = {};
+        rows.forEach((r) => {
+          map[String(r.childId)] = { caseId: String(r.caseId), status: String(r.status || '') };
+        });
+        setCasesByChildId(map);
+      })
+      .catch(() => setCasesByChildId({}));
+  }, []);
+
+  const selectedCase = formData.childId ? casesByChildId[String(formData.childId)] : null;
+  const selectedCaseStatus = String(selectedCase?.status || '');
+  const canBookAppointment = ['REVIEW'].includes(selectedCaseStatus);
 
   // Fetch professionals when type changes
   useEffect(() => {
@@ -128,7 +147,14 @@ function BookingForm({ children, onClose, onSuccess }: {
     setLoading(true);
 
     try {
+      if (!selectedCase?.caseId) {
+        throw new Error('No case found for this child. Start screening first.');
+      }
+      if (!canBookAppointment) {
+        throw new Error('Complete screening before booking clinician appointment.');
+      }
       const fd = new FormData();
+      fd.append('caseId', String(selectedCase.caseId));
       fd.append('childId', formData.childId);
       fd.append('appointmentType', formData.appointmentType);
       fd.append('professionalId', formData.professionalId);
@@ -187,6 +213,14 @@ function BookingForm({ children, onClose, onSuccess }: {
                 <option key={c._id} value={c._id}>{c.firstName} {c.lastName}</option>
               ))}
             </select>
+            {formData.childId ? (
+              <div className="mt-2">
+                <CaseStatusBadge status={selectedCaseStatus || 'NEW'} />
+              </div>
+            ) : null}
+            {formData.childId && !canBookAppointment ? (
+              <p className="mt-2 text-xs text-muted-foreground">Not available in current stage</p>
+            ) : null}
           </div>
 
           {/* Appointment Type */}
@@ -341,7 +375,7 @@ function BookingForm({ children, onClose, onSuccess }: {
             </Button>
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !canBookAppointment}
               className="flex-1"
               variant="accent"
             >

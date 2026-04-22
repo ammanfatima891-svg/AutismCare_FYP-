@@ -15,6 +15,8 @@ type Row = {
   activityName?: string;
   instructions?: string;
   materials?: string;
+  frequency?: string;
+  duration?: string;
   dueDate?: string;
   status?: string;
   childName?: string;
@@ -342,6 +344,18 @@ export function ParentHomeAssignments() {
                       <div>
                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Instructions</p>
                         <p className="text-sm leading-relaxed text-foreground">{a.instructions}</p>
+                      </div>
+                    ) : null}
+                    {a.frequency ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Frequency</p>
+                        <p className="text-sm text-foreground">{a.frequency}</p>
+                      </div>
+                    ) : null}
+                    {a.duration ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Duration</p>
+                        <p className="text-sm text-foreground">{a.duration}</p>
                       </div>
                     ) : null}
                     {a.materials ? (

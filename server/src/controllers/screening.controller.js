@@ -8,6 +8,27 @@ const ASQ_CUTOFFS = require("../utils/asqCutoffs");
 const { getASQInterval } = require("../utils/ASQinterval");
 const sendEmailWithAttachments = require("../utils/email").sendEmailWithAttachments;
 const { appendScreeningReportBody } = require("../utils/screeningReportPdf");
+const { evaluateDecisionSupport } = require("../services/decisionEngine");
+const { createBulkNotifications, NOTIFICATION_TYPES } = require("../utils/notification");
+const { buildScreeningSummaryForChild } = require('../services/childCase.service');
+const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
+const { getScreeningPlan } = require('../services/screeningOrchestrator');
+
+function computeAgeMonths(dob) {
+  const dt = dob ? new Date(dob) : null;
+  if (!dt || Number.isNaN(dt.getTime())) return null;
+  const ageDays = Math.floor((getCurrentTimeMs() - dt.getTime()) / (1000 * 60 * 60 * 24));
+  const ageMonths = ageDays / 30.44;
+  return Number.isFinite(ageMonths) ? ageMonths : null;
+}
+
+function asqDomainStatusToZone(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (s === "referral for further evaluation") return "below";
+  if (s === "need monitoring") return "close";
+  if (s === "normal development") return "above";
+  return null;
+}
 
 // Build PDF buffer for a submission (for email or download) — ASQ-3 body matches domain-based parent PDF
 function buildSubmissionPdfBuffer(submission, child) {
@@ -45,6 +66,42 @@ function buildSubmissionPdfBuffer(submission, child) {
     doc.end();
   });
 }
+
+exports.getScreeningPlan = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const rawChildId = req.query?.childId;
+    if (!rawChildId) {
+      return res.status(400).json({ success: false, message: 'childId is required' });
+    }
+
+    const parent = await User.findById(userId);
+    if (!parent) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const child = parent.children && parent.children.find((c) => c._id && c._id.toString() === String(rawChildId));
+    if (!child) {
+      return res.status(404).json({ success: false, message: 'Child not found' });
+    }
+
+    const ageMonths = computeAgeMonths(child?.dateOfBirth);
+    const plan = getScreeningPlan(typeof ageMonths === 'number' ? ageMonths : null, {
+      childId: String(rawChildId),
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        childId: String(rawChildId),
+        ageMonths,
+        plan,
+      },
+    });
+  } catch (error) {
+    console.error('Error building screening plan:', error);
+    return res.status(500).json({ success: false, message: 'Failed to build screening plan' });
+  }
+};
 
 // Calculate screening
 exports.calculateScreening = async (req, res) => {
@@ -129,6 +186,65 @@ exports.calculateScreening = async (req, res) => {
 
     await submission.save();
 
+    // ---- Decision Support Engine (safe, non-diagnostic) ----
+    // Combine latest ASQ-3 + M-CHAT (age aware). If one is missing, engine still returns safe guidance.
+    let decisionSupport = null;
+    try {
+      const ageMonths = computeAgeMonths(child?.dateOfBirth || dob);
+
+      const [latestMchat, latestAsq] = await Promise.all([
+        Submission.findOne({ childId, questionnaireType: "MCHAT-R" }).sort({ createdAt: -1 }).lean(),
+        Submission.findOne({ childId, questionnaireType: "ASQ-3" }).sort({ createdAt: -1 }).lean(),
+      ]);
+
+      const mchatScore = latestMchat?.scores?.totalScore ?? null;
+
+      const asqDomains = [];
+      const ds = latestAsq?.scores?.domainStatuses && typeof latestAsq.scores.domainStatuses === "object"
+        ? latestAsq.scores.domainStatuses
+        : null;
+      if (ds) {
+        for (const [domain, raw] of Object.entries(ds)) {
+          const zone = asqDomainStatusToZone(raw);
+          if (zone) asqDomains.push(zone);
+        }
+      }
+
+      decisionSupport = evaluateDecisionSupport({
+        ageMonths: typeof ageMonths === "number" ? ageMonths : 0,
+        mchatScore,
+        asqDomains,
+      });
+
+      // Persist DSE on this submission (snapshot of the combined state at time of submit).
+      submission.decisionSupport = decisionSupport;
+      await submission.save();
+
+      // HIGH risk -> notify clinicians (non-diagnostic alert to review).
+      const urgent =
+        decisionSupport?.autismRisk === "HIGH" ||
+        decisionSupport?.urgencyLevel === "red";
+      if (urgent) {
+        const clinicians = await User.find({ role: "clinician", approvalStatus: "active" })
+          .select("_id")
+          .lean();
+        const clinicianIds = clinicians.map((c) => c._id);
+        if (clinicianIds.length) {
+          await createBulkNotifications(clinicianIds, {
+            type: NOTIFICATION_TYPES.SYSTEM,
+            title: "Screening flagged for review",
+            message:
+              "A parent screening result indicates elevated risk or significant developmental concern. Please review the screening record. (Decision support only; not a diagnosis.)",
+            relatedResourceType: "Submission",
+            relatedResourceId: submission._id,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[calculateScreening] DSE failed:", e?.message || e);
+      decisionSupport = null;
+    }
+
     // Send report by email to the parent; await so we can report success/failure to the client
     let reportEmailed = false;
     let reportEmailError = null;
@@ -156,6 +272,46 @@ exports.calculateScreening = async (req, res) => {
       reportEmailError = err.message || "Email could not be sent.";
     }
 
+    // Lifecycle: SCREENING_SUBMITTED -> REVIEW (store risk + latest screening summary)
+    try {
+      const screeningSummary = await buildScreeningSummaryForChild(childId);
+      const skippedMchat = String(req.body?.skippedMchat || '').toLowerCase() === 'true';
+      const orderFollowedRaw = req.body?.orderFollowed;
+      const orderFollowed =
+        typeof orderFollowedRaw === 'boolean'
+          ? orderFollowedRaw
+          : String(orderFollowedRaw || '').toLowerCase() === 'true'
+            ? true
+            : String(orderFollowedRaw || '').toLowerCase() === 'false'
+              ? false
+              : undefined;
+
+      const screeningProgress = {
+        ...(questionnaireType === 'MCHAT-R' ? { mchatCompleted: true } : {}),
+        ...(questionnaireType === 'ASQ-3' ? { asqCompleted: true } : {}),
+        ...(skippedMchat === true ? { skippedMchat: true } : {}),
+      };
+
+      await transitionCase({
+        parentId: req.user._id,
+        childId,
+        eventType: CASE_EVENTS.SCREENING_SUBMITTED,
+        payload: {
+          riskLevel,
+          screeningSummary,
+          screeningProgress,
+          screeningFlow: {
+            questionnaireType,
+            skippedMchat: skippedMchat === true,
+            orderFollowed,
+          },
+        },
+        triggeredBy: req.user._id,
+      });
+    } catch (e) {
+      console.error('[calculateScreening] case lifecycle transition failed:', e?.message || e);
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -165,6 +321,7 @@ exports.calculateScreening = async (req, res) => {
         result,
         resultDescription,
         riskLevel,
+        decisionSupport,
         reportEmailed,
         reportEmailError: reportEmailError || undefined,
       },
@@ -201,6 +358,41 @@ exports.getQuestionnaireByType = async (req, res) => {
       });
     }
 
+    // Lifecycle: Parent opening questionnaire => SCREENING_STARTED (best-effort; requires ?childId=)
+    try {
+      const rawChildId = req.query?.childId;
+      const skippedMchat = String(req.query?.skippedMchat || '').toLowerCase() === 'true';
+      const orderFollowedRaw = req.query?.orderFollowed;
+      const orderFollowed =
+        typeof orderFollowedRaw === 'boolean'
+          ? orderFollowedRaw
+          : String(orderFollowedRaw || '').toLowerCase() === 'true'
+            ? true
+            : String(orderFollowedRaw || '').toLowerCase() === 'false'
+              ? false
+              : undefined;
+      if (rawChildId && req.user?._id) {
+        await transitionCase({
+          parentId: req.user._id,
+          childId: rawChildId,
+          eventType: CASE_EVENTS.SCREENING_STARTED,
+          payload: {
+            questionnaireType: type,
+            screeningFlow: {
+              origin: String(req.query?.origin || ''),
+              flow: String(req.query?.flow || ''),
+              skippedMchat: skippedMchat === true,
+              orderFollowed,
+            },
+          },
+          triggeredBy: req.user._id,
+        });
+      }
+    } catch (e) {
+      // Best-effort: do not block questionnaire load.
+      console.error('[getQuestionnaireByType] case lifecycle transition failed:', e?.message || e);
+    }
+
     res.status(200).json({
       success: true,
       data: questionnaire,
@@ -231,7 +423,10 @@ exports.getAvailableQuestionnaires = async (req, res) => {
     let childrenToScan = user.children || [];
     if (rawChildId) {
       const match = childrenToScan.filter(
-        (c) => c && c._id && String(c._id) === String(rawChildId)
+        (c) => {
+          const candidateId = c && (c._id || c.id);
+          return candidateId && String(candidateId) === String(rawChildId);
+        }
       );
       if (match.length === 0) {
         return res.status(404).json({
@@ -255,12 +450,18 @@ exports.getAvailableQuestionnaires = async (req, res) => {
     };
 
     for (const child of childrenToScan) {
-      const ageDays = Math.floor(
-        (getCurrentTimeMs() - new Date(child.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const dob = child?.dateOfBirth ? new Date(child.dateOfBirth) : null;
+      if (!dob || Number.isNaN(dob.getTime())) {
+        continue;
+      }
 
-      // MCHAT-R available for 16-30 months
-      if (ageDays >= 480 && ageDays <= 900) {
+      const ageDays = Math.floor(
+        (getCurrentTimeMs() - dob.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const ageMonths = ageDays / 30.44;
+
+      // MCHAT-R available for 16-30 months (month-based, avoids day-window edge misses)
+      if (ageMonths >= 16 && ageMonths <= 30) {
         pushQuestionnaire({
           type: "MCHAT-R",
           name: "M-CHAT-R™",
@@ -270,12 +471,10 @@ exports.getAvailableQuestionnaires = async (req, res) => {
         });
       }
 
-      // ASQ-3 intervals
-      const asqIntervals = [2, 6, 12, 18, 24, 30, 36, 48, 60];
-      for (const interval of asqIntervals) {
-        const minDays = interval * 30 - 15;
-        const maxDays = interval * 30 + 15;
-        if (ageDays >= minDays && ageDays <= maxDays) {
+      // ASQ-3 interval derived from canonical utility and available cutoffs.
+      try {
+        const interval = getASQInterval(ageDays);
+        if (ASQ_CUTOFFS[interval]) {
           pushQuestionnaire({
             type: "ASQ-3",
             intervalMonths: interval,
@@ -285,6 +484,8 @@ exports.getAvailableQuestionnaires = async (req, res) => {
             childName: `${child.firstName || ""} ${child.lastName || ""}`.trim() || child.name,
           });
         }
+      } catch (err) {
+        // Age is outside ASQ-3 range for this child; intentionally no ASQ entry.
       }
     }
 

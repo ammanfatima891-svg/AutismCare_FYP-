@@ -36,5 +36,7 @@ export type TherapistCaseFileData = {
     goalsTotal: number;
     domainsCount: number;
   };
+  /** TherapyCase row for this therapist+case (report / session gates). */
+  therapyCase?: { status: string } | null;
   labRequests?: CaseLabRequestRow[];
 };

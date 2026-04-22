@@ -4,6 +4,7 @@ import {
     Clock, CheckCircle, AlertCircle, X, FileUp
 } from 'lucide-react';
 import { labAPI } from '../../api';
+import { CaseStatusBadge } from '../CaseStatusBadge';
 
 interface LabTestRequestDetailProps {
     requestId: string | null;
@@ -18,6 +19,8 @@ interface RequestData {
     testType: string;
     notes: string;
     status: string;
+    caseId?: string;
+    caseStatus?: string;
     releasedToParent: boolean;
     createdAt: string;
     updatedAt: string;
@@ -126,6 +129,10 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
         const formData = new FormData();
         formData.append('report', selectedFile);
         formData.append('testRequestId', requestId);
+        // Server state gate requires caseId (single source of truth).
+        if (request && (request as any).caseId) {
+            formData.append('caseId', String((request as any).caseId));
+        }
 
         try {
             setUploading(true);
@@ -208,6 +215,11 @@ export function LabTestRequestDetail({ requestId, onBack }: LabTestRequestDetail
                     {request.status}
                 </span>
             </div>
+            {request.caseStatus ? (
+                <div className="mb-6">
+                    <CaseStatusBadge status={request.caseStatus} />
+                </div>
+            ) : null}
 
             {/* Info cards row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">

@@ -109,16 +109,17 @@ exports.getCaseAnalytics = async (req, res) => {
 
     ]);
 
-    const engineResult = await computeProgressEngineForCase(caseId, { therapistId, useCache: true });
-    if (!engineResult.success) {
-      return res.status(400).json({ success: false, message: engineResult.message || 'Failed to compute progress' });
+    let enginePayload = null;
+    if (sessions.length > 0) {
+      const engineResult = await computeProgressEngineForCase(caseId, { therapistId, useCache: true });
+      if (!engineResult.success) {
+        return res.status(400).json({ success: false, message: engineResult.message || 'Failed to compute progress' });
+      }
+      enginePayload = engineResult.data || null;
     }
 
     /** Same shape as report generation — legacy charts + stakeholder KPIs + progress engine (see caseAnalyticsSnapshot). */
-    const data = buildUnifiedCaseAnalytics(
-      { plan, sessions, assignments },
-      engineResult.data || null
-    );
+    const data = buildUnifiedCaseAnalytics({ plan, sessions, assignments }, enginePayload);
 
 
 

@@ -13,6 +13,7 @@ import { useScreeningProgress } from "./guided/useScreeningProgress";
 
 interface MCHATFormProps {
   child: any;
+  flowContext?: any;
   onComplete: (results: any) => void;
 }
 
@@ -23,7 +24,7 @@ function mchatHint(questionNumber1Based: number) {
   return "You’re close — answer based on everyday routines and play.";
 }
 
-export function MCHATForm({ child, onComplete }: MCHATFormProps) {
+export function MCHATForm({ child, flowContext, onComplete }: MCHATFormProps) {
   const progress = useScreeningProgress({ type: "mchat", childId: child?.id, initialStep: 0 });
   const { answers, currentStep: currentPageIndex, setAnswer, setStep } = progress;
 
@@ -38,7 +39,17 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
   useEffect(() => {
     const fetchQuestionnaire = async () => {
       try {
-        const response = await API.get(`/screening/questionnaires/MCHAT-R?dob=${child.dateOfBirth}`);
+        const params = new URLSearchParams();
+        params.set('dob', child.dateOfBirth);
+        params.set('childId', encodeURIComponent(String(child.id)));
+        if (flowContext?.flow) params.set('flow', String(flowContext.flow));
+        if (flowContext?.origin) params.set('origin', String(flowContext.origin));
+        if (flowContext?.skippedMchat === true) params.set('skippedMchat', 'true');
+        if (flowContext?.orderFollowed === true) params.set('orderFollowed', 'true');
+        if (flowContext?.orderFollowed === false) params.set('orderFollowed', 'false');
+        const response = await API.get(
+          `/screening/questionnaires/MCHAT-R?${params.toString()}`
+        );
         setQuestionnaire(response.data.data);
       } catch (error) {
         console.error('Error fetching MCHAT-R questionnaire:', error);
@@ -134,6 +145,8 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
         dob: child.dateOfBirth,
         weeksPreterm: 0,
         responses,
+        skippedMchat: flowContext?.skippedMchat === true,
+        orderFollowed: typeof flowContext?.orderFollowed === 'boolean' ? flowContext.orderFollowed : undefined,
       });
 
       const submission = res.data.data;
@@ -145,6 +158,7 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
         scores: submission.scores,
         result: submission.result,
         resultDescription: submission.resultDescription,
+        decisionSupport: submission.decisionSupport || null,
         reportEmailed: submission.reportEmailed === true,
         reportEmailError: submission.reportEmailError || null,
       };
@@ -204,9 +218,11 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
         <GuidanceCards
           items={[
             { tone: "friendly", title: "You’re doing fine", body: "There are no trick questions." },
-            { tone: "info", title: "Most days matter", body: "Answer based on typical behavior." },
-            { tone: "progress", title: "Pause anytime", body: "Your progress saves automatically." },
+            { tone: "info", title: "Most days matter", body: "Answer based on typical behavior on most days." },
+            { tone: "progress", title: "Pause anytime", body: "Your answers are auto-saved while you respond." },
+            { tone: "friendly", title: "Almost there", body: "You’re doing a great job completing this screening." },
           ]}
+          currentIndex={currentPageIndex}
         />
 
         <GuideToggle enabled={guideMode} onChange={setGuideMode} />
@@ -282,7 +298,7 @@ export function MCHATForm({ child, onComplete }: MCHATFormProps) {
                 disabled={!isPageAnswered || isSubmitting}
                 className="rounded-xl"
               >
-                Next
+                Save & Continue
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}

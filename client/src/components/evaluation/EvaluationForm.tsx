@@ -15,6 +15,7 @@ import { useForm, Controller, useWatch } from 'react-hook-form';
 import { AlertCircle, Loader2, Info } from 'lucide-react';
 
 export type EvaluationStatus = 'DRAFT' | 'FINALIZED';
+export type FinalDisposition = 'MONITORING' | 'REFER_THERAPY';
 
 export type ObservationTag =
   | 'Eye Contact Issues'
@@ -68,6 +69,7 @@ export interface EvaluationDraft {
         followUp: FollowUpOption;
         followUpFreeText?: string;
       };
+  finalDisposition?: FinalDisposition | '';
 }
 
 export type EvaluationDecision = {
@@ -91,6 +93,7 @@ const emptyDraft: EvaluationDraft = {
   diagnosis: { primary: '', primaryFreeText: '', confidence: '', severityLevel: '', rationale: '' },
   comorbidConditions: [],
   recommendations: { therapies: [], therapiesFreeText: [], followUp: '', followUpFreeText: '' },
+  finalDisposition: '',
 };
 
 function normalizeToStructured(initial?: Partial<EvaluationDraft>): EvaluationDraft {
@@ -148,6 +151,7 @@ function normalizeToStructured(initial?: Partial<EvaluationDraft>): EvaluationDr
   }
 
   base.comorbidConditions = Array.isArray(base.comorbidConditions) ? base.comorbidConditions : [];
+  base.finalDisposition = (base.finalDisposition as any) || '';
   return base;
 }
 
@@ -185,6 +189,7 @@ export function EvaluationForm({
   const recommendationsFollowUp = useWatch({ control: form.control, name: 'recommendations.followUp' });
 
   const decision: EvaluationDecision = useMemo(() => resolveEvaluationDecision(watchAll), [watchAll]);
+  const finalDisposition = useWatch({ control: form.control, name: 'finalDisposition' as any });
 
   const canContinue = useMemo(() => {
     if (readOnly) return false;
@@ -307,12 +312,15 @@ export function EvaluationForm({
 
   const finalize = async () => {
     setError(null);
+    const disp = String((form.getValues() as any)?.finalDisposition || '').trim().toUpperCase();
+    if (disp !== 'MONITORING' && disp !== 'REFER_THERAPY') {
+      setError('Choose a final disposition (Monitoring or Refer to therapy) before finalizing.');
+      return;
+    }
     setFinalizing(true);
     try {
       await onSubmit(form.getValues(), 'FINALIZED');
-      if (decision.referralRequired) {
-        setReferralOpen(true);
-      }
+      if (disp === 'REFER_THERAPY') setReferralOpen(true);
     } finally {
       setFinalizing(false);
     }
@@ -421,6 +429,23 @@ export function EvaluationForm({
             </div>
 
             <div className="flex gap-2 sm:justify-end">
+              {step === steps.length - 1 ? (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={String(finalDisposition || '')}
+                    onValueChange={(v) => form.setValue('finalDisposition' as any, v as any, { shouldDirty: true })}
+                    disabled={submitting || finalizing}
+                  >
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue placeholder="Final disposition (required)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONITORING">Monitoring (no referral)</SelectItem>
+                      <SelectItem value="REFER_THERAPY">Refer to therapy</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -1271,6 +1296,26 @@ function ReviewStep({ value, decision }: { value: EvaluationDraft; decision: Eva
             </ul>
           </div>
         ) : null}
+      </div>
+
+      <div className="rounded-lg border bg-card p-4 space-y-2">
+        <div className="font-medium text-sm">Final Disposition (required to finalize)</div>
+        <div className="text-xs text-muted-foreground">
+          This is the clinician’s explicit decision. Suggestions above are advisory only.
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="finalDisposition" disabled readOnly checked={String((value as any)?.finalDisposition).toUpperCase() === 'MONITORING'} />
+            <span>Monitoring (no therapy referral)</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="finalDisposition" disabled readOnly checked={String((value as any)?.finalDisposition).toUpperCase() === 'REFER_THERAPY'} />
+            <span>Refer to therapy</span>
+          </label>
+          <div className="text-xs text-muted-foreground">
+            Use the controls above the Finalize button to set this value.
+          </div>
+        </div>
       </div>
     </div>
   );

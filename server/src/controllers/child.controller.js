@@ -1,5 +1,6 @@
 const { User } = require('../models/User');
 const { ROLES } = require('../models/User');
+const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
 
 // Get a specific child for the authenticated parent
 const getChildById = async (req, res) => {
@@ -123,6 +124,20 @@ const createChild = async (req, res) => {
 
     // Return the newly created child
     const newChild = user.children[user.children.length - 1];
+
+    // Lifecycle: CHILD_CREATED -> NEW (idempotent for safety)
+    try {
+      await transitionCase({
+        parentId: user._id,
+        childId: newChild._id,
+        eventType: CASE_EVENTS.CHILD_CREATED,
+        payload: {},
+        triggeredBy: req.user._id,
+      });
+    } catch (e) {
+      console.error('[createChild] case lifecycle sync failed:', e?.message || e);
+      // Do not block child creation if lifecycle sync fails; case can be healed later.
+    }
 
     res.status(201).json({
       success: true,

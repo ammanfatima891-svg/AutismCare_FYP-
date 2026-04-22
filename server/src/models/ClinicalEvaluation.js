@@ -53,6 +53,12 @@ const ClinicalEvaluationSchema = new Schema(
       default: false,
       index: true,
     },
+    finalDisposition: {
+      type: String,
+      enum: ['MONITORING', 'REFER_THERAPY'],
+      default: null,
+      index: true,
+    },
     status: {
       type: String,
       enum: Object.values(EVALUATION_STATUS),

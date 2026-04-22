@@ -7,6 +7,7 @@ const { createNotification, createNotificationIfNotExists } = require('../utils/
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { logAction, AUDIT_ACTIONS, RESOURCE_TYPES } = require('../utils/audit');
 const { ChildCase } = require('../models/ChildCase');
+const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
 
 // ─── Helper: get professional display name ───────────────────────────────────
 
@@ -30,6 +31,7 @@ exports.createAppointment = async (req, res) => {
     try {
         const parentId = req.user._id;
         const {
+            caseId,
             childId,
             appointmentType,
             professionalId,
@@ -41,10 +43,10 @@ exports.createAppointment = async (req, res) => {
         } = req.body;
 
         // Validate required fields
-        if (!childId || !appointmentType || !professionalId || !preferredDate || !preferredTime || !reason || !mode) {
+        if (!caseId || !childId || !appointmentType || !professionalId || !preferredDate || !preferredTime || !reason || !mode) {
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields: childId, appointmentType, professionalId, preferredDate, preferredTime, reason, mode'
+                message: 'Missing required fields: caseId, childId, appointmentType, professionalId, preferredDate, preferredTime, reason, mode'
             });
         }
 
@@ -332,11 +334,16 @@ exports.approveAppointment = async (req, res) => {
         await appointment.save();
 
         let childCaseSyncWarning = null;
-        // Auto-create/sync child case when a clinician approves (idempotent per child + clinician)
+        // Lifecycle: clinician appointment approved => assign clinician on case (status remains REVIEW)
         if (String(appointment.professionalRole) === 'clinician') {
             try {
-                const { ensureCaseFromApprovedAppointment } = require('../services/childCase.service');
-                await ensureCaseFromApprovedAppointment(appointment);
+                await transitionCase({
+                    parentId: appointment.parent,
+                    childId: appointment.child,
+                    eventType: CASE_EVENTS.CLINICIAN_APPOINTMENT_BOOKED,
+                    payload: { clinicianId: appointment.professional, appointmentId: appointment._id },
+                    triggeredBy: professionalId,
+                });
             } catch (caseErr) {
                 console.error('Child case auto-create failed:', caseErr);
                 childCaseSyncWarning = 'Appointment approved, but child case sync failed.';

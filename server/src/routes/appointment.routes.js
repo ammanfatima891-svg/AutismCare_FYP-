@@ -19,6 +19,8 @@ const {
 } = require('../controllers/appointment.controller');
 const { protect, restrictTo } = require('../middleware/auth.middleware');
 const { auditContext } = require('../utils/audit');
+const { validateCaseState } = require('../middleware/validateCaseState');
+const { ACTIONS } = require('../services/actionPermissionService');
 
 // ─── Multer config for appointment document uploads ─────────────────────────
 // Global rule: Images (jpeg/png/webp) <=5MB, PDFs <=10MB. No doc/docx.
@@ -63,7 +65,15 @@ router.post('/', restrictTo('parent'), uploadDocuments, (req, res, next) => {
         }
     }
     return next();
-}, createAppointment);
+},
+// State gate: appointment booking requires REVIEW (screening submitted)
+validateCaseState({
+    childCaseId: 'body.caseId',
+    requiredStatuses: ['REVIEW'],
+    actionName: ACTIONS.BOOK_APPOINTMENT,
+    message: 'Complete screening before booking clinician appointment.',
+}),
+createAppointment);
 
 // Get parent's own appointments
 router.get('/my', restrictTo('parent'), getParentAppointments);

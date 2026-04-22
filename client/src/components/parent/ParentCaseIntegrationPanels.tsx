@@ -10,11 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { BookOpen, Calendar, ClipboardList, History, Loader2, TrendingUp, FlaskConical } from 'lucide-react';
+import { BookOpen, Calendar, ClipboardList, History, Loader2, TrendingUp, FlaskConical, Target } from 'lucide-react';
 import { Progress } from '../ui/progress';
-import { parentAPI, progressEngineAPI } from '../../api';
+import { integrationAPI, parentAPI, progressEngineAPI } from '../../api';
 import { CaseMessagingThread } from '../messaging/CaseMessagingThread';
 import { CaseLabRequestsPanel, type CaseLabRequestRow } from '../case/CaseLabRequestsPanel';
+import { CaseStatusBadge } from '../CaseStatusBadge';
 
 type ParentCaseRow = {
   caseId: string;
@@ -77,6 +78,32 @@ type SlotRow = {
   status: string;
 };
 
+type TherapyPlanShortGoal = {
+  title?: string;
+  measurableCriteria?: string;
+  domain?: string;
+  status?: string;
+};
+
+type TherapyPlanActivity = {
+  title?: string;
+  linkedGoal?: string;
+  description?: string;
+};
+
+type TherapyPlanSummary = {
+  domains?: string[];
+  longTermGoal?: {
+    title?: string;
+    description?: string;
+    timeline?: string;
+  };
+  shortTermGoals?: TherapyPlanShortGoal[];
+  activities?: TherapyPlanActivity[];
+  status?: string;
+  approval?: { status?: string };
+};
+
 const SLOT_STATUS_BADGE: Record<string, string> = {
   scheduled: 'bg-muted text-foreground border',
   completed: 'bg-blue-50 text-blue-900 border-blue-200',
@@ -89,6 +116,14 @@ const ASSIGN_BADGE: Record<string, string> = {
   submitted: 'bg-blue-100 text-blue-900',
   reviewed: 'bg-yellow-100 text-yellow-900',
   completed: 'bg-blue-100 text-blue-950',
+};
+
+const GOAL_STATUS_BADGE: Record<string, string> = {
+  active: 'bg-blue-100 text-blue-900',
+  achieved: 'bg-emerald-100 text-emerald-900',
+  modified: 'bg-violet-100 text-violet-900',
+  onhold: 'bg-yellow-100 text-yellow-900',
+  retired: 'bg-muted text-muted-foreground',
 };
 
 function formatDate(iso: string | undefined) {
@@ -149,6 +184,7 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
   const [parentEngineView, setParentEngineView] = useState<ParentEngineFriendly | null>(null);
   const [sessionSlots, setSessionSlots] = useState<SlotRow[]>([]);
   const [labRequests, setLabRequests] = useState<CaseLabRequestRow[]>([]);
+  const [therapyPlan, setTherapyPlan] = useState<TherapyPlanSummary | null>(null);
   const [loadingCases, setLoadingCases] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +239,7 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
       setParentEngineView(null);
       setSessionSlots([]);
       setLabRequests([]);
+      setTherapyPlan(null);
       return;
     }
 
@@ -211,12 +248,13 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
         setLoadingDetail(true);
         setError(null);
         setLabRequests([]);
-        const [sRes, aRes, slotRes, peRes, labRes] = await Promise.all([
+        const [sRes, aRes, slotRes, peRes, labRes, summaryRes] = await Promise.all([
           parentAPI.getCaseSessions(selectedCaseId),
           parentAPI.getCaseAssignments(selectedCaseId),
           parentAPI.getSessionSlots(selectedCaseId),
           progressEngineAPI.getByCase(selectedCaseId).catch(() => null),
           parentAPI.getCaseLabRequests(selectedCaseId).catch(() => ({ data: { data: [] } })),
+          integrationAPI.getCaseSummary(selectedCaseId).catch(() => null),
         ]);
         setSessions(Array.isArray(sRes.data?.data) ? sRes.data.data : []);
         setAssignments(Array.isArray(aRes.data?.data) ? aRes.data.data : []);
@@ -225,6 +263,12 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
           ? ((peRes.data as { data: ParentEngineFriendly }).data)
           : null;
         setParentEngineView(ped && typeof ped === 'object' && ped.headline ? ped : null);
+        const plan =
+          summaryRes?.data != null &&
+          typeof (summaryRes.data as { data?: { therapyPlan?: unknown } }).data?.therapyPlan === 'object'
+            ? ((summaryRes.data as { data: { therapyPlan: TherapyPlanSummary } }).data.therapyPlan)
+            : null;
+        setTherapyPlan(plan);
         const rawSlots = Array.isArray(slotRes.data?.data) ? slotRes.data.data : [];
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
@@ -249,6 +293,7 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
         setParentEngineView(null);
         setSessionSlots([]);
         setLabRequests([]);
+        setTherapyPlan(null);
       } finally {
         setLoadingDetail(false);
       }
@@ -350,7 +395,9 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Case status</dt>
-                <dd className="text-base text-foreground">{activeCase.status || '—'}</dd>
+                <dd className="pt-1">
+                  <CaseStatusBadge status={activeCase.status || 'NEW'} />
+                </dd>
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Case reference</dt>
@@ -729,6 +776,131 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No progress data yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Parent-friendly therapy plan summary */}
+      <Card className="border-blue-100 bg-card shadow-sm">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-blue-700" />
+            <CardTitle className="text-lg">Therapy plan summary</CardTitle>
+          </div>
+          <CardDescription>
+            Family-friendly overview of goals and planned activities from your care team.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loadingDetail ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading therapy plan summary…
+            </div>
+          ) : !therapyPlan ? (
+            <p className="text-sm text-muted-foreground">
+              No therapy plan summary is available yet for this case.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                {(therapyPlan.domains || []).slice(0, 6).map((d) => (
+                  <Badge key={String(d)} variant="outline" className="bg-background">
+                    {String(d)}
+                  </Badge>
+                ))}
+                {therapyPlan.status ? (
+                  <Badge variant="outline" className="capitalize">
+                    {String(therapyPlan.status)}
+                  </Badge>
+                ) : null}
+                {therapyPlan.approval?.status && therapyPlan.approval.status !== 'none' ? (
+                  <Badge variant="outline" className="capitalize">
+                    approval: {String(therapyPlan.approval.status)}
+                  </Badge>
+                ) : null}
+              </div>
+
+              {therapyPlan.longTermGoal?.title ? (
+                <div className="rounded-lg border bg-background/60 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Long-term focus</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    {therapyPlan.longTermGoal.title}
+                  </p>
+                  {therapyPlan.longTermGoal.description ? (
+                    <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
+                      {therapyPlan.longTermGoal.description}
+                    </p>
+                  ) : null}
+                  {therapyPlan.longTermGoal.timeline ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Timeline: {therapyPlan.longTermGoal.timeline}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Short-term goals</p>
+                {Array.isArray(therapyPlan.shortTermGoals) && therapyPlan.shortTermGoals.length > 0 ? (
+                  <ul className="space-y-2">
+                    {therapyPlan.shortTermGoals.slice(0, 6).map((g, idx) => {
+                      const st = String(g.status || 'Active').toLowerCase();
+                      return (
+                        <li key={`${String(g.title || 'goal')}-${idx}`} className="rounded-md border bg-background p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium text-foreground">{String(g.title || 'Goal')}</p>
+                            {g.domain ? (
+                              <Badge variant="outline" className="text-xs">
+                                {String(g.domain)}
+                              </Badge>
+                            ) : null}
+                            <Badge className={GOAL_STATUS_BADGE[st] || GOAL_STATUS_BADGE.active}>
+                              {String(g.status || 'Active')}
+                            </Badge>
+                          </div>
+                          {g.measurableCriteria ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {String(g.measurableCriteria)}
+                            </p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No short-term goals listed yet.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Planned activities</p>
+                {Array.isArray(therapyPlan.activities) && therapyPlan.activities.length > 0 ? (
+                  <ul className="space-y-2">
+                    {therapyPlan.activities.slice(0, 6).map((a, idx) => (
+                      <li key={`${String(a.title || 'activity')}-${idx}`} className="rounded-md border bg-background p-3">
+                        <p className="text-sm font-medium text-foreground">{String(a.title || 'Activity')}</p>
+                        {a.linkedGoal ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Linked to goal: {String(a.linkedGoal)}
+                          </p>
+                        ) : null}
+                        {a.description ? (
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+                            {String(a.description)}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No plan activities added yet.</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Tip: activities become actionable for home when your therapist assigns them in the Home assignments section.
+                </p>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

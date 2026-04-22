@@ -14,7 +14,8 @@ type LabReportRow = {
 
 export type CaseLabRequestRow = {
   _id: string;
-  testType: string;
+  testType?: string;
+  test_name?: string;
   status: string;
   notes?: string;
   releasedToParent?: boolean;
@@ -44,6 +45,8 @@ const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-muted text-foreground border-border',
   UPLOADED: 'bg-secondary text-primary border-border',
   RELEASED: 'bg-emerald-50 text-emerald-900 border-emerald-200',
+  IN_PROGRESS: 'bg-blue-50 text-blue-900 border-blue-200',
+  COMPLETED: 'bg-emerald-50 text-emerald-900 border-emerald-200',
 };
 
 function statusBadgeClass(status: string) {
@@ -92,7 +95,7 @@ export function CaseLabRequestsPanel({ requests, showLabTechnician }: CaseLabReq
           <div key={String(req._id)} className="rounded-lg border bg-background/40 p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border pb-2">
               <div>
-                <p className="font-semibold text-foreground">{req.testType}</p>
+                <p className="font-semibold text-foreground">{req.testType || req.test_name || 'Lab test'}</p>
                 <p className="text-xs text-muted-foreground">{formatDate(req.createdAt)}</p>
               </div>
               <Badge variant="outline" className={statusBadgeClass(req.status)}>
@@ -113,10 +116,16 @@ export function CaseLabRequestsPanel({ requests, showLabTechnician }: CaseLabReq
             {!showLabTechnician && req.status === 'PENDING' ? (
               <p className="mt-2 text-xs text-muted-foreground">Waiting for the lab to upload results.</p>
             ) : null}
+            {!showLabTechnician && req.status === 'IN_PROGRESS' ? (
+              <p className="mt-2 text-xs text-muted-foreground">Lab has accepted this request and is processing it.</p>
+            ) : null}
             {!showLabTechnician && req.status === 'UPLOADED' ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 Results uploaded — pending clinician review and release.
               </p>
+            ) : null}
+            {!showLabTechnician && req.status === 'COMPLETED' ? (
+              <p className="mt-2 text-xs text-muted-foreground">Lab completed this request and uploaded report.</p>
             ) : null}
             {Array.isArray(req.reports) && req.reports.length > 0 ? (
               <ul className="mt-3 space-y-2">

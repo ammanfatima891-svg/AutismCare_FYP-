@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, CardContent } from "../../../ui/card";
 import { Heart, Info, Sparkles } from "lucide-react";
 
@@ -17,29 +18,33 @@ function toneIcon(tone: CardTone) {
 
 export function GuidanceCards(props: {
   items: Array<{ tone: CardTone; title: string; body: string }>;
+  currentIndex?: number;
 }) {
-  const { items } = props;
+  const { items, currentIndex = 0 } = props;
+  const activeItem = useMemo(() => {
+    if (!items.length) return null;
+    const normalizedIndex = ((currentIndex % items.length) + items.length) % items.length;
+    return items[normalizedIndex];
+  }, [currentIndex, items]);
+
+  if (!activeItem) return null;
+
+  const Icon = toneIcon(activeItem.tone);
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      {items.slice(0, 3).map((item, idx) => {
-        const Icon = toneIcon(item.tone);
-        return (
-          <Card key={idx} className={`rounded-xl border ${toneClasses(item.tone)}`}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-2">
-                <div className="mt-0.5 rounded-lg bg-white/60 p-1.5">
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold leading-tight">{item.title}</div>
-                  <div className="mt-0.5 text-xs leading-snug opacity-90">{item.body}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+    <Card className={`rounded-xl border ${toneClasses(activeItem.tone)}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-2">
+          <div className="mt-0.5 rounded-lg bg-white/60 p-1.5">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold leading-tight">{activeItem.title}</div>
+            <div className="mt-0.5 text-xs leading-snug opacity-90">{activeItem.body}</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -12,6 +12,8 @@ const integrationController = require("../controllers/integrationController");
 const { uploadHomeAssignmentEvidence } = require("../middleware/uploadHomeAssignmentEvidence");
 const { validateFileStrict } = require("../middleware/uploadValidation");
 const { protect, restrictTo } = require("../middleware/auth.middleware.js");
+const { validateCaseState } = require('../middleware/validateCaseState');
+const { HomeAssignment } = require('../models/HomeAssignment');
 
 router.use(protect);
 router.use(restrictTo("parent"));
@@ -48,8 +50,48 @@ function submitAssignmentMiddleware(req, res, next) {
   });
 }
 
-router.patch("/assignments/:id/submit", submitAssignmentMiddleware, submitParentAssignment);
-router.patch("/assignments/:id/complete", parentMarkComplete);
+router.patch(
+  "/assignments/:id/submit",
+  submitAssignmentMiddleware,
+  async (req, res, next) => {
+    try {
+      const doc = await HomeAssignment.findById(req.params.id).select('caseId').lean();
+      req.body = req.body || {};
+      if (doc?.caseId) req.body.caseId = String(doc.caseId);
+      return next();
+    } catch {
+      return res.status(500).json({ success: false, message: 'Failed to validate case state' });
+    }
+  },
+  validateCaseState({
+    childCaseId: 'body.caseId',
+    requiredStatuses: ['THERAPY_ACTIVE'],
+    actionName: 'PARENT_SUBMIT_ASSIGNMENT',
+    message: 'Not available in current stage',
+  }),
+  submitParentAssignment
+);
+
+router.patch(
+  "/assignments/:id/complete",
+  async (req, res, next) => {
+    try {
+      const doc = await HomeAssignment.findById(req.params.id).select('caseId').lean();
+      req.body = req.body || {};
+      if (doc?.caseId) req.body.caseId = String(doc.caseId);
+      return next();
+    } catch {
+      return res.status(500).json({ success: false, message: 'Failed to validate case state' });
+    }
+  },
+  validateCaseState({
+    childCaseId: 'body.caseId',
+    requiredStatuses: ['THERAPY_ACTIVE'],
+    actionName: 'PARENT_COMPLETE_ASSIGNMENT',
+    message: 'Not available in current stage',
+  }),
+  parentMarkComplete
+);
 router.get("/therapy-session-instructions", getParentTherapySessionInstructions);
 
 module.exports = router;

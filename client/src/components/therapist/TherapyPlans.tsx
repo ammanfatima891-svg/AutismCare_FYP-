@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Loader2, Plus, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../ui/utils';
 
@@ -119,14 +119,6 @@ export function TherapyPlans() {
     void loadAssignedCases();
   }, [loadPlans, loadAssignedCases]);
 
-  const openAssignModal = () => {
-    setAssignCaseId('');
-    setAssignContext(null);
-    setSelectedPlanId('');
-    setSelectedChildId('');
-    setAssignOpen(true);
-  };
-
   useEffect(() => {
     if (!assignOpen || !assignCaseId) {
       setAssignContext(null);
@@ -219,19 +211,11 @@ export function TherapyPlans() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 pb-10 pt-2">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">Therapy Plans</h1>
           <p className="text-base text-muted-foreground">Manage therapy plans and track goal progress</p>
         </div>
-        <Button
-          type="button"
-          className="h-11 shrink-0 rounded-lg bg-primary px-5 text-white shadow-sm hover:bg-primary/90"
-          onClick={openAssignModal}
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          + Create New Plan
-        </Button>
       </div>
 
       {error ? (
@@ -248,10 +232,7 @@ export function TherapyPlans() {
       ) : plans.length === 0 ? (
         <div className="rounded-xl border-dashed border bg-background/90 px-6 py-14 text-center">
           <p className="text-sm font-medium text-foreground">No therapy plans available</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Use <span className="font-medium">+ Create New Plan</span> to assign a plan from a case file, or open a
-            case file to build goals.
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Open a case file to build goals and assign a plan.</p>
         </div>
       ) : (
         <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">

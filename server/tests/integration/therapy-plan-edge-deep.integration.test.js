@@ -129,6 +129,12 @@ describe('Therapy Plan Deep Edge Integration', () => {
     caseBId = String(caseB._id);
     caseCId = String(caseC._id);
 
+    /** validateCaseState on /assign requires THERAPY or THERAPY_ACTIVE */
+    await ChildCase.updateMany(
+      { _id: { $in: [caseA._id, caseB._id, caseC._id] } },
+      { $set: { status: 'THERAPY' } }
+    );
+
     await TherapyCase.create({
       caseId: caseAId,
       therapistId: therapist1Id,

@@ -177,7 +177,11 @@ export function TherapistCaseFile() {
                 <ProgressCaseTab caseId={caseId} data={data} />
               </TabsContent>
               <TabsContent value="reports" className="mt-4">
-                <ReportsCaseTab caseId={caseId} />
+                <ReportsCaseTab
+                  caseId={caseId}
+                  sessionsCount={data.sessions?.length ?? data.progressSummary?.sessionsCount ?? 0}
+                  therapyCaseStatus={data.therapyCase?.status ?? ''}
+                />
               </TabsContent>
               <TabsContent value="lab" className="mt-4">
                 <CaseLabRequestsPanel requests={(data.labRequests || []) as CaseLabRequestRow[]} />

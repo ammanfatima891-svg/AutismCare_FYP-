@@ -162,7 +162,11 @@ export function DashboardHome({ onNavigate, onOpenWelcomeTour }: DashboardHomePr
               variant="outline"
               size="sm"
               className="gap-2 border-2 shadow-sm transition-all hover:shadow-md"
-              onClick={onOpenWelcomeTour}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenWelcomeTour?.();
+              }}
             >
               <Sparkles className="size-4 text-primary" aria-hidden />
               Guided tour

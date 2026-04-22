@@ -411,7 +411,7 @@ exports.generateReportByCaseId = async (req, res) => {
     if (!therapyCase) {
       return res.status(400).json({
         success: false,
-        message: 'Reports can only be generated for ACTIVE or COMPLETED therapy cases.',
+        message: 'Report generation not allowed: therapy must be ACTIVE or COMPLETED.',
         errorCode: 'INVALID_THERAPY_STATE',
       });
     }
@@ -429,6 +429,13 @@ exports.generateReportByCaseId = async (req, res) => {
     ]);
 
     const sessionsAsc = [...sessions];
+    if (sessionsAsc.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Report generation not allowed: at least one session log is required.',
+        errorCode: 'NO_SESSIONS',
+      });
+    }
     const progressEngine = buildProgressEnginePayload({
       caseId: String(caseId),
       plan,
@@ -499,7 +506,7 @@ exports.generateReport = async (req, res) => {
     if (!therapyCase) {
       return res.status(400).json({
         success: false,
-        message: 'Reports can only be generated for ACTIVE or COMPLETED therapy cases.',
+        message: 'Report generation not allowed: therapy must be ACTIVE or COMPLETED.',
         errorCode: 'INVALID_THERAPY_STATE',
       });
     }
@@ -517,6 +524,13 @@ exports.generateReport = async (req, res) => {
     ]);
 
     const sessionsAsc = [...sessions];
+    if (sessionsAsc.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Report generation not allowed: at least one session log is required.',
+        errorCode: 'NO_SESSIONS',
+      });
+    }
     const analytics = buildUnifiedCaseAnalytics({ plan, sessions: sessionsAsc, assignments });
     const childInfo = await loadChildDisplay(caseDoc);
 

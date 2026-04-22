@@ -15,6 +15,7 @@ vi.mock('@/components/evaluation/EvaluationForm', () => {
         diagnosis: (initialValue?.diagnosis as string) || '',
         comorbidConditions: (initialValue?.comorbidConditions as string[]) || [],
         recommendations: (initialValue?.recommendations as string) || '',
+        finalDisposition: (initialValue?.finalDisposition as string) || 'MONITORING',
       }));
       return (
         <div>
@@ -62,6 +63,7 @@ vi.mock('@/components/evaluation/EvaluationForm', () => {
                   diagnosis: form.diagnosis,
                   comorbidConditions: form.comorbidConditions,
                   recommendations: form.recommendations,
+                  finalDisposition: form.finalDisposition,
                 },
                 'FINALIZED'
               )

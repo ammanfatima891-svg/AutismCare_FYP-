@@ -2,10 +2,11 @@ import { useState, useContext, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { ThemeToggleButton } from '../ui/ThemeToggleButton';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Settings, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, LogOut, Menu, X, ChevronDown, ChevronRight, Infinity as InfinityIcon } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { NotificationBell } from '../notifications/NotificationBell';
+import { cn } from '../ui/utils';
 
 interface NavigationChild {
   id: string;
@@ -44,6 +45,8 @@ interface DashboardLayoutProps {
   variant?: DashboardLayoutVariant;
   /** When set, logo + title navigate here (e.g. `/parent-dashboard`). */
   brandHref?: string;
+  /** Appended to `<main>` — use to override surface styles (e.g. transparent + custom background). */
+  mainClassName?: string;
 }
 
 export function DashboardLayout({
@@ -58,10 +61,12 @@ export function DashboardLayout({
   communicationCluster,
   variant = 'default',
   brandHref,
+  mainClassName,
 }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedDropdown, setExpandedDropdown] = useState<string | null>(null);
-  const { user } = useContext(AuthContext);
+  const auth = useContext(AuthContext);
+  const user = auth?.user ?? null;
   const location = useLocation();
 
   const linkItemActive = (item: NavigationItem) => {
@@ -88,16 +93,14 @@ export function DashboardLayout({
   /** Viewport-height shell + overflow hidden so only `<main>` scrolls; sidebar stays in view. */
   const shellClass =
     variant === 'clinical'
-      ? 'flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-background'
-      : 'flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-slate-50 to-amber-50 dark:bg-background';
+      ? 'flex min-h-screen h-[100dvh] min-h-0 flex-col overflow-hidden bg-background'
+      : 'flex min-h-screen h-[100dvh] min-h-0 flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-slate-50 to-amber-50 dark:bg-background';
   const activeNavClass =
     'border-l-4 border-[var(--accent)] bg-gradient-to-r from-[color-mix(in_srgb,var(--accent)_14%,transparent)] to-transparent font-medium text-primary dark:text-primary-foreground';
   const sidebarActiveClass =
     'rounded-xl border bg-primary/10 shadow-sm ring-1 ring-[color-mix(in_srgb,var(--accent)_38%,transparent)] dark:bg-primary/20';
   const sidebarChildActiveClass =
     'rounded-lg border bg-muted font-medium text-foreground ring-1 ring-[color-mix(in_srgb,var(--accent)_30%,transparent)] dark:bg-primary/15 dark:text-foreground';
-
-  const brandMarkSrc = `${String(import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')}autismcare-mark.svg`;
 
   return (
     <div className={shellClass}>
@@ -119,26 +122,22 @@ export function DashboardLayout({
                   className="flex items-center gap-2.5 rounded-lg outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={`${title} home`}
                 >
-                  <img
-                    src={brandMarkSrc}
-                    width={36}
-                    height={36}
-                    alt=""
-                    className="h-9 w-9 shrink-0 rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10"
-                    decoding="async"
-                  />
+                  <span
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
+                    aria-hidden
+                  >
+                    <InfinityIcon className="h-5 w-5" strokeWidth={2.2} />
+                  </span>
                   <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
                 </Link>
               ) : (
                 <div className="flex items-center gap-2.5">
-                  <img
-                    src={brandMarkSrc}
-                    width={36}
-                    height={36}
-                    alt=""
-                    className="h-9 w-9 shrink-0 rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10"
-                    decoding="async"
-                  />
+                  <span
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
+                    aria-hidden
+                  >
+                    <InfinityIcon className="h-5 w-5" strokeWidth={2.2} />
+                  </span>
                   <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
                 </div>
               )}
@@ -375,9 +374,11 @@ export function DashboardLayout({
 
         {/* Main: scroll container so page content never paints under the sticky header */}
         <main
-          className={`relative z-0 min-h-0 min-w-0 flex-1 overflow-y-auto scroll-pt-20 px-4 pb-8 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10 ${
-            variant === 'clinical' ? 'bg-background' : 'bg-card backdrop-blur-sm'
-          }`}
+          className={cn(
+            'relative z-0 min-h-0 min-w-0 flex-1 overflow-y-auto scroll-pt-20 px-4 pb-8 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10',
+            variant === 'clinical' ? 'bg-background' : 'bg-card backdrop-blur-sm',
+            mainClassName,
+          )}
         >
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>

@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { calculateScreening, getQuestionnaireByType, getAvailableQuestionnaires, getScreeningHistory, getSubmissionById, getChildScreeningStatus, getChildScreeningsCount, getChildScreenings, getAvailableCliniciansAndTherapists, getScreeningStats, downloadSubmissionReport, sendReportByEmail } = require("../controllers/screening.controller");
+const { calculateScreening, getQuestionnaireByType, getAvailableQuestionnaires, getScreeningHistory, getSubmissionById, getChildScreeningStatus, getChildScreeningsCount, getChildScreenings, getAvailableCliniciansAndTherapists, getScreeningStats, downloadSubmissionReport, sendReportByEmail, getScreeningPlan } = require("../controllers/screening.controller");
 const { protect, requireRole } = require("../middleware/auth.middleware");
 
 const upload = multer({
@@ -37,6 +37,7 @@ router.use(requireRole('parent', 'clinician', 'admin'));
 router.post("/calculate-screening", requireRole('parent'), calculateScreening);
 router.post("/send-report", requireRole('parent'), sendReportWithUpload, sendReportByEmail);
 router.get("/available-questionnaires", requireRole('parent'), getAvailableQuestionnaires);
+router.get("/screening-plan", requireRole('parent'), getScreeningPlan);
 router.get("/screening-history", requireRole('parent'), getScreeningHistory);
 router.get("/submission/:id", requireRole('parent', 'clinician', 'admin'), getSubmissionById);
 router.get("/submission/:id/download", requireRole('parent'), downloadSubmissionReport);

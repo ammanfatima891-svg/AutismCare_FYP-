@@ -53,6 +53,18 @@ const HomeAssignmentSchema = new Schema(
       trim: true,
       default: '',
     },
+    /** How often the family should practice (e.g. "3x per week") */
+    frequency: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    /** Expected length per practice (e.g. "10 minutes") */
+    duration: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     /** Primary ref to Activity library item */
     activityId: {
       type: Schema.Types.ObjectId,
@@ -77,6 +89,10 @@ const HomeAssignmentSchema = new Schema(
       default: 'pending',
       index: true,
     },
+    /** Optional link to TherapyPlan shortTermGoals[].goalKey for per-goal analytics. */
+    goalKey: { type: String, trim: true, default: '' },
+    /** Optional therapy domain label (mirrors plan domain when goal-linked). */
+    domain: { type: String, trim: true, default: '' },
     parentSubmission: {
       type: ParentSubmissionSchema,
       default: () => ({}),

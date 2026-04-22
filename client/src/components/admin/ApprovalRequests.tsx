@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { CheckCircle, XCircle, Clock, User, Stethoscope, Users } from "lucide-react";
+import { CheckCircle, XCircle, Clock, User, Stethoscope, Users, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import API from "../../api";
 
@@ -21,13 +21,16 @@ interface PendingUser {
   role: string;
   specialization?: string;
   licenseNumber?: string;
+  labName?: string;
+  accreditation?: string;
   documents?: Document[];
   createdAt: string;
 }
 
 const roleConfig = {
   clinician: { icon: Stethoscope, label: "Clinician", color: "bg-secondary/70 text-primary" },
-  therapist: { icon: Users, label: "Therapist", color: "bg-secondary text-primary" }
+  therapist: { icon: Users, label: "Therapist", color: "bg-secondary text-primary" },
+  lab: { icon: FlaskConical, label: "Lab", color: "bg-secondary text-primary" }
 };
 
 export default function ApprovalRequests() {
@@ -95,7 +98,7 @@ export default function ApprovalRequests() {
             <CheckCircle className="h-12 w-12 text-primary mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">All caught up!</h3>
             <p className="text-muted-foreground text-center">
-              No pending professional approvals at this time.
+              No pending approvals at this time.
             </p>
           </CardContent>
         </Card>
@@ -138,6 +141,23 @@ export default function ApprovalRequests() {
                         <span className="text-sm font-medium text-foreground">License Number:</span>
                         <span className="text-sm text-muted-foreground ml-2">{user.licenseNumber}</span>
                       </div>
+                    )}
+
+                    {user.role === 'lab' && (
+                      <>
+                        {user.labName && (
+                          <div>
+                            <span className="text-sm font-medium text-foreground">Lab Name:</span>
+                            <span className="text-sm text-muted-foreground ml-2">{user.labName}</span>
+                          </div>
+                        )}
+                        {user.accreditation && (
+                          <div>
+                            <span className="text-sm font-medium text-foreground">Accreditation:</span>
+                            <span className="text-sm text-muted-foreground ml-2">{user.accreditation}</span>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {user.documents && user.documents.length > 0 && (

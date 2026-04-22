@@ -6,25 +6,42 @@ import { ScreeningIntro } from './screening/ScreeningIntro';
 import { MCHATForm } from './screening/MCHATForm';
 import { ASQ3Form } from './screening/ASQ3Form';
 import { ScreeningResults } from './screening/ScreeningResults';
+import ScreeningGuide from '../../pages/parent/ScreeningGuide';
 
-type View = 'selection' | 'intro' | 'MCHAT-R' | 'ASQ-3' | 'results';
+type View = 'selection' | 'guide' | 'intro' | 'MCHAT-R' | 'ASQ-3' | 'results';
 
 export function ScreeningSection() {
   const [currentView, setCurrentView] = useState<View>('selection');
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [screeningType, setScreeningType] = useState<string>('');
   const [results, setResults] = useState<any>(null);
+  const [flowContext, setFlowContext] = useState<any>(null);
 
   const handleStartScreening = (type: string, child: any) => {
     setScreeningType(type);
     setSelectedChild(child);
-    if (type === 'MCHAT-R') setCurrentView('MCHAT-R');
-    else if (type === 'ASQ-3') setCurrentView('ASQ-3');
+    setCurrentView('guide');
   };
 
   const handleScreeningComplete = (screeningResults: any) => {
     setResults(screeningResults);
     setCurrentView('results');
+  };
+
+  const handleStartFromGuide = (type: string) => {
+    setScreeningType(type);
+    setFlowContext(null);
+    if (type === 'MCHAT-R') setCurrentView('MCHAT-R');
+    else if (type === 'ASQ-3') setCurrentView('ASQ-3');
+    else setCurrentView('selection');
+  };
+
+  const handleStartFromGuideWithContext = (type: string, context: any) => {
+    setScreeningType(type);
+    setFlowContext(context || null);
+    if (type === 'MCHAT-R') setCurrentView('MCHAT-R');
+    else if (type === 'ASQ-3') setCurrentView('ASQ-3');
+    else setCurrentView('selection');
   };
 
   const handleBack = () => {
@@ -69,6 +86,15 @@ export function ScreeningSection() {
         <QuestionnaireSelection onStartScreening={handleStartScreening} />
       )}
 
+      {currentView === 'guide' && (
+        <ScreeningGuide
+          child={selectedChild}
+          selectedType={screeningType}
+          onBack={handleBack}
+          onStart={handleStartFromGuideWithContext}
+        />
+      )}
+
       {currentView === 'intro' && (
         <ScreeningIntro
           onStart={handleIntroComplete}
@@ -80,6 +106,7 @@ export function ScreeningSection() {
       {currentView === 'MCHAT-R' && (
         <MCHATForm
           child={selectedChild}
+          flowContext={flowContext}
           onComplete={handleScreeningComplete}
         />
       )}
@@ -87,6 +114,7 @@ export function ScreeningSection() {
       {currentView === 'ASQ-3' && (
         <ASQ3Form
           child={selectedChild}
+          flowContext={flowContext}
           onComplete={handleScreeningComplete}
         />
       )}

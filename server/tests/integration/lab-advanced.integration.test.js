@@ -8,6 +8,7 @@ jest.mock('../../src/utils/email', () => {
 
 const { app } = require('../../src/server');
 const { User } = require('../../src/models/User');
+const { ChildCase } = require('../../src/models/ChildCase');
 const LabTestRequest = require('../../src/models/LabTestRequest');
 const LabReport = require('../../src/models/LabReport');
 const { connectTestDb, disconnectTestDb } = require('../helpers/testDb');
@@ -26,6 +27,7 @@ describe('Lab Advanced Lifecycle Integration', () => {
   let clinicianToken;
   let labToken;
   let parentId;
+  let caseId;
   let testRequestId;
   let uploadedReportId;
 
@@ -83,6 +85,24 @@ describe('Lab Advanced Lifecycle Integration', () => {
       emergencyPhone: '03001234567',
     });
     await parentDoc.save({ validateModifiedOnly: true });
+
+    // Create a case in DIAGNOSIS so lab actions are state-gated correctly.
+    const childSub = parentDoc.children[parentDoc.children.length - 1];
+    const clinicianDoc = await User.findOne({ email: emails.clinician }).select('_id').lean();
+    const c = await ChildCase.create({
+      parentId: parentDoc._id,
+      childId: childSub._id,
+      clinicianId: clinicianDoc?._id || null,
+      status: 'DIAGNOSIS',
+      caseHistory: [{
+        fromStatus: null,
+        toStatus: 'DIAGNOSIS',
+        event: 'TEST_SETUP',
+        timestamp: new Date(),
+        triggeredBy: clinicianDoc?._id || null,
+      }],
+    });
+    caseId = String(c._id);
   });
 
   afterAll(async () => {
@@ -102,6 +122,7 @@ describe('Lab Advanced Lifecycle Integration', () => {
       .post('/api/lab/clinician/requests')
       .set(authHeader(clinicianToken))
       .send({
+        caseId,
         parentId,
         childId: String(child._id),
         childName: `${child.firstName} ${child.lastName}`,
@@ -153,6 +174,7 @@ describe('Lab Advanced Lifecycle Integration', () => {
     const uploadRes = await request(app)
       .post('/api/lab/reports/upload')
       .set(authHeader(labToken))
+      .field('caseId', caseId)
       .field('testRequestId', testRequestId)
       .attach('report', Buffer.from('%PDF-1.4 lab report fixture'), 'fixture-report.pdf');
     expect(uploadRes.statusCode).toBe(201);

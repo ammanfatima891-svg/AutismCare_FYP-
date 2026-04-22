@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const LabTestRequest = require('../models/LabTestRequest');
 const LabReport = require('../models/LabReport');
+const LabRequest = require('../models/LabRequest');
 const { ChildCase } = require('../models/ChildCase');
 const { AuditLog } = require('../models/AuditLog');
 const { User } = require('../models/User');
@@ -12,6 +13,9 @@ const sendEmail = require('../utils/email');
 const { createNotificationIfNotExists } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { validateFileStrict, wrapMulter } = require('../middleware/uploadValidation');
+const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
+const { validateCaseState } = require('../middleware/validateCaseState');
+const { ACTIONS } = require('../services/actionPermissionService');
 
 // -------------------------------------------------------------------
 // Multer configuration for lab report uploads
@@ -124,7 +128,17 @@ exports.getTestRequestById = async (req, res) => {
         const reports = await LabReport.find({ testRequestId: request._id })
             .populate('labTechnicianId', 'firstName lastName');
 
-        res.status(200).json({ success: true, data: { ...request.toObject(), reports } });
+        let caseStatus = null;
+        try {
+            if (request.caseId) {
+                const c = await ChildCase.findById(request.caseId).select('status').lean();
+                caseStatus = c?.status || null;
+            }
+        } catch (_) {
+            caseStatus = null;
+        }
+
+        res.status(200).json({ success: true, data: { ...request.toObject(), caseStatus, reports } });
     } catch (err) {
         console.error('getTestRequestById error:', err);
         res.status(500).json({ success: false, message: 'Failed to retrieve test request' });
@@ -136,6 +150,12 @@ exports.getTestRequestById = async (req, res) => {
 // -------------------------------------------------------------------
 exports.uploadReport = [
     labUploadSingle,
+    validateCaseState({
+        childCaseId: 'body.caseId',
+        requiredStatuses: ['DIAGNOSIS'],
+        actionName: ACTIONS.UPLOAD_LAB_REPORT,
+        message: 'Lab report upload is only allowed during DIAGNOSIS.',
+    }),
     async (req, res) => {
         try {
             if (!req.file) {
@@ -147,11 +167,15 @@ exports.uploadReport = [
                 return res.status(400).json({ success: false, message: strict.message, errorCode: strict.errorCode });
             }
 
-            const { testRequestId } = req.body;
+            const { testRequestId, caseId } = req.body;
             if (!testRequestId) {
                 // Clean up the uploaded file if validation fails
                 fs.unlinkSync(req.file.path);
                 return res.status(400).json({ success: false, message: 'Test request ID is required' });
+            }
+            if (!caseId) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ success: false, message: 'caseId is required' });
             }
 
             // Verify the test request exists
@@ -159,6 +183,11 @@ exports.uploadReport = [
             if (!testRequest) {
                 fs.unlinkSync(req.file.path);
                 return res.status(404).json({ success: false, message: 'Test request not found' });
+            }
+            // Hard guard: uploaded report must match the gated caseId
+            if (testRequest.caseId && String(testRequest.caseId) !== String(caseId)) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ success: false, message: 'caseId does not match test request' });
             }
 
             // Build the file URL relative to the server
@@ -179,6 +208,20 @@ exports.uploadReport = [
             // Update test request status to UPLOADED
             testRequest.status = 'UPLOADED';
             await testRequest.save();
+
+            // Lifecycle: LAB_UPLOADS_REPORT -> DIAGNOSIS_READY (requires caseId on request)
+            try {
+                if (testRequest.caseId) {
+                    await transitionCase({
+                        caseId: testRequest.caseId,
+                        eventType: CASE_EVENTS.LAB_UPLOADS_REPORT,
+                        payload: { testRequestId: testRequest._id, reportId: report._id },
+                        triggeredBy: req.user._id,
+                    });
+                }
+            } catch (e) {
+                console.error('[uploadReport] case lifecycle transition failed:', e?.message || e);
+            }
 
             // Audit log
             await createAuditLog({
@@ -242,69 +285,94 @@ exports.uploadReport = [
 ];
 
 // -------------------------------------------------------------------
-// PATCH /api/lab/requests/:id/status — update test request status
+// PATCH /api/lab/requests/:id/accept — lab accepts a pending request (event only)
 // -------------------------------------------------------------------
-exports.updateTestStatus = async (req, res) => {
+exports.acceptTestRequest = async (req, res) => {
     try {
-        const { status } = req.body;
-        const validStatuses = ['PENDING', 'UPLOADED', 'RELEASED'];
-
-        if (!status || !validStatuses.includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
-            });
-        }
-
         const request = await LabTestRequest.findById(req.params.id);
         if (!request) {
             return res.status(404).json({ success: false, message: 'Test request not found' });
         }
-
-        const previousStatus = request.status;
-
-        // Transition guards:
-        // PENDING -> UPLOADED, UPLOADED -> RELEASED, and idempotent same-status updates only.
-        if (previousStatus === 'PENDING' && status === 'RELEASED') {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid transition: PENDING requests cannot be marked RELEASED directly'
-            });
-        }
-        if (previousStatus === 'RELEASED' && status !== 'RELEASED') {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid transition: RELEASED requests cannot be changed'
-            });
+        if (request.status !== 'PENDING') {
+            return res.status(400).json({ success: false, message: `Only PENDING requests can be accepted (current: ${request.status})` });
         }
 
-        request.status = status;
-
-        // If releasing, mark the release timestamp on associated reports
-        if (status === 'RELEASED') {
-            request.releasedToParent = true;
-            await LabReport.updateMany(
-                { testRequestId: request._id, releasedAt: null },
-                { releasedAt: getCurrentTime() }
-            );
+        // Lifecycle: LAB_ACCEPTS_REQUEST (status stays DIAGNOSIS)
+        try {
+            if (request.caseId) {
+                await transitionCase({
+                    caseId: request.caseId,
+                    eventType: CASE_EVENTS.LAB_ACCEPTS_REQUEST,
+                    payload: { testRequestId: request._id },
+                    triggeredBy: req.user._id,
+                });
+            }
+        } catch (e) {
+            return res.status(400).json({ success: false, message: e?.message || 'Invalid case transition' });
         }
 
-        await request.save();
-
-        // Audit log
+        // Keep request.status as PENDING (accepted is tracked by audit log only for now)
         await createAuditLog({
             userId: req.user._id,
-            action: 'UPDATE',
+            action: 'ACCEPT',
             resource: 'LabTestRequest',
             resourceId: request._id,
-            details: `Status changed from ${previousStatus} to ${status}`,
+            details: 'Lab accepted test request',
             ipAddress: req.ip
         });
 
-        res.status(200).json({ success: true, data: request, message: 'Status updated' });
+        res.status(200).json({ success: true, data: request, message: 'Request accepted' });
+    } catch (err) {
+        console.error('acceptTestRequest error:', err);
+        res.status(500).json({ success: false, message: 'Failed to accept request' });
+    }
+};
+
+// -------------------------------------------------------------------
+// PATCH /api/lab/requests/:id/status — manual status updates are DISABLED (state-driven system)
+// -------------------------------------------------------------------
+exports.updateTestStatus = async (req, res) => {
+    try {
+        const { status } = req.body || {};
+        const next = String(status || '').trim().toUpperCase();
+
+        // Backward-compatible behavior for older clients/tests:
+        // Allow lab to mark a request UPLOADED (which is effectively "report uploaded").
+        if (next !== 'UPLOADED') {
+            return res.status(400).json({
+                success: false,
+                message: 'Only UPLOADED transition is supported here. Use clinician release endpoint for RELEASED.',
+            });
+        }
+
+        const request = await LabTestRequest.findById(req.params.id);
+        if (!request) return res.status(404).json({ success: false, message: 'Test request not found' });
+
+        const previousStatus = String(request.status || '').toUpperCase();
+        if (previousStatus === 'RELEASED') {
+            return res.status(400).json({ success: false, message: 'RELEASED requests cannot be changed' });
+        }
+
+        request.status = 'UPLOADED';
+        await request.save();
+
+        try {
+            if (request.caseId) {
+                await transitionCase({
+                    caseId: request.caseId,
+                    eventType: CASE_EVENTS.LAB_UPLOADS_REPORT,
+                    payload: { testRequestId: request._id, via: 'updateTestStatus' },
+                    triggeredBy: req.user._id,
+                });
+            }
+        } catch (e) {
+            console.error('[updateTestStatus] case lifecycle transition failed:', e?.message || e);
+        }
+
+        return res.status(200).json({ success: true, data: request, message: 'Status updated' });
     } catch (err) {
         console.error('updateTestStatus error:', err);
-        res.status(500).json({ success: false, message: 'Failed to update status' });
+        return res.status(500).json({ success: false, message: 'Failed to update status' });
     }
 };
 
@@ -676,25 +744,31 @@ exports.createTestRequest = async (req, res) => {
             });
         }
 
-        let resolvedCaseId = null;
-        if (caseId) {
-            if (!mongoose.Types.ObjectId.isValid(caseId)) {
-                return res.status(400).json({ success: false, message: 'Invalid caseId' });
-            }
-            const caseDoc = await ChildCase.findOne({
-                _id: caseId,
-                clinicianId: req.user._id,
-            }).lean();
-            if (!caseDoc) {
-                return res.status(404).json({ success: false, message: 'Case not found for this clinician' });
-            }
-            if (String(caseDoc.parentId) !== String(parentId) || String(caseDoc.childId) !== String(childId)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'caseId does not match the selected parent and child',
-                });
-            }
-            resolvedCaseId = caseDoc._id;
+        if (!caseId) {
+            return res.status(400).json({ success: false, message: 'caseId is required' });
+        }
+        if (!mongoose.Types.ObjectId.isValid(caseId)) {
+            return res.status(400).json({ success: false, message: 'Invalid caseId' });
+        }
+        const caseDoc = await ChildCase.findById(caseId).select('_id parentId childId clinicianId status').lean();
+        if (!caseDoc) {
+            return res.status(404).json({ success: false, message: 'Case not found' });
+        }
+        if (String(caseDoc.parentId) !== String(parentId) || String(caseDoc.childId) !== String(childId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'caseId does not match the selected parent and child',
+            });
+        }
+        if (caseDoc.clinicianId && String(caseDoc.clinicianId || '') !== String(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Only the assigned clinician can prescribe lab tests for this case',
+            });
+        }
+        if (!caseDoc.clinicianId) {
+            await ChildCase.updateOne({ _id: caseDoc._id }, { $set: { clinicianId: req.user._id } });
+            caseDoc.clinicianId = req.user._id;
         }
 
         // Create the test request
@@ -713,8 +787,22 @@ exports.createTestRequest = async (req, res) => {
             requestSummary: computedSummary,
             notes: notes || '',
             status: 'PENDING',
-            ...(resolvedCaseId ? { caseId: resolvedCaseId } : {}),
+            caseId: caseDoc._id,
         });
+
+        // Lifecycle: CLINICIAN_PRESCRIBES_LAB_TEST -> DIAGNOSIS
+        try {
+            await transitionCase({
+                caseId: caseDoc._id,
+                eventType: CASE_EVENTS.CLINICIAN_PRESCRIBES_LAB_TEST,
+                payload: { testRequestId: testRequest._id },
+                triggeredBy: req.user._id,
+            });
+        } catch (e) {
+            // Hard fail: prescribing lab tests must not succeed without state transition.
+            await LabTestRequest.deleteOne({ _id: testRequest._id });
+            return res.status(400).json({ success: false, message: e?.message || 'Invalid case transition' });
+        }
 
         // Audit log
         await createAuditLog({
@@ -759,38 +847,90 @@ exports.createTestRequest = async (req, res) => {
 // -------------------------------------------------------------------
 exports.getParentReports = async (req, res) => {
     try {
-        // Find all test requests that belong to this parent AND have been released
-        const requests = await LabTestRequest.find({
-            parentId: req.user._id,
-            status: 'RELEASED',
-            releasedToParent: true
-        })
-            .populate('clinicianId', 'firstName lastName email')
-            .sort({ updatedAt: -1 });
+        const parent = await User.findById(req.user._id).select('children').lean();
+        const childRows = Array.isArray(parent?.children) ? parent.children : [];
+        const childIds = childRows.map((c) => c._id).filter(Boolean);
+        const childMap = new Map(
+            childRows.map((c) => {
+                const childName = `${c?.firstName || ''} ${c?.lastName || ''}`.trim() || 'Child';
+                const childAge = c?.dateOfBirth ? getAgeYearsFromDob(new Date(c.dateOfBirth)) : 0;
+                return [String(c._id), { childName, childAge }];
+            })
+        );
 
-        if (!requests.length) {
-            return res.status(200).json({ success: true, data: [] });
-        }
+        const [legacyRequests, modernRequests] = await Promise.all([
+            LabTestRequest.find({
+                parentId: req.user._id,
+                status: 'RELEASED',
+                releasedToParent: true
+            })
+                .populate('clinicianId', 'firstName lastName email')
+                .sort({ updatedAt: -1 }),
+            childIds.length
+                ? LabRequest.find({
+                    child_id: { $in: childIds },
+                    status: 'completed',
+                    report_url: { $exists: true, $ne: '' },
+                })
+                    .populate('test_id', 'test_name category')
+                    .populate('clinician_id', 'firstName lastName email')
+                    .sort({ updatedAt: -1 })
+                    .lean()
+                : Promise.resolve([]),
+        ]);
 
-        // Fetch reports for all released requests in one query
-        const requestIds = requests.map(r => r._id);
-        const reports = await LabReport.find({ testRequestId: { $in: requestIds } })
-            .populate('labTechnicianId', 'firstName lastName')
-            .sort({ uploadedAt: -1 });
+        // Fetch reports for released legacy requests in one query
+        const legacyRequestIds = legacyRequests.map((r) => r._id);
+        const legacyReports = legacyRequestIds.length
+            ? await LabReport.find({ testRequestId: { $in: legacyRequestIds } })
+                .populate('labTechnicianId', 'firstName lastName')
+                .sort({ uploadedAt: -1 })
+            : [];
 
-        // Group reports by testRequestId
-        const reportsByRequest = {};
-        reports.forEach(r => {
-            const key = r.testRequestId.toString();
-            if (!reportsByRequest[key]) reportsByRequest[key] = [];
-            reportsByRequest[key].push(r);
+        const reportsByLegacyRequest = {};
+        legacyReports.forEach((r) => {
+            const key = String(r.testRequestId);
+            if (!reportsByLegacyRequest[key]) reportsByLegacyRequest[key] = [];
+            reportsByLegacyRequest[key].push(r);
         });
 
-        // Merge reports into requests
-        const data = requests.map(r => ({
+        const legacyData = legacyRequests.map((r) => ({
             ...r.toObject(),
-            reports: reportsByRequest[r._id.toString()] || []
+            reports: reportsByLegacyRequest[String(r._id)] || [],
         }));
+
+        const modernData = modernRequests.map((row) => {
+            const childMeta = childMap.get(String(row.child_id)) || { childName: 'Child', childAge: 0 };
+            return {
+                _id: row._id,
+                childId: row.child_id,
+                childName: childMeta.childName,
+                childAge: childMeta.childAge,
+                testType: row?.test_id?.test_name || 'Lab test',
+                notes: row.notes || '',
+                status: 'RELEASED',
+                releasedToParent: true,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt,
+                clinicianId: row.clinician_id || null,
+                reports: row.report_url
+                    ? [{
+                        _id: `${row._id}-report`,
+                        fileUrl: row.report_url,
+                        fileType: 'link',
+                        fileName: `${row?.test_id?.test_name || 'Lab test'} report`,
+                        fileSize: 0,
+                        uploadedAt: row.updatedAt || row.createdAt,
+                        releasedAt: row.updatedAt || row.createdAt,
+                        labTechnicianId: null,
+                    }]
+                    : [],
+            };
+        });
+
+        const data = [...legacyData, ...modernData].sort(
+            (a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime()
+        );
 
         res.status(200).json({ success: true, data });
     } catch (err) {

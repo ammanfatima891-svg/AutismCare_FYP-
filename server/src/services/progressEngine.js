@@ -331,6 +331,54 @@ function movingAverage3(values) {
   });
 }
 
+const STRUCTURED_MEASUREMENT_TYPES = new Set(['accuracy_trials', 'frequency', 'duration', 'latency', 'score']);
+
+function varianceSample(vals) {
+  if (!vals.length) return Infinity;
+  const m = mean(vals);
+  let s = 0;
+  for (const v of vals) s += (v - m) ** 2;
+  return s / vals.length;
+}
+
+/**
+ * Adaptive per-session confidence (0–1): goal rows, structure, short-window consistency, sparsity, rating-only.
+ * @param {object} session
+ * @param {number} idx — index in scored session list (chronological among scored)
+ * @param {{ session: object, perFive: number }[]} scoredSessions
+ */
+function computeSessionAdaptiveConfidence(session, idx, scoredSessions) {
+  const rows = Array.isArray(session.goalData) ? session.goalData : [];
+  let c = 0;
+  if (rows.length > 0) c += 0.4;
+  const hasStructured = rows.some((r) =>
+    STRUCTURED_MEASUREMENT_TYPES.has(String(r.measurementType || '').trim())
+  );
+  if (hasStructured) c += 0.2;
+
+  const window = scoredSessions.slice(Math.max(0, idx - 4), idx + 1).map((x) => x.perFive);
+  if (window.length >= 3) {
+    const v = varianceSample(window);
+    if (v < 0.12) c += 0.2;
+  }
+
+  const legacyOnly = rows.length === 0 && legacySessionPct(session) != null;
+  if (legacyOnly) c -= 0.2;
+
+  const onlyRating =
+    rows.length > 0 &&
+    rows.every((r) => String(r.measurementType || 'rating_1_5').trim() === 'rating_1_5');
+  if (onlyRating || (rows.length === 0 && legacyOnly)) c += 0.1;
+
+  return Math.max(0, Math.min(1, Number(c.toFixed(3))));
+}
+
+function confidenceLabel(overall) {
+  if (overall > 0.7) return 'high';
+  if (overall > 0.4) return 'medium';
+  return 'low';
+}
+
 function sessionCompositeScoreFive(s) {
   // Treat signed sessions as completed for analytics/trends.
   const st = String(s.status || 'completed').toLowerCase();
@@ -403,7 +451,7 @@ function buildProgressEnginePayload(input) {
   const assigns = assignments || [];
   const goalDefs = collectPlanGoalDefs(plan);
 
-  const therapyScoresFive = [];
+  const scoredSessions = [];
   for (const s of sessionsAsc) {
     const st = String(s.status || 'completed').toLowerCase();
     if (st !== 'completed' && st !== 'signed') continue;
@@ -415,13 +463,20 @@ function buildProgressEnginePayload(input) {
         return pct != null ? pctToFive(pct) : null;
       })
       .filter((v) => v != null);
+    let perFive = null;
     if (rowScores.length) {
-      therapyScoresFive.push(mean(rowScores));
-      continue;
+      perFive = mean(rowScores);
+    } else {
+      const leg = legacySessionPct(s);
+      if (leg != null) perFive = pctToFive(leg);
     }
-    const leg = legacySessionPct(s);
-    if (leg != null) therapyScoresFive.push(pctToFive(leg));
+    if (perFive == null) continue;
+    scoredSessions.push({ session: s, perFive });
   }
+  const therapyScoresFive = scoredSessions.map((x) => x.perFive);
+  const sessionConfidences = scoredSessions.map((row, idx) =>
+    computeSessionAdaptiveConfidence(row.session, idx, scoredSessions)
+  );
 
   const homeRatings = assigns
     .map((a) => a.therapistFeedback?.rating)
@@ -431,14 +486,27 @@ function buildProgressEnginePayload(input) {
   const therapyScore = therapyScoresFive.length ? mean(therapyScoresFive) : null;
   const homeScore = homeScoresFive.length ? mean(homeScoresFive) : null;
 
-  let finalScore = 0;
+  let rawBlendScore = 0;
   if (therapyScore != null && homeScore != null) {
-    finalScore = therapyScore * 0.6 + homeScore * 0.4;
+    rawBlendScore = therapyScore * 0.6 + homeScore * 0.4;
   } else if (therapyScore != null) {
-    finalScore = therapyScore;
+    rawBlendScore = therapyScore;
   } else if (homeScore != null) {
-    finalScore = homeScore;
+    rawBlendScore = homeScore;
   }
+
+  let confidenceOverall = 0;
+  if (sessionConfidences.length > 0) {
+    confidenceOverall = Number(mean(sessionConfidences).toFixed(3));
+  } else if (homeScoresFive.length > 0 && therapyScoresFive.length === 0) {
+    confidenceOverall = 0.55;
+  }
+
+  const finalScore = Number((rawBlendScore * confidenceOverall).toFixed(2));
+  const confidence = {
+    overall: confidenceOverall,
+    label: confidenceLabel(confidenceOverall),
+  };
 
   const totalAssignments = assigns.length;
   const completedAssignments = assigns.filter((a) => String(a.status || '') === 'completed').length;
@@ -473,6 +541,18 @@ function buildProgressEnginePayload(input) {
     let masteryStatus = mastery.status;
     if (String(def.planStatus).toLowerCase() === 'achieved') masteryStatus = 'mastered';
 
+    const linkedAssignments = assigns.filter((a) => {
+      const gk = String(a.goalKey || '').trim();
+      return gk && def.matchKeys.has(gk);
+    });
+    const assignRatings = linkedAssignments
+      .map((a) => a.therapistFeedback?.rating)
+      .filter((r) => r != null && Number.isFinite(Number(r)));
+    const assignmentRatingAvg =
+      assignRatings.length > 0
+        ? Number(mean(assignRatings.map((r) => ratingToFive(r))).toFixed(2))
+        : null;
+
     return {
       goalId: def.goalId,
       domain: def.clinicalDomain,
@@ -486,6 +566,8 @@ function buildProgressEnginePayload(input) {
       goalName: def.goalName,
       measurementType: def.measurementType,
       dataPoints: series.length,
+      linkedAssignmentsCount: linkedAssignments.length,
+      assignmentRatingAvg,
     };
   });
 
@@ -532,7 +614,9 @@ function buildProgressEnginePayload(input) {
   return {
     caseId: String(caseId),
     engineVersion: 1,
-    overallScore: Number(finalScore.toFixed(2)),
+    overallScore: finalScore,
+    rawBlendScore: Number(rawBlendScore.toFixed(3)),
+    confidence,
     improvementRate,
     consistency: consistency != null ? Number(consistency.toFixed(3)) : null,
     activityCompletionRate,

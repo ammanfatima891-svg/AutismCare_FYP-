@@ -20,6 +20,9 @@ const MASTERY_RULE_TYPES = ['threshold_consecutive_sessions', 'threshold_out_of_
 
 const PLAN_APPROVAL_STATUS = ['none', 'pending', 'approved', 'rejected'];
 
+/** Canonical plan lifecycle (author → validator → in-use). */
+const PLAN_LIFECYCLE_STATUSES = ['draft', 'final', 'approved', 'active', 'archived'];
+
 /** Legacy goal subdocument (kept for backward compatibility). */
 const GoalSchema = new Schema(
   {
@@ -185,6 +188,18 @@ const TherapyPlanSchema = new Schema(
       default: 'draft',
       index: true,
     },
+    /** Explicit lifecycle (authority: therapist authors; clinician validates; active = session-eligible). */
+    planStatus: {
+      type: String,
+      enum: PLAN_LIFECYCLE_STATUSES,
+      default: 'draft',
+      index: true,
+    },
+    /** When therapist submitted plan for clinician review. */
+    submittedAt: { type: Date, default: null },
+    /** Top-level mirror of clinician sign-off (also stored under `approval`). */
+    approvedAt: { type: Date, default: null },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User', default: undefined },
     /** Increments on explicit publish / major revision (analytics versioning). */
     planVersion: { type: Number, default: 1, min: 1 },
     /** Clinician (supervisor) approval workflow for the active plan document. */
@@ -224,4 +239,5 @@ TherapyPlan.SHORT_TERM_GOAL_STATUS = SHORT_TERM_GOAL_STATUS;
 TherapyPlan.MEASUREMENT_TYPES = MEASUREMENT_TYPES;
 TherapyPlan.MASTERY_RULE_TYPES = MASTERY_RULE_TYPES;
 TherapyPlan.PLAN_APPROVAL_STATUS = PLAN_APPROVAL_STATUS;
+TherapyPlan.PLAN_LIFECYCLE_STATUSES = PLAN_LIFECYCLE_STATUSES;
 module.exports = TherapyPlan;

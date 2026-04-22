@@ -3,7 +3,6 @@ const router = express.Router();
 const {
   getCases,
   getCaseById,
-  updateCaseStatus,
   createCase,
   createFromAppointment,
 } = require('../controllers/caseController');
@@ -15,7 +14,6 @@ router.use(restrictTo('clinician'));
 router.get('/', getCases);
 router.post('/create', createCase);
 router.post('/from-appointment', createFromAppointment);
-router.patch('/:id/status', updateCaseStatus);
 router.get('/:id', getCaseById);
 
 module.exports = router;

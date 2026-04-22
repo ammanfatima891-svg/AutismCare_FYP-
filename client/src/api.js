@@ -55,6 +55,7 @@ export const screeningAPI = {
   calculateScreening: (screeningData) => API.post('/screening/calculate-screening', screeningData),
   getQuestionnaireByType: (type) => API.get(`/screening/questionnaires/${type}`),
   getAvailableQuestionnaires: () => API.get('/screening/available-questionnaires'),
+  getScreeningPlan: (childId) => API.get('/screening/screening-plan', { params: { childId } }),
   getScreeningHistory: () => API.get('/screening/screening-history'),
   getSubmissionById: (id) => API.get(`/screening/submission/${id}`),
   downloadSubmissionReport: (id) => API.get(`/screening/submission/${id}/download`, { responseType: 'blob' }),
@@ -76,12 +77,12 @@ export const labAPI = {
   getStats: () => API.get('/lab/stats'),
   getRequests: (params) => API.get('/lab/requests', { params }),
   getRequestById: (id) => API.get(`/lab/requests/${id}`),
+  acceptRequest: (id) => API.patch(`/lab/requests/${id}/accept`),
   uploadReport: (formData, onUploadProgress) =>
     API.post('/lab/reports/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress
     }),
-  updateStatus: (id, status) => API.patch(`/lab/requests/${id}/status`, { status }),
   getReportById: (id) => API.get(`/lab/reports/${id}`),
   getAllReports: () => API.get('/lab/reports'),
 
@@ -94,6 +95,28 @@ export const labAPI = {
 
   // Parent endpoints
   getParentReports: () => API.get('/lab/parent/reports')
+};
+
+// New lab catalog endpoints (discriminator-safe module)
+export const labTestsAPI = {
+  getMyTests: () => API.get('/lab-tests/my-tests', { timeout: 15000 }),
+  getAll: () => API.get('/lab-tests/all', { timeout: 15000 }),
+  getByTest: (testName) =>
+    API.get(`/lab-tests/by-test/${encodeURIComponent(String(testName))}`, { timeout: 15000 }),
+  create: (payload) => API.post('/lab-tests', payload, { timeout: 15000 }),
+  update: (id, payload) => API.put(`/lab-tests/${id}`, payload, { timeout: 15000 }),
+  remove: (id) => API.delete(`/lab-tests/${id}`, { timeout: 15000 }),
+};
+
+export const labRequestsAPI = {
+  create: (payload) => API.post('/lab-requests', payload),
+  getByChild: (childId) => API.get(`/lab-requests/by-child/${encodeURIComponent(String(childId))}`),
+  getMyRequests: () => API.get('/lab-requests/my-requests'),
+  accept: (id) => API.put(`/lab-requests/${id}/accept`),
+  uploadReport: (id, payload) =>
+    API.put(`/lab-requests/${id}/upload-report`, payload, payload instanceof FormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : undefined),
 };
 
 // Therapist API endpoints
@@ -216,10 +239,6 @@ export const clinicianAPI = {
 export const caseAPI = {
   list: (params) => API.get('cases', { params }),
   getById: (id) => API.get(`cases/${id}`),
-  updateStatus: (id, status) => API.patch(`cases/${id}/status`, { status }),
-  create: (body) => API.post('cases/create', body),
-  fromAppointment: (appointmentId) =>
-    API.post('cases/from-appointment', { appointmentId }),
 };
 
 // Clinical evaluations (clinician only)

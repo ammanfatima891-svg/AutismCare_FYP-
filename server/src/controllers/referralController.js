@@ -10,6 +10,8 @@ const { createNotificationIfNotExists, createNotification } = require('../utils/
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { REFERRAL_STATUS, EVALUATION_STATUS, THERAPY_STATUS } = require('../constants/workflowEnums');
 const { recordAuditEvent } = require('../utils/auditLog');
+const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
+const { activateTherapyPlanWhenTherapyStarts } = require('../utils/therapyPlanLifecycle');
 
 function normalizeText(value) {
   return String(value || '')
@@ -194,6 +196,18 @@ exports.createReferral = async (req, res) => {
       notes: typeof notes === 'string' ? notes.trim() : '',
       status: REFERRAL_STATUS.CREATED,
     });
+
+    // Lifecycle: clinician decision "therapy needed" => THERAPY (best-effort for legacy flows)
+    try {
+      await transitionCase({
+        caseId,
+        eventType: CASE_EVENTS.CLINICIAN_REVIEWS_REPORT,
+        payload: { therapyNeeded: true },
+        triggeredBy: clinicianId,
+      });
+    } catch (e) {
+      console.error('[createReferral] case lifecycle transition skipped:', e?.message || e);
+    }
 
     try {
       await recordAuditEvent({
@@ -446,6 +460,23 @@ exports.startReferral = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Referral not found' });
     }
 
+    // State gate: THERAPY only
+    try {
+      const { ChildCase } = require('../models/ChildCase');
+      const caseDoc = await ChildCase.findById(referral.caseId).select('status').lean();
+      const st = String(caseDoc?.status || '').toUpperCase();
+      if (st !== 'THERAPY') {
+        return res.status(403).json({
+          success: false,
+          message: 'Action not allowed in current case state',
+          errorCode: 'CASE_STATE_FORBIDDEN',
+          meta: { action: 'START_THERAPY', currentStatus: st, requiredStatuses: ['THERAPY'] },
+        });
+      }
+    } catch (e) {
+      return res.status(500).json({ success: false, message: 'Failed to validate case state' });
+    }
+
     const therapistTypes = await resolveTherapistTypes(req);
     if (!therapistTypes.length || !therapistTypes.includes(referral.therapistType)) {
       return res.status(403).json({ success: false, message: 'Not authorized for this referral type' });
@@ -469,6 +500,24 @@ exports.startReferral = async (req, res) => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+
+    try {
+      await activateTherapyPlanWhenTherapyStarts(referral.caseId, req.user._id);
+    } catch (e) {
+      console.error('[startReferral] activate therapy plan skipped:', e?.message || e);
+    }
+
+    // Lifecycle: therapist accepts/starts case => THERAPY_ACTIVE (best-effort for legacy flows)
+    try {
+      await transitionCase({
+        caseId: referral.caseId,
+        eventType: CASE_EVENTS.THERAPIST_ACCEPTS_CASE,
+        payload: { therapistId: req.user._id },
+        triggeredBy: req.user._id,
+      });
+    } catch (e) {
+      console.error('[startReferral] case lifecycle transition skipped:', e?.message || e);
+    }
 
     try {
       await recordAuditEvent({

@@ -229,11 +229,11 @@ export function ParentScreenings() {
                     </div>
                   </dl>
                 </CardContent>
-                <CardFooter className="mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-border/60 bg-muted/20 px-6 py-5">
+                <CardFooter className="mt-auto grid w-full grid-cols-1 gap-3 border-t border-border/60 bg-muted/20 px-6 py-5 sm:grid-cols-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="min-h-10 shrink-0 border-primary/30 px-4 text-primary hover:bg-primary/10"
+                    className="min-h-10 w-full border-primary/30 px-4 text-primary hover:bg-primary/10"
                     onClick={() => handleViewReport(s._id)}
                     disabled={viewingId === s._id}
                   >
@@ -243,7 +243,7 @@ export function ParentScreenings() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="min-h-10 shrink-0 px-4"
+                    className="min-h-10 w-full px-4"
                     onClick={() => handleDownloadReport(s._id)}
                     disabled={downloadingId === s._id}
                   >

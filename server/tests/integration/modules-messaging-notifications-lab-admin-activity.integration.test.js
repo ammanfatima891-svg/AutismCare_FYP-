@@ -159,6 +159,7 @@ describe('Messaging, Notifications, Lab, Admin, Activity Library Integration', (
       childId,
       parentId,
       clinicianId,
+      status: 'DIAGNOSIS',
     });
     caseId = String(c._id);
 
@@ -295,6 +296,7 @@ describe('Messaging, Notifications, Lab, Admin, Activity Library Integration', (
       .post('/api/lab/clinician/requests')
       .set(authHeader(tokens.clinician))
       .send({
+        caseId,
         parentId,
         childId,
         childName: 'Module Child',

@@ -1,14 +1,18 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-const CASE_STATUS = {
-  ACTIVE: 'Active',
-  UNDER_EVALUATION: 'Under Evaluation',
-  REFERRED: 'Referred',
-  ONGOING_THERAPY: 'Ongoing Therapy',
-};
-
 const RISK_LEVEL = ['low', 'medium', 'high', 'unknown'];
+
+const CASE_LIFECYCLE_STATUS = [
+  'NEW',
+  'SCREENING',
+  'REVIEW',
+  'DIAGNOSIS',
+  'DIAGNOSIS_READY',
+  'THERAPY',
+  'THERAPY_ACTIVE',
+  'MONITORING',
+];
 
 const ChildCaseSchema = new Schema(
   {
@@ -26,7 +30,13 @@ const ChildCaseSchema = new Schema(
     clinicianId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
+      index: true,
+    },
+    therapistId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
       index: true,
     },
     appointmentId: {
@@ -46,32 +56,50 @@ const ChildCaseSchema = new Schema(
     },
     status: {
       type: String,
-      enum: Object.values(CASE_STATUS),
-      default: CASE_STATUS.UNDER_EVALUATION,
+      enum: CASE_LIFECYCLE_STATUS,
+      default: 'NEW',
       index: true,
       set: (v) => {
         if (v == null) return v;
         const raw = String(v).trim();
         if (!raw) return raw;
+        // Backward-compatible mapping from legacy status labels to lifecycle states.
         const key = raw.toLowerCase().replace(/\s+/g, '_');
-        const map = {
-          active: CASE_STATUS.ACTIVE,
-          under_evaluation: CASE_STATUS.UNDER_EVALUATION,
-          under__evaluation: CASE_STATUS.UNDER_EVALUATION,
-          referred: CASE_STATUS.REFERRED,
-          ongoing_therapy: CASE_STATUS.ONGOING_THERAPY,
+        const legacyMap = {
+          active: 'REVIEW',
+          under_evaluation: 'REVIEW',
+          referred: 'THERAPY',
+          ongoing_therapy: 'THERAPY_ACTIVE',
         };
-        return map[key] ?? raw;
+        return legacyMap[key] || raw;
       },
+    },
+    caseHistory: {
+      type: [
+        {
+          fromStatus: { type: String, default: null },
+          toStatus: { type: String, required: true },
+          event: { type: String, required: true },
+          context: { type: Schema.Types.Mixed, default: undefined },
+          timestamp: { type: Date, default: Date.now },
+          triggeredBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        },
+      ],
+      default: [],
+    },
+    screeningProgress: {
+      mchatCompleted: { type: Boolean, default: false },
+      asqCompleted: { type: Boolean, default: false },
+      skippedMchat: { type: Boolean, default: false },
     },
   },
   { timestamps: true }
 );
 
-ChildCaseSchema.index({ clinicianId: 1, childId: 1 }, { unique: true });
+ChildCaseSchema.index({ parentId: 1, childId: 1 }, { unique: true });
 
 module.exports = {
   ChildCase: mongoose.model('ChildCase', ChildCaseSchema),
-  CASE_STATUS,
+  CASE_LIFECYCLE_STATUS,
   CASE_RISK_LEVELS: RISK_LEVEL,
 };

@@ -56,6 +56,33 @@ const SubmissionSchema = new mongoose.Schema({
       default: undefined,
     },
   },
+  /** Clinically Safe Decision Support Engine output (non-diagnostic). */
+  decisionSupport: {
+    autismRisk: {
+      type: String,
+      enum: ["LOW", "MEDIUM", "HIGH", "INCOMPLETE", "IGNORED"],
+      default: undefined,
+    },
+    developmentStatus: {
+      type: String,
+      enum: ["NORMAL", "MONITOR", "MILD_DELAY", "SIGNIFICANT_DELAY"],
+      default: undefined,
+    },
+    recommendation: {
+      type: String,
+      default: "",
+    },
+    urgencyLevel: {
+      type: String,
+      enum: ["green", "orange", "red"],
+      default: undefined,
+    },
+    inputsUsed: mongoose.Schema.Types.Mixed,
+    safetyNote: {
+      type: String,
+      default: "",
+    },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Submission", SubmissionSchema);

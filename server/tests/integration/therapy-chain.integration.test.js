@@ -8,6 +8,7 @@ const { User } = require('../../src/models/User');
 const { ChildCase } = require('../../src/models/ChildCase');
 const TherapyCase = require('../../src/models/TherapyCase');
 const TherapyPlan = require('../../src/models/TherapyPlan');
+const { startNewEpisode } = require('../../src/services/therapyEpisodeService');
 const SessionLog = require('../../src/models/SessionLog');
 const { HomeAssignment } = require('../../src/models/HomeAssignment');
 const { connectTestDb, disconnectTestDb } = require('../helpers/testDb');
@@ -84,6 +85,7 @@ describe('Therapy Plan -> Session -> Home Assignment Chain', () => {
       childId,
       parentId,
       clinicianId: new mongoose.Types.ObjectId(),
+      status: 'THERAPY_ACTIVE',
     });
     caseId = String(createdCase._id);
 
@@ -143,6 +145,31 @@ describe('Therapy Plan -> Session -> Home Assignment Chain', () => {
     expect(createPlanRes.statusCode).toBe(201);
     expect(createPlanRes.body.success).toBe(true);
     expect(createPlanRes.body.data.status).toBe('final');
+
+    /** Session logging requires planStatus `active` (therapy already started in this fixture). */
+    await TherapyPlan.updateOne(
+      { caseId, therapistId },
+      {
+        $set: {
+          planStatus: 'active',
+          approval: {
+            status: 'approved',
+            requestedAt: new Date(),
+            approvedAt: new Date(),
+            approvedBy: new mongoose.Types.ObjectId(),
+            rejectionReason: '',
+          },
+        },
+      }
+    );
+
+    const planRow = await TherapyPlan.findOne({ caseId, therapistId }).lean();
+    await startNewEpisode({
+      caseId,
+      therapistId: planRow.therapistId,
+      planId: planRow._id,
+      planVersion: planRow.planVersion || 1,
+    });
 
     const createSessionRes = await request(app)
       .post('/api/sessions')

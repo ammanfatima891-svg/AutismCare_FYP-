@@ -4,6 +4,7 @@ jest.mock('../../src/utils/email', () => jest.fn().mockResolvedValue(true));
 
 const { app } = require('../../src/server');
 const { User } = require('../../src/models/User');
+const { ChildCase } = require('../../src/models/ChildCase');
 const { connectTestDb, disconnectTestDb } = require('../helpers/testDb');
 const { registerUser, activateUser, loginUser, authHeader } = require('../helpers/authHelpers');
 
@@ -25,6 +26,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
   let clinicianId;
   let therapistId;
   let childAId;
+  let caseId;
   let appointmentId;
 
   const futureDate = (() => {
@@ -111,6 +113,14 @@ describe('Appointments Exceptional and BVA Integration', () => {
 
     expect(childRes.statusCode).toBe(201);
     childAId = String(childRes.body.data.id || childRes.body.data._id);
+
+    // Child creation should have created a NEW case; bump to REVIEW for appointment booking tests.
+    const existingCase = await ChildCase.findOne({ parentId: (await User.findOne({ email: emails.parentA }))._id, childId: childAId })
+      .select('_id status')
+      .lean();
+    if (!existingCase) throw new Error('Expected ChildCase to exist for created child');
+    caseId = String(existingCase._id);
+    await ChildCase.findByIdAndUpdate(caseId, { $set: { status: 'REVIEW' } });
   });
 
   afterAll(async () => {
@@ -122,7 +132,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
     const res = await request(app)
       .post('/api/appointments')
       .set(authHeader(parentAToken))
-      .send({ childId: childAId });
+      .send({ childId: childAId, caseId });
 
     expect(res.statusCode).toBe(400);
     expect(String(res.body.message || '')).toMatch(/missing required fields/i);
@@ -133,6 +143,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
       .post('/api/appointments')
       .set(authHeader(parentAToken))
       .send({
+        caseId,
         childId: 'bad-child-id',
         appointmentType: 'DIAGNOSTIC',
         professionalId: clinicianId,
@@ -150,6 +161,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
       .post('/api/appointments')
       .set(authHeader(parentAToken))
       .send({
+        caseId,
         childId: childAId,
         appointmentType: 'DIAGNOSTIC',
         professionalId: therapistId,
@@ -171,6 +183,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
       .post('/api/appointments')
       .set(authHeader(parentAToken))
       .send({
+        caseId,
         childId: childAId,
         appointmentType: 'DIAGNOSTIC',
         professionalId: clinicianId,
@@ -190,6 +203,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
       .post('/api/appointments')
       .set(authHeader(parentAToken))
       .send({
+        caseId,
         childId: childAId,
         appointmentType: 'DIAGNOSTIC',
         professionalId: clinicianId,
@@ -209,6 +223,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
       .post('/api/appointments')
       .set(authHeader(parentAToken))
       .send({
+        caseId,
         childId: childAId,
         appointmentType: 'DIAGNOSTIC',
         professionalId: clinicianId,
@@ -268,6 +283,7 @@ describe('Appointments Exceptional and BVA Integration', () => {
       .post('/api/appointments')
       .set(authHeader(parentAToken))
       .send({
+        caseId,
         childId: childAId,
         appointmentType: 'DIAGNOSTIC',
         professionalId: clinicianId,

@@ -9,7 +9,9 @@ const { validateSessionBody } = require('../utils/sessionLogShared');
 const {
   validateSessionGoalsAndActivities,
   validateSessionGoalData,
+  buildActivityUsageRows,
 } = require('../utils/sessionPlanValidation');
+const { getActiveEpisodeForCase } = require('../services/therapyEpisodeService');
 const { completeMatchingSessionSlot, validateSessionSlotForNewLog } = require('../utils/sessionSlotLink');
 const { invalidateProgressEngineCache } = require('../services/progressEngine');
 const { maybeLockPlanBaselineAfterSession } = require('../utils/planBaselineLock');
@@ -110,12 +112,24 @@ exports.createSession = async (req, res) => {
       });
     }
 
-    const planCheck = await validateSessionGoalsAndActivities(caseId, therapistId, v.payload.goalsTargeted, v.payload.activitiesUsed);
+    const planLean = await TherapyPlan.findOne({ caseId, therapistId }).sort({ updatedAt: -1 }).lean();
+    if (!planLean) {
+      return res.status(400).json({
+        success: false,
+        message: 'A therapy plan is required before logging sessions for this case',
+      });
+    }
+
+    const planCheck = await validateSessionGoalsAndActivities(caseId, therapistId, v.payload.goalsTargeted, v.payload.activitiesUsed, {
+      plan: planLean,
+    });
     if (!planCheck.ok) {
       return res.status(400).json({ success: false, message: planCheck.message });
     }
 
-    const goalDataCheck = await validateSessionGoalData(caseId, therapistId, v.payload.goalData || []);
+    const goalDataCheck = await validateSessionGoalData(caseId, therapistId, v.payload.goalData || [], {
+      plan: planLean,
+    });
     if (!goalDataCheck.ok) {
       return res.status(400).json({ success: false, message: goalDataCheck.message });
     }
@@ -131,10 +145,25 @@ exports.createSession = async (req, res) => {
         ? new mongoose.Types.ObjectId(String(sessionSlotId))
         : undefined;
 
-    const planStamp = await TherapyPlan.findOne({ caseId, therapistId }).select('_id planVersion').lean();
-    const planForWarnings = await TherapyPlan.findOne({ caseId, therapistId })
-      .select('shortTermGoals goals')
-      .lean();
+    const activityUsage = buildActivityUsageRows(p.activitiesUsed, planLean);
+    const activitiesUsedDeduped = activityUsage.map((row) => row.displayName);
+
+    const activeEpisode = await getActiveEpisodeForCase(caseId);
+    if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active therapy episode found for this case. Complete plan approval and episode setup before logging sessions.',
+        errorCode: 'NO_ACTIVE_EPISODE',
+      });
+    }
+    if (!activeEpisode.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active therapy episode found for this case.',
+        errorCode: 'NO_ACTIVE_EPISODE',
+      });
+    }
+    const episodeId = activeEpisode._id;
 
     const created = await SessionLog.create({
       caseId,
@@ -142,17 +171,19 @@ exports.createSession = async (req, res) => {
       sessionDate: p.sessionDate,
       duration: p.duration,
       goalsTargeted: p.goalsTargeted,
-      activitiesUsed: p.activitiesUsed,
+      activitiesUsed: activitiesUsedDeduped,
+      activityUsage,
       childResponse: p.childResponse,
       notes: p.notes,
       parentInstructions: p.parentInstructions,
       status: p.status,
       goalData: Array.isArray(p.goalData) ? p.goalData : [],
-      planId: planStamp?._id,
-      planVersionNumber: planStamp?.planVersion != null ? Number(planStamp.planVersion) : 1,
+      planId: planLean?._id,
+      planVersionNumber: planLean?.planVersion != null ? Number(planLean.planVersion) : 1,
       noteState: p.noteState || 'draft',
       lateEntry: Boolean(p.lateEntry),
       lateEntryReason: p.lateEntryReason || '',
+      ...(episodeId ? { episodeId } : {}),
       ...(slotRef ? { sessionSlotId: slotRef } : {}),
     });
 
@@ -182,6 +213,9 @@ exports.createSession = async (req, res) => {
       /* ignore cache bust errors */
     }
 
+    const planForWarnings = await TherapyPlan.findOne({ caseId, therapistId })
+      .select('shortTermGoals goals')
+      .lean();
     const warnings = collectGoalDataLinkageWarnings(planForWarnings, Array.isArray(p.goalData) ? p.goalData : []);
 
     return res.status(201).json({
@@ -271,26 +305,49 @@ exports.updateSession = async (req, res) => {
       return res.status(400).json({ success: false, message: v.message });
     }
 
+    const planLean = await TherapyPlan.findOne({ caseId: session.caseId, therapistId }).sort({ updatedAt: -1 }).lean();
+    if (!planLean) {
+      return res.status(400).json({
+        success: false,
+        message: 'A therapy plan is required before logging sessions for this case',
+      });
+    }
+
     const planCheck = await validateSessionGoalsAndActivities(
       session.caseId,
       therapistId,
       v.payload.goalsTargeted,
-      v.payload.activitiesUsed
+      v.payload.activitiesUsed,
+      { plan: planLean }
     );
     if (!planCheck.ok) {
       return res.status(400).json({ success: false, message: planCheck.message });
     }
 
-    const goalDataCheck = await validateSessionGoalData(session.caseId, therapistId, v.payload.goalData || []);
+    const goalDataCheck = await validateSessionGoalData(session.caseId, therapistId, v.payload.goalData || [], {
+      plan: planLean,
+    });
     if (!goalDataCheck.ok) {
       return res.status(400).json({ success: false, message: goalDataCheck.message });
     }
 
+    const activeEpisode = await getActiveEpisodeForCase(session.caseId);
+    if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId) || !activeEpisode.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active therapy episode found for this case.',
+        errorCode: 'NO_ACTIVE_EPISODE',
+      });
+    }
+
     const p = v.payload;
+    const activityUsage = buildActivityUsageRows(p.activitiesUsed, planLean);
+    const activitiesUsedDeduped = activityUsage.map((row) => row.displayName);
     session.sessionDate = p.sessionDate;
     session.duration = p.duration;
     session.goalsTargeted = p.goalsTargeted;
-    session.activitiesUsed = p.activitiesUsed;
+    session.activitiesUsed = activitiesUsedDeduped;
+    session.activityUsage = activityUsage;
     session.childResponse = p.childResponse;
     session.notes = p.notes;
     session.parentInstructions = p.parentInstructions;

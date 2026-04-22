@@ -1,5 +1,6 @@
 const LabTestRequest = require('../models/LabTestRequest');
 const LabReport = require('../models/LabReport');
+const LabRequest = require('../models/LabRequest');
 
 function mapReportForClinician(rep) {
   const tech = rep.labTechnicianId;
@@ -37,18 +38,19 @@ function mapReportForParent(rep) {
  * @returns {Promise<object[]>}
  */
 async function getLabRequestsForCase(caseDoc, role) {
-  if (!caseDoc?.childId || !caseDoc?.parentId || !caseDoc?.clinicianId) {
+  if (!caseDoc?.childId || !caseDoc?.parentId) {
     return [];
   }
 
+  const isClinician = role === 'clinician';
   const filter = {
     childId: caseDoc.childId,
     parentId: caseDoc.parentId,
-    clinicianId: caseDoc.clinicianId,
   };
+  // Parent/therapist views should include all rows for this child in this family, even across clinician handovers.
+  if (isClinician && caseDoc?.clinicianId) filter.clinicianId = caseDoc.clinicianId;
 
   const requests = await LabTestRequest.find(filter).sort({ createdAt: -1 }).lean();
-  if (!requests.length) return [];
 
   const requestIds = requests.map((r) => r._id);
   const reports = await LabReport.find({ testRequestId: { $in: requestIds } })
@@ -63,9 +65,7 @@ async function getLabRequestsForCase(caseDoc, role) {
     reportsByRequest[key].push(rep);
   }
 
-  const isClinician = role === 'clinician';
-
-  return requests.map((r) => {
+  const legacyRows = requests.map((r) => {
     const key = String(r._id);
     const rowReports = reportsByRequest[key] || [];
 
@@ -103,6 +103,61 @@ async function getLabRequestsForCase(caseDoc, role) {
       reports: released ? rowReports.map(mapReportForParent) : [],
     };
   });
+
+  // New LabRequest workflow rows (test catalog -> lab assignment flow)
+  const modernFilter = { child_id: caseDoc.childId };
+  if (isClinician && caseDoc?.clinicianId) modernFilter.clinician_id = caseDoc.clinicianId;
+  const newRequests = await LabRequest.find(modernFilter)
+    .populate('test_id', 'test_name category')
+    .populate('lab_id', 'labName accreditation')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const modernRows = newRequests.map((r) => {
+    const base = {
+      _id: r._id,
+      testType: r.test_id?.test_name || 'Lab test',
+      status: String(r.status || '').toUpperCase(),
+      releasedToParent: r.status === 'completed',
+      childName: null,
+      createdAt: r.createdAt,
+      requestPurpose: undefined,
+      priority: undefined,
+      requestSummary: '',
+      requestedItems: [],
+      notes: r.notes || '',
+      reports: r.report_url
+        ? [
+            {
+              _id: `${r._id}-report`,
+              fileUrl: r.report_url,
+              fileName: `${r.test_id?.test_name || 'Lab test'} report`,
+              fileType: 'link',
+              fileSize: 0,
+              uploadedAt: r.updatedAt || r.createdAt,
+              labTechnician: null,
+            },
+          ]
+        : [],
+    };
+
+    if (isClinician) {
+      return {
+        ...base,
+        requestSummary: [r.lab_id?.labName, r.test_id?.category].filter(Boolean).join(' · '),
+      };
+    }
+
+    return {
+      ...base,
+      notes: r.status === 'completed' ? base.notes : undefined,
+      reports: r.status === 'completed' ? base.reports : [],
+    };
+  });
+
+  return [...modernRows, ...legacyRows].sort(
+    (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  );
 }
 
 module.exports = { getLabRequestsForCase };

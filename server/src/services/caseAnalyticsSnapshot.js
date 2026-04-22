@@ -257,7 +257,7 @@ const { buildProgressEnginePayload } = require('./progressEngine');
  * @param {{ plan: object|null, sessions: object[], assignments: object[] }} params
  * @param {object} [precomputedEngine] — optional; if omitted, engine is built from the same inputs.
  */
-function buildUnifiedCaseAnalytics(params, precomputedEngine = null) {
+function buildUnifiedCaseAnalytics(params, precomputedEngine = undefined) {
   const legacy = buildCaseAnalyticsSnapshot(params);
   const stakeholder = buildStakeholderAnalyticsBlock(params);
   const cid =
@@ -266,15 +266,16 @@ function buildUnifiedCaseAnalytics(params, precomputedEngine = null) {
     params.assignments?.[0]?.caseId ||
     '';
   const progressEngine =
-    precomputedEngine ||
-    buildProgressEnginePayload({
-      caseId: String(cid),
-      plan: params.plan,
-      sessions: params.sessions,
-      assignments: params.assignments || [],
-    });
+    precomputedEngine !== undefined
+      ? precomputedEngine
+      : buildProgressEnginePayload({
+          caseId: String(cid),
+          plan: params.plan,
+          sessions: params.sessions,
+          assignments: params.assignments || [],
+        });
   const enginePct =
-    progressEngine.overallScore != null
+    progressEngine && progressEngine.overallScore != null
       ? Number(((progressEngine.overallScore / 5) * 100).toFixed(2))
       : null;
   return {
@@ -282,7 +283,7 @@ function buildUnifiedCaseAnalytics(params, precomputedEngine = null) {
     ...legacy,
     ...(enginePct != null ? { overallProgress: enginePct } : {}),
     ...stakeholder,
-    progressEngine,
+    ...(progressEngine != null ? { progressEngine } : {}),
   };
 }
 

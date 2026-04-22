@@ -14,6 +14,7 @@ import { useScreeningProgress } from "./guided/useScreeningProgress";
 
 interface ASQ3FormProps {
   child: any;
+  flowContext?: any;
   onComplete: (results: any) => void;
 }
 
@@ -69,7 +70,7 @@ const domainMeta: Record<
   },
 };
 
-export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
+export function ASQ3Form({ child, flowContext, onComplete }: ASQ3FormProps) {
   const progress = useScreeningProgress({ type: "asq", childId: child?.id, initialStep: 0 });
   const { answers, currentStep: currentDomainIndex, setAnswer, setStep } = progress;
 
@@ -83,7 +84,17 @@ export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
   useEffect(() => {
     const fetchQuestionnaire = async () => {
       try {
-        const response = await API.get(`/screening/questionnaires/ASQ-3?dob=${child.dateOfBirth}`);
+        const params = new URLSearchParams();
+        params.set('dob', child.dateOfBirth);
+        params.set('childId', encodeURIComponent(String(child.id)));
+        if (flowContext?.flow) params.set('flow', String(flowContext.flow));
+        if (flowContext?.origin) params.set('origin', String(flowContext.origin));
+        if (flowContext?.skippedMchat === true) params.set('skippedMchat', 'true');
+        if (flowContext?.orderFollowed === true) params.set('orderFollowed', 'true');
+        if (flowContext?.orderFollowed === false) params.set('orderFollowed', 'false');
+        const response = await API.get(
+          `/screening/questionnaires/ASQ-3?${params.toString()}`
+        );
         setQuestionnaire(response.data.data);
       } catch (error) {
         console.error('Error fetching ASQ-3 questionnaire:', error);
@@ -188,6 +199,8 @@ export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
         weeksPreterm: 0, // Default to 0 for ASQ-3
         intervalMonths: questionnaire.intervalMonths,
         responses,
+        skippedMchat: flowContext?.skippedMchat === true,
+        orderFollowed: typeof flowContext?.orderFollowed === 'boolean' ? flowContext.orderFollowed : undefined,
       });
 
       const submission = res.data.data;
@@ -199,6 +212,7 @@ export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
         result: submission.result,
         resultDescription: submission.resultDescription,
         submissionId: submission.submissionId,
+        decisionSupport: submission.decisionSupport || null,
         reportEmailed: submission.reportEmailed === true,
         reportEmailError: submission.reportEmailError || null,
       };
@@ -260,10 +274,13 @@ export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
 
         <GuidanceCards
           items={[
-            { tone: "friendly", title: "Calm and simple", body: "Answer what you’ve observed." },
-            { tone: "info", title: "Small steps", body: "One domain per page." },
-            { tone: "progress", title: "Auto-saved", body: "You can come back anytime." },
+            { tone: "friendly", title: "Calm and simple", body: "Answer what you’ve observed in daily routines." },
+            { tone: "info", title: "Small steps", body: "One domain at a time keeps things focused." },
+            { tone: "progress", title: "Auto-saved", body: "Your progress is saved while you answer." },
+            { tone: "info", title: "Take your time", body: "Use typical behavior from recent days." },
+            { tone: "friendly", title: "Great progress", body: "You’re helping build a clearer developmental picture." },
           ]}
+          currentIndex={currentDomainIndex}
         />
 
         <GuideToggle enabled={guideMode} onChange={setGuideMode} />
@@ -360,7 +377,7 @@ export function ASQ3Form({ child, onComplete }: ASQ3FormProps) {
                 disabled={!isDomainAnswered || isSubmitting}
                 className="rounded-xl"
               >
-                Next Domain
+                Save & Continue
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}

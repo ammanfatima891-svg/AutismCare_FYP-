@@ -21,6 +21,9 @@ import { getScreeningRecommendations } from '../../../constants/screeningRecomme
 import { Alert, AlertDescription } from '../../ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible';
 import jsPDF from 'jspdf';
+import { DecisionSummaryCard } from '../../results/DecisionSummaryCard';
+import { useNavigate } from 'react-router-dom';
+import { parentAPI } from '../../../api';
 
 interface ScreeningResultsProps {
   results: any;
@@ -56,16 +59,39 @@ function asqDomainZoneLabel(status: string): { badge: string; detail: string; to
 
 function asqBadgeClass(tone: 'good' | 'warn' | 'bad' | 'neutral') {
   if (tone === 'good') return 'bg-primary text-primary-foreground';
-  if (tone === 'warn') return 'bg-amber-500 text-white dark:bg-amber-600';
+  if (tone === 'warn') return 'border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200';
   if (tone === 'bad') return 'bg-destructive text-destructive-foreground';
   return 'bg-muted text-foreground';
 }
 
 export function ScreeningResults({ results, screeningType, child }: ScreeningResultsProps) {
   const [tipsOpen, setTipsOpen] = useState(false);
+  const navigate = useNavigate();
+  const [caseStatus, setCaseStatus] = useState<string | null>(null);
 
   const isMchat = isMchatType(screeningType);
   const isAsq = isAsqType(screeningType);
+  const clinicianNeeded =
+    typeof results?.decisionSupport?.recommendation === 'string' &&
+    results.decisionSupport.recommendation.toLowerCase().includes('clinician needed');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await parentAPI.getCases();
+        const rows = res?.data?.data || [];
+        const match = rows.find((r: any) => String(r.childId) === String(child?.id));
+        if (!cancelled) setCaseStatus(match?.status || null);
+      } catch {
+        if (!cancelled) setCaseStatus(null);
+      }
+    }
+    if (child?.id) load();
+    return () => {
+      cancelled = true;
+    };
+  }, [child?.id]);
 
   const getRiskTone = (risk: string): 'good' | 'warn' | 'bad' | 'neutral' => {
     switch (risk) {
@@ -334,6 +360,7 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
   if (isAsq) {
     return (
       <div className="space-y-6">
+        {results?.decisionSupport ? <DecisionSummaryCard decisionSupport={results.decisionSupport} /> : null}
         {asqDomainCard}
 
         <Card className="border-2 border-border bg-card">
@@ -411,6 +438,19 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
             </CardContent>
           </Card>
         )}
+
+        {results?.decisionSupport && clinicianNeeded && (
+          <Button
+            type="button"
+            variant={results.decisionSupport.urgencyLevel === 'red' || results.decisionSupport.urgencyLevel === 'orange' ? 'default' : 'secondary'}
+            onClick={() => navigate('/parent-dashboard', { state: { section: 'book-appointment' } })}
+            className="w-full sm:w-auto"
+            disabled={caseStatus != null && !['SCREENING', 'REVIEW'].includes(String(caseStatus))}
+            title={caseStatus != null && !['SCREENING', 'REVIEW'].includes(String(caseStatus)) ? 'Not available in the current case stage' : undefined}
+          >
+            Book Appointment
+          </Button>
+        )}
       </div>
     );
   }
@@ -420,6 +460,7 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
 
   return (
     <div className="space-y-6">
+      {results?.decisionSupport ? <DecisionSummaryCard decisionSupport={results.decisionSupport} /> : null}
       <Card className={`border-2 ${toneStyles.header}`}>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -590,6 +631,19 @@ export function ScreeningResults({ results, screeningType, child }: ScreeningRes
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {results?.decisionSupport && clinicianNeeded && (
+        <Button
+          type="button"
+          variant={results.decisionSupport.urgencyLevel === 'red' || results.decisionSupport.urgencyLevel === 'orange' ? 'default' : 'secondary'}
+          onClick={() => navigate('/parent-dashboard', { state: { section: 'book-appointment' } })}
+          className="w-full sm:w-auto"
+          disabled={caseStatus != null && !['SCREENING', 'REVIEW'].includes(String(caseStatus))}
+          title={caseStatus != null && !['SCREENING', 'REVIEW'].includes(String(caseStatus)) ? 'Not available in the current case stage' : undefined}
+        >
+          Book Appointment
+        </Button>
       )}
     </div>
   );

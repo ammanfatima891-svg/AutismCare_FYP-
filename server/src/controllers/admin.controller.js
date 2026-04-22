@@ -1,6 +1,7 @@
 const { User, APPROVAL_STATUS } = require('../models/User');
 const mongoose = require('mongoose');
 const { recordAuditEvent } = require('../utils/auditLog');
+const LabApproval = require('../models/LabApproval');
 
 // Get all pending professionals
 exports.getPendingProfessionals = async (req, res) => {
@@ -10,7 +11,47 @@ exports.getPendingProfessionals = async (req, res) => {
       approvalStatus: APPROVAL_STATUS.PENDING
     }).select('firstName lastName email role specialization licenseNumber documents createdAt');
 
-    res.status(200).json({ users: pendingUsers });
+    const pendingLabs = await LabApproval.find({ status: APPROVAL_STATUS.PENDING })
+      .populate({
+        path: 'labUserId',
+        select: 'firstName lastName email role labName accreditation createdAt',
+        match: { role: 'lab' },
+      })
+      .lean();
+
+    const labUsersFromApproval = pendingLabs
+      .filter((row) => row.labUserId)
+      .map((row) => ({
+        _id: row.labUserId._id,
+        firstName: row.labUserId.firstName,
+        lastName: row.labUserId.lastName,
+        email: row.labUserId.email,
+        role: 'lab',
+        labName: row.labUserId.labName || '',
+        accreditation: row.labUserId.accreditation || '',
+        createdAt: row.labUserId.createdAt || row.createdAt,
+      }));
+
+    const approvedLabIds = new Set(labUsersFromApproval.map((row) => String(row._id)));
+    const untrackedLabs = await User.find({
+      role: 'lab',
+      _id: { $nin: [...approvedLabIds] },
+    }).select('firstName lastName email role labName accreditation createdAt');
+    const labUsers = [
+      ...labUsersFromApproval,
+      ...untrackedLabs.map((row) => ({
+        _id: row._id,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        email: row.email,
+        role: 'lab',
+        labName: row.labName || '',
+        accreditation: row.accreditation || '',
+        createdAt: row.createdAt,
+      })),
+    ];
+
+    res.status(200).json({ users: [...pendingUsers, ...labUsers] });
   } catch (err) {
     console.error("Get pending professionals error:", err);
     res.status(500).json({ message: 'Server error' });
@@ -31,13 +72,34 @@ exports.updateProfessionalStatus = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    if (!user || !['clinician', 'therapist'].includes(user.role)) {
-      return res.status(404).json({ message: 'User not found or not a professional' });
+    if (!user || !['clinician', 'therapist', 'lab'].includes(user.role)) {
+      return res.status(404).json({ message: 'User not found or not an approvable professional' });
     }
 
-    const before = { approvalStatus: user.approvalStatus };
-    user.approvalStatus = status;
-    await user.save({ validateBeforeSave: false });
+    let before = {};
+    let after = {};
+    if (user.role === 'lab') {
+      const existingBefore = await LabApproval.findOne({ labUserId: user._id }).lean();
+      const existing = await LabApproval.findOneAndUpdate(
+        { labUserId: user._id },
+        {
+          $set: {
+            status,
+            reviewedBy: req.user?._id || null,
+            reviewedAt: new Date(),
+          },
+          $setOnInsert: { labUserId: user._id },
+        },
+        { upsert: true, new: true }
+      );
+      before = { approvalStatus: existingBefore?.status || APPROVAL_STATUS.PENDING };
+      after = { approvalStatus: status };
+    } else {
+      before = { approvalStatus: user.approvalStatus };
+      user.approvalStatus = status;
+      await user.save({ validateBeforeSave: false });
+      after = { approvalStatus: status };
+    }
 
     try {
       await recordAuditEvent({
@@ -48,7 +110,7 @@ exports.updateProfessionalStatus = async (req, res) => {
         entityId: user._id,
         summary: `professional=${String(user.role)} status=${String(status)}`,
         before,
-        after: { approvalStatus: status },
+        after,
       });
     } catch (e) {
       console.error('audit admin professional approval:', e);

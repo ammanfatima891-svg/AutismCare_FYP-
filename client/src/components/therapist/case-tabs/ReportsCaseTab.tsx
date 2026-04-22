@@ -55,7 +55,22 @@ function reportTypeBadgeClass(type: string) {
   return 'border-slate-200 bg-slate-50 text-slate-800';
 }
 
-export function ReportsCaseTab({ caseId }: { caseId: string }) {
+type ReportsCaseTabProps = {
+  caseId: string;
+  /** From case file — used to disable generate when backend would reject. */
+  sessionsCount?: number;
+  therapyCaseStatus?: string;
+};
+
+export function ReportsCaseTab({
+  caseId,
+  sessionsCount = 0,
+  therapyCaseStatus = '',
+}: ReportsCaseTabProps) {
+  const therapyUpper = String(therapyCaseStatus || '').toUpperCase();
+  const canGenerateReports =
+    (therapyUpper === 'ACTIVE' || therapyUpper === 'COMPLETED') && sessionsCount > 0;
+
   const [list, setList] = useState<ReportRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -181,6 +196,12 @@ export function ReportsCaseTab({ caseId }: { caseId: string }) {
             </div>
           ) : null}
 
+          {!canGenerateReports ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
+              Reports are available when therapy is active or completed and at least one session exists.
+            </p>
+          ) : null}
+
           <div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Generate</p>
             <div className="flex flex-wrap gap-2">
@@ -191,7 +212,7 @@ export function ReportsCaseTab({ caseId }: { caseId: string }) {
                   size="sm"
                   variant="outline"
                   className="border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-50"
-                  disabled={!!generating}
+                  disabled={!canGenerateReports || !!generating}
                   onClick={() => generate(opt.value)}
                 >
                   {generating === opt.value ? (

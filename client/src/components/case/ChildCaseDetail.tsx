@@ -3,13 +3,6 @@ import { caseAPI, progressEngineAPI } from '../../api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
 import { Loader2, ArrowLeft, AlertCircle, ClipboardList, Users, Activity, TrendingUp, FlaskConical } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ClinicalEvaluationTab } from '../evaluation/ClinicalEvaluationTab';
@@ -18,7 +11,7 @@ import { TherapyOversightTab } from '../therapy/TherapyOversightTab';
 import { ProgressMonitoringTab } from '../progress/ProgressMonitoringTab';
 import { ClinicianCaseReports } from '../reports/ClinicianCaseReports';
 import { cn } from '../ui/utils';
-import { CaseLabRequestsPanel, type CaseLabRequestRow } from './CaseLabRequestsPanel';
+import { ChildCaseLabModule } from './ChildCaseLabModule';
 
 export interface ChildCaseDetailProps {
   caseId: string;
@@ -51,8 +44,6 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('');
-  const [saving, setSaving] = useState(false);
   const [peSummary, setPeSummary] = useState<ProgressEngineCaseSummary | null>(null);
   const [peSummaryLoading, setPeSummaryLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -68,7 +59,6 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
         const { data: res } = await caseAPI.getById(caseId);
         if (!cancelled && res.success) {
           setData(res.data);
-          setStatus(res.data.status);
         }
       } catch (e: any) {
         if (!cancelled) setError(e.response?.data?.message || 'Failed to load case');
@@ -100,30 +90,21 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
     };
   }, [caseId]);
 
-  const handleStatusChange = async (next: string) => {
-    setStatus(next);
-    try {
-      setSaving(true);
-      await caseAPI.updateStatus(caseId, next);
-      const { data: res } = await caseAPI.getById(caseId);
-      if (res.success) setData(res.data);
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Could not update status');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const childName = data?.childProfile
     ? `${data.childProfile.firstName || ''} ${data.childProfile.lastName || ''}`.trim()
     : 'Child';
   const screening = data?.screeningSummary || {};
-  const statusOptions: string[] = data?.statusOptions || [
-    'Active',
-    'Under Evaluation',
-    'Referred',
-    'Ongoing Therapy',
-  ];
+  const caseStatus = String(data?.status || 'NEW');
+  const statusLabelMap: Record<string, string> = {
+    NEW: 'New',
+    SCREENING: 'Screening in progress',
+    REVIEW: 'Awaiting clinician evaluation',
+    DIAGNOSIS: 'Lab tests in progress',
+    DIAGNOSIS_READY: 'Lab report ready for clinician review',
+    THERAPY: 'Therapy assignment pending',
+    THERAPY_ACTIVE: 'Therapy active',
+    MONITORING: 'Monitoring',
+  };
 
   return (
     <div className="space-y-6">
@@ -156,23 +137,9 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <span className="text-sm font-medium text-muted-foreground">Case status</span>
-              <Select
-                value={status}
-                onValueChange={handleStatusChange}
-                disabled={saving}
-              >
-                <SelectTrigger className="w-[220px] border bg-card">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {saving && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+              <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-900">
+                {statusLabelMap[caseStatus] || caseStatus}
+              </Badge>
             </div>
           </div>
 
@@ -441,7 +408,7 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                     {data.riskLevel}
                   </Badge>
                   <span className="text-sm text-muted-foreground">
-                    Use status above to reflect where the child is in your diagnostic workflow.
+                    Status is state-driven and updates automatically as screening, lab, and therapy events occur.
                   </span>
                 </CardContent>
               </Card>
@@ -472,10 +439,7 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
             </TabsContent>
 
             <TabsContent value="lab" className="pt-2">
-              <CaseLabRequestsPanel
-                requests={(data.labRequests || []) as CaseLabRequestRow[]}
-                showLabTechnician
-              />
+              <ChildCaseLabModule childId={data?.childProfile?.id ? String(data.childProfile.id) : undefined} />
             </TabsContent>
           </Tabs>
         </>

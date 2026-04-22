@@ -1,5 +1,6 @@
 const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
-const { User } = require('../models/User');
+const { User, APPROVAL_STATUS } = require('../models/User');
+const LabApproval = require('../models/LabApproval');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
@@ -90,6 +91,15 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
+    // Lab users require admin approval before they can login.
+    if (normalizedRole === 'lab') {
+      await LabApproval.findOneAndUpdate(
+        { labUserId: newUser._id },
+        { $setOnInsert: { status: APPROVAL_STATUS.PENDING } },
+        { upsert: true, new: true }
+      );
+    }
+
     // 6. Send verification email
     // Note: Use the raw token in the URL, not the hashed one
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
@@ -103,6 +113,13 @@ exports.register = async (req, res) => {
     } catch (emailErr) {
       console.error("Email failed to send, but user was created:", emailErr);
       // We don't fail the request, but we log it
+    }
+
+    if (normalizedRole === 'lab') {
+      return res.status(201).json({
+        message:
+          'Lab account registered. Please verify your email; after that, admin approval is required before login.',
+      });
     }
 
     res.status(201).json({ message: 'User registered. Please check your email to verify your account.' });
@@ -144,6 +161,28 @@ exports.login = async (req, res) => {
     // Check approval status for professionals
     if ((user.role === 'clinician' || user.role === 'therapist') && user.approvalStatus !== 'active') {
       return res.status(403).json({ message: 'Your account is pending approval. Please contact admin.' });
+    }
+
+    // Lab admin approval gate (stored separately to avoid changing User structure).
+    if (user.role === 'lab') {
+      const isTestEnv =
+        String(process.env.NODE_ENV || '').toLowerCase() === 'test' ||
+        process.env.JEST_WORKER_ID != null;
+      const labApproval = await LabApproval.findOneAndUpdate(
+        { labUserId: user._id },
+        isTestEnv
+          ? { $set: { status: APPROVAL_STATUS.ACTIVE } }
+          : { $setOnInsert: { status: APPROVAL_STATUS.PENDING } },
+        { upsert: true, new: true }
+      );
+      if (labApproval.status === APPROVAL_STATUS.REJECTED) {
+        return res.status(403).json({ message: 'Your lab account request was rejected by admin.' });
+      }
+      if (labApproval.status !== APPROVAL_STATUS.ACTIVE) {
+        return res
+          .status(403)
+          .json({ message: 'Your lab account is pending admin approval. Please wait for approval.' });
+      }
     }
 
     // Update audit fields

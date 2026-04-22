@@ -262,6 +262,8 @@ exports.assignActivity = async (req, res) => {
         title,
         instructions,
         materials,
+        frequency: String(activity.frequency || '').trim(),
+        duration: '',
         dueDate: due,
         status: 'pending',
         activityId: activity._id,
