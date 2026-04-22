@@ -4,7 +4,7 @@ const LabApproval = require('../models/LabApproval');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
-const sendEmail = require('../utils/email');
+const { sendEmail } = require('../services/emailService');
 
 function shouldLogAuthRegistrationDebug() {
   return process.env.DEBUG_AUTH_REGISTRATION === 'true';
@@ -105,11 +105,12 @@ exports.register = async (req, res) => {
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
     
     try {
-      await sendEmail({
+      const resp = await sendEmail({
         to: newUser.email,
         subject: 'Verify your account',
         text: `Welcome, ${firstName}! Please verify your email here: ${verificationUrl}`
       });
+      if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
     } catch (emailErr) {
       console.error("Email failed to send, but user was created:", emailErr);
       // We don't fail the request, but we log it
@@ -250,11 +251,12 @@ exports.resendVerificationEmail = async (req, res) => {
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
 
     try {
-      await sendEmail({
+      const resp = await sendEmail({
         to: user.email,
         subject: 'Verify your account',
         text: `Welcome, ${user.firstName}! Please verify your email here: ${verificationUrl}`
       });
+      if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
     } catch (emailErr) {
       console.error("Email failed to send:", emailErr);
       return res.status(500).json({ message: 'Failed to send verification email' });
@@ -278,11 +280,12 @@ exports.forgotPassword = async (req, res) => {
 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
     
-    await sendEmail({
+    const resp = await sendEmail({
       to: user.email,
       subject: 'Your password reset token (valid for 10 min)',
       text: `Reset your password here: ${resetUrl}`
     });
+    if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
 
     res.status(200).json({ message: 'Token sent to email!' });
   } catch (err) {

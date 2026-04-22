@@ -8,6 +8,8 @@ const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { logAction, AUDIT_ACTIONS, RESOURCE_TYPES } = require('../utils/audit');
 const { ChildCase } = require('../models/ChildCase');
 const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
+const { sendEmail } = require('../services/emailService');
+const { appointmentConfirmationTemplate } = require('../emailTemplates/appointmentConfirmationTemplate');
 
 // ─── Helper: get professional display name ───────────────────────────────────
 
@@ -75,6 +77,7 @@ exports.createAppointment = async (req, res) => {
         }
 
         // Validate child belongs to parent
+        const parent = await User.findById(parentId).lean();
         const child = await getChildFromParent(parentId, childId);
         if (!child) {
             return res.status(403).json({
@@ -175,6 +178,45 @@ exports.createAppointment = async (req, res) => {
             relatedResourceType: 'Appointment',
             relatedResourceId: appointment._id
         });
+
+        // Email confirmations (best-effort; do not block API success)
+        try {
+            const parentEmail = parent?.email || '';
+            const professionalEmail = professional?.email || '';
+            const childName = `${child.firstName || ''} ${child.lastName || ''}`.trim();
+            const professionalName = getProfessionalName(professional);
+
+            const parentTpl = appointmentConfirmationTemplate({
+                recipientName: `${parent?.firstName || ''} ${parent?.lastName || ''}`.trim() || 'Parent',
+                childName,
+                appointmentType,
+                preferredDate: appointmentDate.toLocaleDateString(),
+                preferredTime,
+                mode,
+                professionalName,
+            });
+
+            if (parentEmail) {
+                const resp = await sendEmail({
+                    to: parentEmail,
+                    subject: parentTpl.subject,
+                    text: parentTpl.text,
+                    html: parentTpl.html,
+                });
+                if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
+            }
+
+            if (professionalEmail) {
+                const resp = await sendEmail({
+                    to: professionalEmail,
+                    subject: `AutismCare: New ${appointmentType.toLowerCase()} appointment request`,
+                    text: `You have a new appointment request for ${childName} on ${appointmentDate.toLocaleDateString()} at ${preferredTime}. Please review it in AutismCare.`,
+                });
+                if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
+            }
+        } catch (emailErr) {
+            console.error('Appointment confirmation email failed:', emailErr?.message || emailErr);
+        }
 
         res.status(201).json({
             success: true,

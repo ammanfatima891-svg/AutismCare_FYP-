@@ -9,7 +9,7 @@ const LabRequest = require('../models/LabRequest');
 const { ChildCase } = require('../models/ChildCase');
 const { AuditLog } = require('../models/AuditLog');
 const { User } = require('../models/User');
-const sendEmail = require('../utils/email');
+const { sendEmail } = require('../services/emailService');
 const { createNotificationIfNotExists } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { validateFileStrict, wrapMulter } = require('../middleware/uploadValidation');
@@ -248,11 +248,12 @@ exports.uploadReport = [
             try {
                 const clinician = await User.findById(testRequest.clinicianId);
                 if (clinician && clinician.email) {
-                    await sendEmail({
+                    const resp = await sendEmail({
                         to: clinician.email,
                         subject: 'Lab Report Uploaded – AutismCare',
                         text: `A lab report for ${testRequest.childName} (${testRequest.testType}) has been uploaded and is ready for review.`
                     });
+                    if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
                 }
             } catch (emailErr) {
                 console.error('Clinician notification failed:', emailErr.message);
@@ -262,11 +263,12 @@ exports.uploadReport = [
             try {
                 const parent = await User.findById(testRequest.parentId);
                 if (parent && parent.email) {
-                    await sendEmail({
+                    const resp = await sendEmail({
                         to: parent.email,
                         subject: 'Lab Report Update – AutismCare',
                         text: `A lab report for your child ${testRequest.childName} (${testRequest.testType}) has been uploaded. Your clinician will review and release the results shortly.`
                     });
+                    if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
                 }
             } catch (emailErr) {
                 console.error('Parent notification failed:', emailErr.message);
@@ -560,11 +562,12 @@ exports.releaseReport = async (req, res) => {
         try {
             const parent = await User.findById(request.parentId);
             if (parent && parent.email) {
-                await sendEmail({
+                const resp = await sendEmail({
                     to: parent.email,
                     subject: 'Lab Report Released – AutismCare',
                     text: `The lab report for your child ${request.childName} (${request.testType}) has been reviewed by your clinician and is now available for you to view.`
                 });
+                if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
             }
         } catch (emailErr) {
             console.error('Release notification failed:', emailErr.message);
@@ -817,11 +820,12 @@ exports.createTestRequest = async (req, res) => {
         // Notify parent via email
         try {
             if (parent.email) {
-                await sendEmail({
+                const resp = await sendEmail({
                     to: parent.email,
                     subject: 'New Lab Test Requested – AutismCare',
                     text: `Your clinician has requested diagnostic investigations for your child ${childName}. The lab/team will process this shortly.`
                 });
+                if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
             }
         } catch (emailErr) {
             console.error('Parent notification failed:', emailErr.message);

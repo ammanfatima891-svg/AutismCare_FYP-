@@ -212,7 +212,10 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
 
   return (
     <>
-      <ParentWelcomeWizard open={welcomeOpen} onOpenChange={setWelcomeOpen} />
+      {/* Mount wizard only while open to guarantee no stale overlay blocks clicks. */}
+      {welcomeOpen ? (
+        <ParentWelcomeWizard open={welcomeOpen} onOpenChange={setWelcomeOpen} />
+      ) : null}
       <DashboardLayout
         navigation={navigation}
         currentSection={currentSection}

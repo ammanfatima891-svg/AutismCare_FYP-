@@ -11,7 +11,15 @@ import "./styles/globals.css";
 // @ts-ignore: virtual module provided by Vite PWA plugin at build time
 import { registerSW } from 'virtual:pwa-register';
 
-registerSW();
+// Avoid stale SW-cached UI after deployments: reload once a new SW is ready.
+if (!import.meta.env.DEV) {
+  registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      window.location.reload();
+    },
+  });
+}
 
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
