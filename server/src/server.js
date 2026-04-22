@@ -164,7 +164,7 @@ app.use('/api/messaging', messagingLimiter, messageRoutes);
    7. Server + DB startup (FIXED FLOW)
 ───────────────────────────────────────────── */
 
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 8080;
 
 /**
  * Start server ONLY after DB is connected
