@@ -37,8 +37,13 @@ if (typeof document !== "undefined") {
     (e) => {
       const { clientX: x, clientY: y } = e;
       const top = document.elementFromPoint(x, y);
+      const bodyPE = window.getComputedStyle(document.body).pointerEvents;
+      const htmlPE = window.getComputedStyle(document.documentElement).pointerEvents;
+      const root = document.getElementById("root");
+      const rootPE = root ? window.getComputedStyle(root).pointerEvents : "n/a";
+      const overlays = document.querySelectorAll("[data-radix-dialog-overlay], [data-radix-popper-content-wrapper]");
       // eslint-disable-next-line no-console
-      console.log("[debug:pointerdown]", { x, y, top });
+      console.log("[debug:pointerdown]", { x, y, top, bodyPE, htmlPE, rootPE, overlays: overlays.length });
     },
     { capture: true },
   );

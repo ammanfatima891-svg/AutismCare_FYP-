@@ -161,8 +161,9 @@ export function ParentWelcomeWizard({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        hideCloseButton
-        onInteractOutside={(event) => event.preventDefault()}
+        // Let users dismiss the tour reliably (also prevents stale modal-lock states).
+        // If they want to keep it open, they can continue with Next.
+        hideCloseButton={false}
         className={cn(
           "gap-0 overflow-hidden p-0 sm:max-w-lg",
           "max-h-[min(92dvh,720px)] grid-rows-[auto_1fr_auto]",
