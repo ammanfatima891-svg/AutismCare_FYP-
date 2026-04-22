@@ -5,6 +5,160 @@ function normalizeFrom(raw) {
   return v.replace(/^["']|["']$/g, '').trim();
 }
 
+function boolEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || String(raw).trim() === '') return fallback;
+  const v = String(raw).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(v)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(v)) return false;
+  return fallback;
+}
+
+function getEmailDriver() {
+  const v = String(process.env.EMAIL_DRIVER || '').trim().toLowerCase();
+  if (v === 'sendgrid') return 'sendgrid';
+  if (v === 'postmark') return 'postmark';
+  return 'smtp';
+}
+
+function assertSendgridConfigured() {
+  const apiKey = String(process.env.SENDGRID_API_KEY || '').trim();
+  const fromRaw = process.env.EMAIL_FROM;
+  const from = normalizeFrom(fromRaw);
+
+  if (!apiKey) {
+    throw new Error('Email not configured. Set SENDGRID_API_KEY.');
+  }
+  if (!from) {
+    throw new Error('Email not configured. Set EMAIL_FROM (must be a verified sender in SendGrid).');
+  }
+
+  return { apiKey, from };
+}
+
+function assertPostmarkConfigured() {
+  const token = String(process.env.POSTMARK_SERVER_TOKEN || '').trim();
+  const fromRaw = process.env.EMAIL_FROM;
+  const from = normalizeFrom(fromRaw);
+
+  if (!token) {
+    throw new Error('Email not configured. Set POSTMARK_SERVER_TOKEN.');
+  }
+  if (!from) {
+    throw new Error('Email not configured. Set EMAIL_FROM (must be an approved sender in Postmark).');
+  }
+
+  return { token, from };
+}
+
+function parseFromEmail(from) {
+  // Accepts: "Name <email@x.com>" or "email@x.com"
+  const m = String(from || '').match(/<\s*([^>]+)\s*>/);
+  return (m ? m[1] : String(from || '')).trim();
+}
+
+function parseFromName(from) {
+  const s = String(from || '').trim();
+  const m = s.match(/^(.+?)\s*<\s*[^>]+\s*>$/);
+  return m ? m[1].trim().replace(/^["']|["']$/g, '').trim() : '';
+}
+
+async function sendEmailViaSendgrid({ to, subject, text, html, attachments } = {}) {
+  const { apiKey, from } = assertSendgridConfigured();
+
+  const fromEmail = parseFromEmail(from);
+  const fromName = parseFromName(from);
+
+  const normalizedAttachments = (attachments || []).map((a) => {
+    const contentBuf = Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content);
+    return {
+      filename: a.filename || 'attachment',
+      content: contentBuf.toString('base64'),
+      type: a.contentType || undefined,
+      disposition: 'attachment',
+    };
+  });
+
+  const payload = {
+    personalizations: [{ to: [{ email: String(to || '').trim() }] }],
+    from: fromName ? { email: fromEmail, name: fromName } : { email: fromEmail },
+    subject: String(subject || '').trim(),
+    content: [
+      ...(html ? [{ type: 'text/html', value: html }] : []),
+      ...(text ? [{ type: 'text/plain', value: text }] : []),
+    ],
+    ...(normalizedAttachments.length ? { attachments: normalizedAttachments } : {}),
+  };
+
+  if (!payload.content.length) {
+    payload.content = [{ type: 'text/plain', value: ' ' }];
+  }
+
+  const resp = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`SendGrid email failed (${resp.status}): ${body}`);
+  }
+
+  return { ok: true, success: true, provider: 'sendgrid' };
+}
+
+async function sendEmailViaPostmark({ to, subject, text, html, attachments } = {}) {
+  const { token, from } = assertPostmarkConfigured();
+
+  const fromEmail = parseFromEmail(from);
+  const fromName = parseFromName(from);
+  const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+  const normalizedAttachments = (attachments || []).map((a) => {
+    const contentBuf = Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content);
+    const filename = a.filename || 'attachment';
+    const contentType = a.contentType || 'application/octet-stream';
+    return {
+      Name: filename,
+      Content: contentBuf.toString('base64'),
+      ContentType: contentType,
+    };
+  });
+
+  const payload = {
+    From: fromHeader,
+    To: String(to || '').trim(),
+    Subject: String(subject || '').trim(),
+    TextBody: text || undefined,
+    HtmlBody: html || undefined,
+    Attachments: normalizedAttachments.length ? normalizedAttachments : undefined,
+  };
+
+  if (!payload.TextBody && !payload.HtmlBody) {
+    payload.TextBody = ' ';
+  }
+
+  const resp = await fetch('https://api.postmarkapp.com/email', {
+    method: 'POST',
+    headers: {
+      'X-Postmark-Server-Token': token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`Postmark email failed (${resp.status}): ${body}`);
+  }
+
+  return { ok: true, success: true, provider: 'postmark' };
+}
+
 function assertEmailConfigured() {
   const user = String(process.env.EMAIL_USER || '').trim();
   const pass = String(process.env.EMAIL_PASS || '').trim();
@@ -26,16 +180,21 @@ function getTransporter() {
   if (cachedTransporter) return cachedTransporter;
   const { user, pass } = assertEmailConfigured();
 
+  const host = String(process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
+  const port = Number(process.env.EMAIL_PORT || 587);
+  const secure = boolEnv('EMAIL_SECURE', port === 465);
+  const requireTLS = boolEnv('EMAIL_REQUIRE_TLS', !secure);
+
   cachedTransporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    host,
+    port,
+    secure,
+    requireTLS,
     auth: {
       user,
       pass,
     },
-    // Production hardening (Railway safe defaults)
+    // Timeouts/pooling: safe defaults for most hosts
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
@@ -83,6 +242,10 @@ function logSmtpError(event, err) {
  * Call this once during startup (best-effort).
  */
 function verifySmtpOnStartup() {
+  // Allows disabling SMTP verification in environments where SMTP is blocked (e.g. Railway).
+  if (!boolEnv('EMAIL_VERIFY_ON_STARTUP', true)) return;
+  if (getEmailDriver() !== 'smtp') return;
+
   // If not configured, just log and move on.
   try {
     if (isTestRuntime()) return;
@@ -138,6 +301,26 @@ async function sendEmail({ to, subject, text, html, attachments } = {}) {
       return { ok: true, success: true, skipped: true, reason: 'blocked-recipient-domain' };
     }
 
+    if (getEmailDriver() === 'sendgrid') {
+      return await sendEmailViaSendgrid({
+        to: normalizedTo,
+        subject: normalizedSubject,
+        text,
+        html,
+        attachments,
+      });
+    }
+
+    if (getEmailDriver() === 'postmark') {
+      return await sendEmailViaPostmark({
+        to: normalizedTo,
+        subject: normalizedSubject,
+        text,
+        html,
+        attachments,
+      });
+    }
+
     const { from } = assertEmailConfigured();
     const transporter = getTransporter();
 
@@ -153,6 +336,7 @@ async function sendEmail({ to, subject, text, html, attachments } = {}) {
     return {
       ok: true,
       success: true,
+      provider: 'smtp',
       messageId: info && info.messageId ? info.messageId : undefined,
       accepted: info && info.accepted ? info.accepted : undefined,
       rejected: info && info.rejected ? info.rejected : undefined,
