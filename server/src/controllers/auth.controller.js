@@ -100,30 +100,40 @@ exports.register = async (req, res) => {
       );
     }
 
-    // 6. Send verification email
+    // 6. Prepare verification email (NON-CRITICAL)
     // Note: Use the raw token in the URL, not the hashed one
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    
-    try {
-      const resp = await sendEmail({
-        to: newUser.email,
-        subject: 'Verify your account',
-        text: `Welcome, ${firstName}! Please verify your email here: ${verificationUrl}`
-      });
-      if (!resp?.ok) throw new Error(resp?.error || 'Email send failed');
-    } catch (emailErr) {
-      console.error("Email failed to send, but user was created:", emailErr);
-      // We don't fail the request, but we log it
-    }
 
+    // Respond immediately; email send happens in background (never blocks user creation)
     if (normalizedRole === 'lab') {
-      return res.status(201).json({
+      res.status(201).json({
         message:
           'Lab account registered. Please verify your email; after that, admin approval is required before login.',
       });
+    } else {
+      res.status(201).json({ message: 'User registered. Please check your email to verify your account.' });
     }
 
-    res.status(201).json({ message: 'User registered. Please check your email to verify your account.' });
+    setImmediate(async () => {
+      try {
+        console.log('[SMTP] SMTP_CONNECTING...');
+        const resp = await sendEmail({
+          to: newUser.email,
+          subject: 'Verify your account',
+          text: `Welcome, ${firstName}! Please verify your email here: ${verificationUrl}`,
+        });
+        if (!resp?.ok) {
+          console.error('[SMTP] SMTP_FAILED', resp?.error || 'Email send failed');
+          return;
+        }
+        console.log('[SMTP] SMTP_CONNECTED');
+      } catch (emailErr) {
+        // Never throw / never crash the server.
+        console.error('SMTP_EMAIL_ERROR', emailErr?.message || String(emailErr));
+      }
+    });
+
+    return;
   } catch (err) {
     console.error("Registration Error:", err);
     res.status(500).json({ message: err.message || 'Server error during registration' });

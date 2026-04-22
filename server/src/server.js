@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const connectDB = require('./config/database.js');
+const { verifySmtpOnStartup } = require('./services/emailService.js');
 
 const app = express();
 
@@ -176,6 +177,13 @@ const startServer = async () => {
     await connectDB();
 
     console.log('✅ MongoDB connected');
+
+    // Non-critical: best-effort SMTP verification (never crashes server)
+    try {
+      verifySmtpOnStartup();
+    } catch (err) {
+      console.error('[SMTP] SMTP_FAILED', err?.message || String(err));
+    }
 
     const server = app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${port}`);
