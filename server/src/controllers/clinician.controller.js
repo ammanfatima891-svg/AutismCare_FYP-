@@ -61,6 +61,38 @@ exports.getScreeningReviewsForClinician = async (req, res) => {
       });
     });
 
+    // Submissions whose childId did not match the first query (e.g. large parent lists split across docs) —
+    // resolve parent/child via ChildCase (unique parentId + childId per case).
+    const missingChildIds = uniqueChildIds.filter((id) => id && !childLookup.has(id));
+    if (missingChildIds.length) {
+      const oidMissing = missingChildIds
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      if (oidMissing.length) {
+        const cases = await ChildCase.find({ childId: { $in: oidMissing } })
+          .select('childId parentId')
+          .lean();
+        const parentIds = [...new Set(cases.map((c) => String(c.parentId)).filter(Boolean))];
+        const oidParents = parentIds
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+          .map((id) => new mongoose.Types.ObjectId(id));
+        if (oidParents.length) {
+          const parentsExtra = await User.find({ _id: { $in: oidParents } })
+            .select('firstName lastName email children')
+            .lean();
+          const pmap = new Map(parentsExtra.map((p) => [String(p._id), p]));
+          for (const row of cases) {
+            const cid = String(row.childId);
+            if (!cid || childLookup.has(cid)) continue;
+            const p = pmap.get(String(row.parentId));
+            if (!p) continue;
+            const ch = (p.children || []).find((c) => String(c._id) === cid);
+            if (ch) childLookup.set(cid, { parent: p, child: ch });
+          }
+        }
+      }
+    }
+
     const reviews = submissions.map((sub) => {
       const cid = sub.childId != null ? String(sub.childId) : "";
       const link = cid ? childLookup.get(cid) : null;

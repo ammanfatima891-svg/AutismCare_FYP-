@@ -16,6 +16,7 @@ import { integrationAPI, parentAPI, progressEngineAPI } from '../../api';
 import { CaseMessagingThread } from '../messaging/CaseMessagingThread';
 import { CaseLabRequestsPanel, type CaseLabRequestRow } from '../case/CaseLabRequestsPanel';
 import { CaseStatusBadge } from '../CaseStatusBadge';
+import { ClinicalAlertsPanel, DomainPerformanceBarChart, GoalClinicalCard, LowConfidenceBanner } from '../progress-clinical';
 
 type ParentCaseRow = {
   caseId: string;
@@ -68,6 +69,18 @@ type ParentEngineFriendly = {
   consistencyPercent?: number | null;
   homeProgramOnTrack?: boolean | null;
   message?: string;
+  confidenceLabel?: string;
+  interpretWithCaution?: boolean;
+  domainScores?: Array<{ name: string; score: number; confidence?: number }>;
+  goalsBrief?: Array<{
+    goalId?: string;
+    goalName?: string;
+    trend?: string;
+    current?: number | null;
+    confidenceLabel?: string;
+    limitedDataUi?: boolean;
+  }>;
+  alertsParent?: Array<{ severity?: string; message?: string; code?: string }>;
 };
 
 type SlotRow = {
@@ -731,15 +744,28 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
               <div>
                 <p className="text-lg font-semibold text-foreground">{parentEngineView.headline}</p>
                 <p className="text-sm text-muted-foreground mt-1">{parentEngineView.message}</p>
+                {parentEngineView.confidenceLabel ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Confidence: <span className="font-medium capitalize">{parentEngineView.confidenceLabel}</span>
+                  </p>
+                ) : null}
               </div>
+              <LowConfidenceBanner
+                visible={Boolean(parentEngineView.interpretWithCaution)}
+                message="Interpret with caution — progress scores may not be precise with current data volume."
+              />
               {parentEngineView.progressPercent != null ? (
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Program momentum</span>
+                    <span>Program momentum (scaled from 0–5)</span>
                     <span>{parentEngineView.progressPercent}%</span>
                   </div>
                   <Progress value={parentEngineView.progressPercent} className="h-3" />
                 </div>
+              ) : parentEngineView.interpretWithCaution ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm text-amber-950">
+                  Overall progress: Limited data — your therapist will contextualize trends.
+                </p>
               ) : null}
               {parentEngineView.consistencyPercent != null ? (
                 <div className="space-y-2">
@@ -773,6 +799,36 @@ export function ParentCaseIntegrationPanels({ forcedCaseId, onCaseIdChange }: Pa
                     ? 'Needs attention'
                     : 'Steady'}
               </Badge>
+              {parentEngineView.domainScores?.length ? (
+                <div className="pt-2">
+                  <p className="mb-2 text-sm font-medium text-foreground">Domain snapshot (0–5)</p>
+                  <div className="h-[200px]">
+                    <DomainPerformanceBarChart data={parentEngineView.domainScores} height={180} />
+                  </div>
+                </div>
+              ) : null}
+              {parentEngineView.goalsBrief?.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {parentEngineView.goalsBrief.map((g) => (
+                    <GoalClinicalCard
+                      key={g.goalId || g.goalName}
+                      goal={{
+                        goalName: g.goalName,
+                        current: g.current,
+                        trend: g.trend,
+                        confidenceLabel: g.confidenceLabel,
+                        limitedDataUi: Boolean(g.limitedDataUi),
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {parentEngineView.alertsParent?.length ? (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-foreground">Updates from analytics</p>
+                  <ClinicalAlertsPanel alerts={parentEngineView.alertsParent} />
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No progress data yet.</p>

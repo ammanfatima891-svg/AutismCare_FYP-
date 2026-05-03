@@ -149,24 +149,38 @@ exports.computeCaseProgressOverview = async function computeCaseProgressOverview
   const goals = Array.isArray(engine.goals) ? engine.goals : [];
   const totalGoals = goals.length;
   const achievedGoals = goals.filter((g) => g && (g.mastery === true || String(g.masteryStatus || '') === 'mastered')).length;
-  // Deterministic high-level progress: % of goals achieved.
-  // (Engine score is useful but can drift with weighting changes; keep UI/test stable.)
-  const overallProgressPercent = totalGoals ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0;
+  const overallProgressPercent =
+    engine.overallScore != null
+      ? Number(((Number(engine.overallScore) / 5) * 100).toFixed(2))
+      : totalGoals
+        ? Number(((achievedGoals / totalGoals) * 100).toFixed(2))
+        : 0;
 
-  // Domain view expected by clinician dashboards/tests: use legacy plan domain buckets (Speech/OT/etc).
+  // Domain view: legacy bucket labels with engine-derived score averages (0–100).
   const domainMap = new Map();
   for (const g of goals) {
     if (!g) continue;
     const legacy = String(g.legacyDomain || '').trim();
     const name = legacy || String(g.domain || '').trim() || 'General';
-    if (!domainMap.has(name)) domainMap.set(name, { domain: name, totalGoals: 0, achievedGoals: 0 });
+    if (!domainMap.has(name)) {
+      domainMap.set(name, { domain: name, totalGoals: 0, achievedGoals: 0, scoreSum: 0, scoreN: 0 });
+    }
     const row = domainMap.get(name);
     row.totalGoals += 1;
     if (g.mastery === true || String(g.masteryStatus || '') === 'mastered') row.achievedGoals += 1;
+    if (g.current != null && Number.isFinite(Number(g.current))) {
+      row.scoreSum += Number(g.current);
+      row.scoreN += 1;
+    }
   }
   const domains = Array.from(domainMap.values()).map((d) => ({
     ...d,
-    progressPercent: d.totalGoals ? Number(((d.achievedGoals / d.totalGoals) * 100).toFixed(2)) : 0,
+    progressPercent:
+      d.scoreN > 0
+        ? Number((((d.scoreSum / d.scoreN) / 5) * 100).toFixed(2))
+        : d.totalGoals
+          ? Number(((d.achievedGoals / d.totalGoals) * 100).toFixed(2))
+          : 0,
   }));
 
   // Trend chart: use engine series (keyed by YYYY-MM-DD).
@@ -243,19 +257,29 @@ exports.getDomainProgress = async (req, res) => {
       });
     }
 
-    const totalGoals = goals.filter((g) => g && String(g.legacyDomain || '').toLowerCase() === matchName.toLowerCase()).length;
-    const achievedGoals = goals.filter(
-      (g) =>
-        g &&
-        String(g.legacyDomain || '').toLowerCase() === matchName.toLowerCase() &&
-        (g.mastery === true || String(g.masteryStatus || '') === 'mastered')
+    const domainGoals = goals.filter((g) => g && String(g.legacyDomain || '').toLowerCase() === matchName.toLowerCase());
+    const totalGoals = domainGoals.length;
+    const achievedGoals = domainGoals.filter(
+      (g) => g.mastery === true || String(g.masteryStatus || '') === 'mastered'
     ).length;
+    const scored = domainGoals.filter((g) => g.current != null && Number.isFinite(Number(g.current)));
+    const domainProgressPct =
+      scored.length > 0
+        ? Number(
+            (
+              (scored.reduce((s, g) => s + Number(g.current), 0) / scored.length / 5) *
+              100
+            ).toFixed(2)
+          )
+        : totalGoals
+          ? Number(((achievedGoals / totalGoals) * 100).toFixed(2))
+          : 0;
 
     return res.status(200).json({
       success: true,
       data: {
         domain: matchName,
-        progressPercent: totalGoals ? Number(((achievedGoals / totalGoals) * 100).toFixed(2)) : 0,
+        progressPercent: domainProgressPct,
         totalGoals,
         achievedGoals,
         // Trend points relevant to this domain (derived from plan activities + session goalsTargeted).

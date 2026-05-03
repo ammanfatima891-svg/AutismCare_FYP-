@@ -105,8 +105,11 @@ function computeTransition({ currentStatus, eventType, payload }) {
     }
 
     case CASE_EVENTS.SCREENING_SUBMITTED: {
-      if (!['SCREENING'].includes(status)) {
-        throw invalidTransition('Cannot submit screening unless in SCREENING', { from: status, eventType });
+      // Primary path: SCREENING → REVIEW. Also allow repeat / late questionnaires when the case is already
+      // in parent-facing stages (e.g. never received SCREENING_STARTED, or rescreen while in REVIEW/MONITORING).
+      const allowedSubmit = ['SCREENING', 'NEW', 'REVIEW', 'MONITORING'];
+      if (!allowedSubmit.includes(status)) {
+        throw invalidTransition('Cannot submit screening from current case stage', { from: status, eventType });
       }
       const riskLevel = payload?.riskLevel;
       if (riskLevel && !['low', 'medium', 'high', 'unknown'].includes(String(riskLevel))) {

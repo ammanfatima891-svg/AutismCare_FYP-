@@ -92,6 +92,9 @@ const ChildCaseSchema = new Schema(
       asqCompleted: { type: Boolean, default: false },
       skippedMchat: { type: Boolean, default: false },
     },
+    /** Last progress-engine case recommendation text (for clinician caseload change detection). */
+    progressEngineRecommendationSnapshot: { type: String, default: null },
+    progressEngineRecommendationAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

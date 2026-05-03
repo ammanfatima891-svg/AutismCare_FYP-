@@ -29,6 +29,7 @@ import { AlertTriangle, ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { activityAPI, scheduleAPI } from '../../api';
 import { createSession, getSessionApiErrorMessage, updateSession } from '../../services/sessionService';
 import { toast } from 'sonner';
+import { SessionProgressModal, type SessionProgressFeedback } from '../progress-clinical/SessionProgressModal';
 import { buildChildResponseString, parseChildResponseToForm, RESPONSE_SCALE_LABELS } from './sessionFormat';
 import type { SessionRow } from './SessionList';
 import { isActiveGoalStatus, normalizeShortTermGoalsList } from '../../utils/therapyPlanResponse';
@@ -228,6 +229,8 @@ export function SessionForm({
   const [scheduleSlotOptions, setScheduleSlotOptions] = useState<{ id: string; label: string; duration: number; time: string; date: string }[]>([]);
   const [loadingScheduleSlots, setLoadingScheduleSlots] = useState(false);
   const [sessionSlotId, setSessionSlotId] = useState('');
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [sessionProgressFeedback, setSessionProgressFeedback] = useState<SessionProgressFeedback | null>(null);
 
   const planDomains = useMemo(() => {
     const d = therapyPlan?.domains;
@@ -524,8 +527,15 @@ export function SessionForm({
       }
 
       if (mode === 'create') {
-        await createSession({ ...payload, caseId: caseIdTrim });
+        const res = (await createSession({ ...payload, caseId: caseIdTrim })) as {
+          progressFeedback?: SessionProgressFeedback;
+        };
         toast.success('Session saved successfully');
+        const fb = res?.progressFeedback;
+        if (fb && (fb.summary != null || (fb.alerts && fb.alerts.length > 0))) {
+          setSessionProgressFeedback(fb);
+          setProgressModalOpen(true);
+        }
       } else if (initialSession?._id) {
         await updateSession(initialSession._id, payload);
         toast.success('Session updated');
@@ -879,6 +889,7 @@ export function SessionForm({
 
   if (isPage) {
     return (
+      <>
       <div className="min-h-screen bg-gradient-to-b from-muted/50 via-background to-muted/30">
         <div className="mx-auto max-w-3xl px-4 py-8 pb-36 sm:px-6 lg:px-8">
           <div className="mb-8">
@@ -1167,10 +1178,17 @@ export function SessionForm({
           </div>
         </div>
       </div>
+      <SessionProgressModal
+        open={progressModalOpen}
+        onOpenChange={setProgressModalOpen}
+        feedback={sessionProgressFeedback}
+      />
+      </>
     );
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[min(92vh,900px)] overflow-y-auto border bg-card sm:max-w-lg">
         <DialogHeader className="space-y-1 border-b border pb-3">
@@ -1203,5 +1221,11 @@ export function SessionForm({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <SessionProgressModal
+      open={progressModalOpen}
+      onOpenChange={setProgressModalOpen}
+      feedback={sessionProgressFeedback}
+    />
+    </>
   );
 }

@@ -325,6 +325,23 @@ exports.getAssignedReferrals = async (req, res) => {
     const caseMap = new Map(cases.map((c) => [c._id.toString(), c]));
 
     const therapistId = req.user._id;
+
+    /** Referral row stays ACCEPTED in DB; TherapyCase ACTIVE means therapy has started — surface as in-progress for UI. */
+    let activeTherapyCaseIds = new Set();
+    if (caseIds.length > 0) {
+      const caseObjectIds = caseIds
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      const activeRows = await TherapyCase.find({
+        therapistId,
+        caseId: { $in: caseObjectIds },
+        status: THERAPY_STATUS.ACTIVE,
+      })
+        .select('caseId')
+        .lean();
+      activeTherapyCaseIds = new Set(activeRows.map((t) => String(t.caseId)));
+    }
+
     let lastSessionByCaseId = new Map();
     if (caseIds.length > 0) {
       const caseObjectIds = caseIds.map((id) => new mongoose.Types.ObjectId(id));
@@ -360,9 +377,13 @@ exports.getAssignedReferrals = async (req, res) => {
       const caseDoc = caseMap.get(ref.caseId.toString());
       if (!caseDoc) continue;
       const details = await mapCaseDetails(caseDoc);
+      let status = toApiReferralStatus(ref.status);
+      if (activeTherapyCaseIds.has(ref.caseId.toString())) {
+        status = 'in-progress';
+      }
       enriched.push({
         ...ref,
-        status: toApiReferralStatus(ref.status),
+        status,
         case: details,
         lastSessionDate: lastSessionByCaseId.get(ref.caseId.toString()) || null,
       });

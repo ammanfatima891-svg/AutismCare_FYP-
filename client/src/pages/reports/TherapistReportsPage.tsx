@@ -165,7 +165,10 @@ export default function TherapistReportsPage() {
     setGenerating(true);
     setError(null);
     try {
-      const res = await reportAPI.generate({ caseId, type: reportType });
+      const res =
+        reportType === 'integrated'
+          ? await reportAPI.generateByCaseId(caseId)
+          : await reportAPI.generate({ caseId, type: reportType });
       const id = String(res.data?.data?.reportId || '');
       toast.success('Report generated');
       setGenerateOpen(false);

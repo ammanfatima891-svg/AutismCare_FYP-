@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AlertCircle, CheckCircle, FlaskConical, Loader2, Plus, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, FlaskConical, Loader2, Plus } from 'lucide-react';
 import { caseAPI, labRequestsAPI, labTestsAPI } from '../../api';
+import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 
 type ChildCaseRow = {
   _id: string;
@@ -286,52 +294,36 @@ export function ClinicianLabReports() {
         </div>
       )}
 
-      {open &&
-        createPortal(
-          <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/50"
-              onClick={() => {
-                setOpen(false);
-                resetForm();
-              }}
-            />
-            <div
-              className="relative z-[1401] flex flex-col overflow-hidden rounded-xl border bg-card shadow-2xl"
-              style={{ width: 'min(680px, calc(100vw - 2rem))', maxHeight: '90vh' }}
-            >
-              <div className="border-b px-6 py-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-primary p-2 text-primary-foreground">
-                      <FlaskConical className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Request Lab Test</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Select child, select test, choose lab, add notes, and submit.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      resetForm();
-                    }}
-                    className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) {
+            setOpen(false);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="shrink-0 border-b px-6 py-4 text-left">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-primary p-2 text-primary-foreground">
+                <FlaskConical className="h-5 w-5" />
               </div>
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <DialogTitle>Request Lab Test</DialogTitle>
+                <DialogDescription>
+                  Select child, select test, choose lab, add notes, and submit.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
 
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+          <div className="max-h-[calc(90vh-11rem)] min-h-0 space-y-4 overflow-y-auto overscroll-contain px-6 py-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">1. Select Child</label>
                   <select
                     className="w-full rounded-md border bg-card px-3 py-2 text-sm"
+                    autoFocus
                     value={selectedChildId}
                     onChange={(e) => setSelectedChildId(e.target.value)}
                   >
@@ -387,42 +379,37 @@ export function ClinicianLabReports() {
                     onChange={(e) => setNotes(e.target.value)}
                   />
                 </div>
-              </div>
+          </div>
 
-              <div className="border-t px-6 py-4">
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    className="rounded-lg border px-4 py-2 text-sm"
-                    onClick={() => {
-                      setOpen(false);
-                      resetForm();
-                    }}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-                    disabled={!selectedChildId || !selectedLab || submitting}
-                    onClick={createRequest}
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      '5. Submit Request'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+          <DialogFooter className="shrink-0 border-t px-6 py-4 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setOpen(false);
+                resetForm();
+              }}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!selectedChildId || !selectedLab || submitting}
+              onClick={() => void createRequest()}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit request'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

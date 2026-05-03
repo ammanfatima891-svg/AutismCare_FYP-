@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { activityAPI, therapyPlanAPI } from '../../api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -21,8 +21,16 @@ import {
   SelectValue,
 } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
-import type { ActivityTemplate } from '../activity-library/activityTypes';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { Loader2, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { ActivityLibraryScreen } from '../activity-library/ActivityLibraryScreen';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '../ui/utils';
 
@@ -32,6 +40,13 @@ const MEASUREMENT_OPTIONS = ['rating_1_5', 'accuracy_trials'] as const;
 const MASTERY_RULE_OPTIONS = ['threshold_out_of_n_sessions', 'threshold_consecutive_sessions'] as const;
 const FREQUENCY_OPTIONS = ['Daily', 'Weekly', '2x/week', '3x/week', 'Monthly', 'As needed'] as const;
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'] as const;
+
+const MASTERY_PRESET_KEYS = ['easy', 'moderate', 'strict'] as const;
+const MASTERY_PRESET_VALUES: Record<(typeof MASTERY_PRESET_KEYS)[number], { masteryThreshold: number; masteryWindow: number; masteryMinSessions: number }> = {
+  easy: { masteryThreshold: 65, masteryWindow: 4, masteryMinSessions: 2 },
+  moderate: { masteryThreshold: 80, masteryWindow: 5, masteryMinSessions: 3 },
+  strict: { masteryThreshold: 90, masteryWindow: 6, masteryMinSessions: 4 },
+};
 
 /** Plan activity row description — mirrors server buildPlanDescription for embedded plan rows */
 function buildPlanDescriptionFromActivityDoc(a: {
@@ -64,6 +79,8 @@ export type ShortGoalRow = {
   status: (typeof STATUS_OPTIONS)[number];
   domain: (typeof DOMAIN_OPTIONS)[number];
   measurementType: (typeof MEASUREMENT_OPTIONS)[number];
+  /** Preset thresholds — server resolves masteryRule when saved */
+  masteryPreset: (typeof MASTERY_PRESET_KEYS)[number];
   ruleType: (typeof MASTERY_RULE_OPTIONS)[number];
   masteryThreshold: number;
   masteryWindow: number;
@@ -86,6 +103,7 @@ function emptyShortGoal(): ShortGoalRow {
     status: 'Active',
     domain: 'Speech',
     measurementType: 'rating_1_5',
+    masteryPreset: 'moderate',
     ruleType: 'threshold_out_of_n_sessions',
     masteryThreshold: 80,
     masteryWindow: 5,
@@ -108,9 +126,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
     libraryActivityId?: string;
   };
   const [activities, setActivities] = useState<PlanActivity[]>([]);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryItems, setLibraryItems] = useState<ActivityTemplate[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<'draft' | 'submit' | 'approval' | 'revision' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -129,10 +145,6 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
 
   /** Skip re-sync when `plan` is a new object reference but data unchanged (prevents setState loops / UI freeze). */
   const planSnapshotRef = useRef<string | null>(null);
-  /** Panel can open below the fold — scroll it into view so the Browse action is visibly “doing something”. */
-  const libraryPanelRef = useRef<HTMLDivElement | null>(null);
-  /** Ignore stale listTemplates responses when Refresh is clicked quickly. */
-  const libraryFetchGenRef = useRef(0);
 
   useEffect(() => {
     if (!plan) {
@@ -183,6 +195,12 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
           >;
           const mt = String(meas.type || 'rating_1_5');
           const rt = String(mr.ruleType || 'threshold_out_of_n_sessions');
+          const mpRaw = String((g as Record<string, unknown>).masteryPreset || '')
+            .trim()
+            .toLowerCase();
+          const masteryPreset = MASTERY_PRESET_KEYS.includes(mpRaw as (typeof MASTERY_PRESET_KEYS)[number])
+            ? (mpRaw as ShortGoalRow['masteryPreset'])
+            : 'moderate';
           return {
             goalKey: String(g.goalKey || ''),
             title: String(g.title || ''),
@@ -193,6 +211,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
             measurementType: (MEASUREMENT_OPTIONS.includes(mt as never)
               ? mt
               : 'rating_1_5') as ShortGoalRow['measurementType'],
+            masteryPreset,
             ruleType: (MASTERY_RULE_OPTIONS.includes(rt as never)
               ? rt
               : 'threshold_out_of_n_sessions') as ShortGoalRow['ruleType'],
@@ -217,42 +236,13 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
     );
   }, [plan]);
 
-  useEffect(() => {
-    if (!libraryOpen) return;
-    const id = requestAnimationFrame(() => {
-      libraryPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [libraryOpen]);
-
-  /** Inline panel (no modal/portal) — avoids freezes from overlays + Tabs/focus traps. */
-  const openLibraryPicker = useCallback(() => {
-    setLibraryOpen(true);
-    setLibraryLoading(true);
-    libraryFetchGenRef.current += 1;
-    const gen = libraryFetchGenRef.current;
-    void activityAPI
-      .listTemplates({})
-      .then((axiosRes) => {
-        if (gen !== libraryFetchGenRef.current) return;
-        const body = axiosRes.data as { data?: ActivityTemplate[] } | undefined;
-        const list = Array.isArray(body?.data) ? body.data : [];
-        setLibraryItems(list);
-      })
-      .catch((err: unknown) => {
-        if (gen !== libraryFetchGenRef.current) return;
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        toast.error(status === 401 ? 'Session expired — sign in again' : 'Could not load activity library');
-        setLibraryItems([]);
-      })
-      .finally(() => {
-        if (gen !== libraryFetchGenRef.current) return;
-        setLibraryLoading(false);
-      });
-  }, []);
-
   const toggleDomain = (d: string) => {
     setDomains((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  };
+
+  const applyMasteryPreset = (idx: number, preset: ShortGoalRow['masteryPreset']) => {
+    const vals = MASTERY_PRESET_VALUES[preset];
+    updateShortGoal(idx, { masteryPreset: preset, ...vals });
   };
 
   const addShortGoal = () => setShortGoals((g) => [...g, emptyShortGoal()]);
@@ -264,35 +254,6 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
   const removeActivity = (idx: number) => setActivities((a) => a.filter((_, i) => i !== idx));
   const updateActivity = (idx: number, patch: Partial<PlanActivity>) =>
     setActivities((a) => a.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
-
-  const addFromLibrary = (lib: ActivityTemplate) => {
-    const description = [
-      lib.objective?.trim(),
-      lib.instructions?.trim(),
-      lib.procedure?.trim(),
-      lib.notes?.trim(),
-      lib.materials ? `Materials: ${lib.materials}` : '',
-      lib.frequency ? `Frequency: ${lib.frequency}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-    let added = false;
-    setActivities((prev) => {
-      if (prev.some((x) => x.libraryActivityId === lib._id)) return prev;
-      added = true;
-      return [
-        ...prev,
-        {
-          title: lib.name,
-          description,
-          linkedGoal: '',
-          libraryActivityId: lib._id,
-        },
-      ];
-    });
-    if (added) toast.success('Activity added to plan');
-    else toast.message('This activity is already in the plan');
-  };
 
   const submitCustomActivity = async () => {
     const err: { name?: string; instructions?: string } = {};
@@ -371,6 +332,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
           status: g.status,
           domain: g.domain,
           measurement: { type: g.measurementType, unit: '' },
+          masteryPreset: g.masteryPreset,
           masteryRule: {
             ruleType: g.ruleType,
             threshold: g.masteryThreshold,
@@ -734,64 +696,92 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Mastery rule</Label>
+                    <Label className="text-xs text-muted-foreground">Mastery preset</Label>
                     <Select
-                      value={row.ruleType}
-                      onValueChange={(v) => updateShortGoal(idx, { ruleType: v as ShortGoalRow['ruleType'] })}
+                      value={row.masteryPreset}
+                      onValueChange={(v) => applyMasteryPreset(idx, v as ShortGoalRow['masteryPreset'])}
                     >
                       <SelectTrigger className="h-11">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="threshold_out_of_n_sessions">Average in window</SelectItem>
-                        <SelectItem value="threshold_consecutive_sessions">Consecutive sessions</SelectItem>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="moderate">Moderate</SelectItem>
+                        <SelectItem value="strict">Strict</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Threshold %</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={row.masteryThreshold}
-                        className="h-11"
-                        onChange={(e) =>
-                          updateShortGoal(idx, { masteryThreshold: Math.max(0, Math.min(100, Number(e.target.value))) })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Window</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={row.masteryWindow}
-                        className="h-11"
-                        onChange={(e) =>
-                          updateShortGoal(idx, { masteryWindow: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Min sessions</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={row.masteryMinSessions}
-                        className="h-11"
-                        onChange={(e) =>
-                          updateShortGoal(idx, {
-                            masteryMinSessions: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
+                  <Collapsible className="rounded-md border bg-muted/30 px-3 py-2">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left text-sm font-medium text-foreground">
+                      Advanced mastery settings
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Mastery rule type</Label>
+                        <Select
+                          value={row.ruleType}
+                          onValueChange={(v) => updateShortGoal(idx, { ruleType: v as ShortGoalRow['ruleType'] })}
+                        >
+                          <SelectTrigger className="h-11">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="threshold_out_of_n_sessions">Average in window</SelectItem>
+                            <SelectItem value="threshold_consecutive_sessions">Consecutive sessions</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Threshold %</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={row.masteryThreshold}
+                            className="h-11"
+                            onChange={(e) =>
+                              updateShortGoal(idx, {
+                                masteryThreshold: Math.max(0, Math.min(100, Number(e.target.value))),
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Window</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={row.masteryWindow}
+                            className="h-11"
+                            onChange={(e) =>
+                              updateShortGoal(idx, {
+                                masteryWindow: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Min sessions</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={row.masteryMinSessions}
+                            className="h-11"
+                            onChange={(e) =>
+                              updateShortGoal(idx, {
+                                masteryMinSessions: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               </div>
             ))}
@@ -808,6 +798,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                     <TableHead className="min-w-[150px]">Review date</TableHead>
                     <TableHead className="min-w-[140px]">Status</TableHead>
                     <TableHead className="min-w-[170px] whitespace-nowrap">Measure</TableHead>
+                    <TableHead className="min-w-[120px] whitespace-nowrap">Preset</TableHead>
                     <TableHead className="min-w-[220px] whitespace-nowrap">Mastery rule</TableHead>
                     <TableHead className="w-[84px] whitespace-nowrap">Thr %</TableHead>
                     <TableHead className="w-[74px] whitespace-nowrap">Win</TableHead>
@@ -894,6 +885,21 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
                       </TableCell>
                       <TableCell>
                         <Select
+                          value={row.masteryPreset}
+                          onValueChange={(v) => applyMasteryPreset(idx, v as ShortGoalRow['masteryPreset'])}
+                        >
+                          <SelectTrigger className="h-10 w-[110px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="easy">Easy</SelectItem>
+                            <SelectItem value="moderate">Moderate</SelectItem>
+                            <SelectItem value="strict">Strict</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
                           value={row.ruleType}
                           onValueChange={(v) => updateShortGoal(idx, { ruleType: v as ShortGoalRow['ruleType'] })}
                         >
@@ -968,60 +974,20 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
         </CardHeader>
         <CardContent className="space-y-8 pt-8">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">Select from Activity Library</Label>
+            <Label className="text-sm font-medium text-foreground">Activity library</Label>
+            <p className="text-xs text-muted-foreground">
+              Opens the same library as <strong>Activity Library</strong> on your dashboard. Use <strong>Assign</strong> on a
+              template and choose <strong>Therapy plan</strong> to attach it to this case, then close the window — the plan
+              reloads from the server.
+            </p>
             <Button
               type="button"
               variant="outline"
-              disabled={libraryLoading}
               className="h-11 w-full border bg-card text-base font-medium text-foreground shadow-sm hover:bg-background"
-              onClick={openLibraryPicker}
+              onClick={() => setLibraryDialogOpen(true)}
             >
-              {libraryLoading ? <Loader2 className="mr-2 h-5 w-5 shrink-0 animate-spin" /> : null}
-              {libraryOpen ? 'Refresh activity list' : 'Browse Activity Library'}
+              Browse Activity Library
             </Button>
-            {libraryOpen ? (
-              <div
-                ref={libraryPanelRef}
-                className="mt-3 rounded-lg border bg-background/90 p-4 shadow-inner ring-1 ring-border"
-                role="region"
-                aria-label="Activity library results"
-              >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground">Add from activity library</p>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 text-muted-foreground" onClick={() => setLibraryOpen(false)}>
-                    Hide
-                  </Button>
-                </div>
-                {libraryLoading ? (
-                  <div className="flex flex-col items-center justify-center gap-2 py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
-                    <p className="text-sm text-muted-foreground">Loading activities…</p>
-                  </div>
-                ) : libraryItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No templates found. Create activities under <strong>Activity library</strong> on the dashboard or case
-                    file, then use Refresh here.
-                  </p>
-                ) : (
-                  <ul className="max-h-[min(50vh,420px)] space-y-2 overflow-y-auto pr-1">
-                    {libraryItems.slice(0, 500).map((lib) => (
-                      <li
-                        key={lib._id}
-                        className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-foreground">{lib.name}</p>
-                          <p className="text-xs text-muted-foreground">{lib.domain}</p>
-                        </div>
-                        <Button type="button" size="sm" className="shrink-0" onClick={() => addFromLibrary(lib)}>
-                          Add
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ) : null}
           </div>
 
           <div className="relative py-1">
@@ -1035,7 +1001,7 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
 
           <div className="space-y-3">
             <Label className="text-sm font-medium text-foreground">Add custom activity</Label>
-            <div className="rounded-xl border bg-muted/40 p-5">
+            <div className="max-h-[min(60vh,520px)] overflow-y-auto overscroll-contain rounded-xl border bg-muted/40 p-5">
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Domain</Label>
@@ -1195,32 +1161,6 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-0 z-20 -mx-1 border-t bg-background/80 px-1 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex w-full max-w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11"
-            disabled={loading}
-            onClick={saveDraft}
-          >
-            {loading && activeAction === 'draft' ? <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" /> : null}
-            Save draft
-          </Button>
-          <Button
-            type="button"
-            className="h-11"
-            disabled={loading}
-            onClick={submitTherapyPlan}
-          >
-            {loading && activeAction === 'submit' ? (
-              <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
-            ) : null}
-            Submit plan
-          </Button>
-        </div>
-      </div>
-
       {hasPlan && planId ? (
         <Card className="border bg-muted/40 shadow-sm">
           <CardHeader className="pb-2">
@@ -1253,6 +1193,48 @@ export function TherapyPlanBuilder({ caseId, plan, onSaved }: Props) {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card className="border bg-card shadow-sm">
+        <CardHeader className="border-b">
+          <CardTitle className="text-foreground">Save plan</CardTitle>
+          <CardDescription>
+            Save a draft while you work, or submit when domains, long-term goal, and short-term goals are complete.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" className="h-11 sm:min-w-[140px]" disabled={loading} onClick={saveDraft}>
+            {loading && activeAction === 'draft' ? <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" /> : null}
+            Save draft
+          </Button>
+          <Button type="button" className="h-11 sm:min-w-[140px]" disabled={loading} onClick={submitTherapyPlan}>
+            {loading && activeAction === 'submit' ? (
+              <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            ) : null}
+            Submit plan
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={libraryDialogOpen} onOpenChange={setLibraryDialogOpen}>
+        <DialogContent className="flex h-[min(92dvh,760px)] max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+          <DialogHeader className="shrink-0 border-b px-5 py-4 text-left">
+            <DialogTitle>Activity library</DialogTitle>
+            <DialogDescription>
+              Same templates as <strong>Activity Library</strong> on the dashboard. Use <strong>Assign</strong> →{' '}
+              <strong>Therapy plan</strong> to link an activity to this case. Close when done — this page refreshes the
+              plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-2 sm:px-4">
+            <ActivityLibraryScreen
+              caseId={caseId}
+              onAssignSuccess={async () => {
+                await onSaved();
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

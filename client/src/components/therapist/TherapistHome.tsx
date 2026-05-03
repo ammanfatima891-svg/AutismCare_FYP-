@@ -88,7 +88,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
     pending: 'border bg-background text-foreground',
     sent: 'border bg-background text-foreground',
     accepted: 'border-border bg-secondary/50 text-primary',
-    'in-progress': 'border-border bg-secondary/50 text-primary',
+    'in-progress': 'border-border bg-emerald-100 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100',
   };
 
   /** Badge: pending = new; accepted = show “Action” if recently updated (client-only recency hint). */
@@ -211,7 +211,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
     },
     {
       key: 'progress',
-      label: 'Overall Progress',
+      label: 'Caseload progress (engine)',
       value: loading ? '—' : `${data.overallProgress}%`,
       icon: TrendingUp,
       iconWrap: 'bg-secondary',
@@ -286,9 +286,12 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                 data.assignedCases.map((c) => {
                   const status = normalizeStatus(c.referralStatus);
                   const caseIdStr = String(c.caseId ?? '');
+                  const caseSt = String(c.caseStatus || '').toUpperCase();
                   const showBadge = assignedCaseShowNewOrActionBadge(c, c.referralStatus);
                   const isPending = status === 'pending' || status === 'sent';
                   const needsAccept = status === 'pending' || status === 'sent';
+                  const therapyStarted = status === 'in-progress';
+                  const canStartTherapy = status === 'accepted' && caseSt === 'THERAPY';
 
                   return (
                     <div key={c.referralId} className={assignedCaseCardClass(c.referralStatus)}>
@@ -331,7 +334,7 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                             {actingId === c.referralId ? '…' : 'Accept'}
                           </Button>
                         ) : null}
-                        {status === 'accepted' && String(c.caseStatus || '').toUpperCase() === 'THERAPY' ? (
+                        {canStartTherapy ? (
                           <>
                             <Button
                               type="button"
@@ -357,10 +360,8 @@ export function TherapistHome({ onNavigate: _onNavigate }: TherapistHomeProps) {
                             </Button>
                           </>
                         ) : null}
-                        {status === 'accepted' && String(c.caseStatus || '').toUpperCase() !== 'THERAPY' ? (
-                          <span className="text-xs text-muted-foreground">Not available in current stage</span>
-                        ) : null}
-                        {status === 'in-progress' ? (
+                        {(therapyStarted || (status === 'accepted' && !canStartTherapy) || status === 'rejected') &&
+                        caseIdStr ? (
                           <Button
                             type="button"
                             variant="outline"

@@ -235,6 +235,8 @@ export const integrationAPI = {
 
 // Clinician API endpoints (no leading `/` so path stays under baseURL `/api`)
 export const clinicianAPI = {
+  /** Bulk progress snapshots for clinician dashboard (single round-trip). */
+  getCaseloadProgress: () => API.get('clinician/caseload-progress'),
   getScreeningReviews: () => API.get('clinician/screening-reviews'),
   /** Record screening triage decision (clear / monitor / refer). */
   recordScreeningDecision: (submissionId, payload) =>
@@ -292,6 +294,13 @@ export const analyticsAPI = {
 };
 
 /** Unified progress engine (therapist full; clinician full; parent summary). */
+/** Unified clinical events, case timeline, shared case state, admin aggregates. */
+export const clinicalIntelligenceAPI = {
+  getCaseTimeline: (caseId) => API.get(`case-timeline/${encodeURIComponent(String(caseId))}`),
+  getClinicalCaseState: (caseId) => API.get(`clinical-case-state/${encodeURIComponent(String(caseId))}`),
+  getGlobalClinicalSummary: () => API.get('global-clinical-analytics/summary'),
+};
+
 export const progressEngineAPI = {
   getByCase: (caseId) => API.get(`progress-engine/${encodeURIComponent(String(caseId))}`),
   getSummary: (caseId) => API.get(`progress-engine/${encodeURIComponent(String(caseId))}/summary`),
@@ -347,6 +356,11 @@ export const notificationAPI = {
   markRead: (id) => API.patch(`notifications/${id}/read`),
   markAllRead: () => API.patch('notifications/read-all'),
   remove: (id) => API.delete(`notifications/${id}`),
+};
+
+/** Admin operational APIs */
+export const adminAPI = {
+  getDashboardMetrics: () => API.get('/admin/dashboard-metrics'),
 };
 
 export default API;

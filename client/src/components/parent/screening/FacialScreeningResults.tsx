@@ -155,7 +155,8 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
                 {results.riskLevel.toUpperCase()} RISK
               </Badge>
               <p className="text-xs text-muted-foreground">
-                Confidence: {results.confidence}%
+                Model vs. threshold (display):{' '}
+                {typeof results.confidence === 'number' ? `${results.confidence}%` : '—'}
               </p>
               <p className="text-xs text-muted-foreground">
                 {new Date(results.date).toLocaleDateString()}
@@ -185,7 +186,9 @@ export function FacialScreeningResults({ results, child }: FacialScreeningResult
               <Alert className="border-border bg-card">
                 <Sparkles className="h-4 w-4 text-accent" />
                 <AlertDescription className="text-foreground text-sm">
-                  AI analysis complete with {results.confidence}% confidence level
+                  {typeof results.confidence === 'number'
+                    ? `Analysis finished; separation score ${results.confidence}% (from model output, not a clinical certainty).`
+                    : 'Analysis finished; see probability and threshold above for the model signal.'}
                 </AlertDescription>
               </Alert>
             </div>

@@ -10,6 +10,7 @@ const { ChildCase } = require('../models/ChildCase');
 const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
 const { sendEmail } = require('../services/emailService');
 const { appointmentConfirmationTemplate } = require('../emailTemplates/appointmentConfirmationTemplate');
+const { scheduleAppointmentClinicalEvent } = require('../services/clinicalEventService');
 
 // ─── Helper: get professional display name ───────────────────────────────────
 
@@ -218,6 +219,10 @@ exports.createAppointment = async (req, res) => {
             console.error('Appointment confirmation email failed:', emailErr?.message || emailErr);
         }
 
+        try {
+            scheduleAppointmentClinicalEvent(req, appointment, 'created', { caseIdHint: caseId });
+        } catch (_) {}
+
         res.status(201).json({
             success: true,
             message: 'Appointment request created successfully',
@@ -413,6 +418,10 @@ exports.approveAppointment = async (req, res) => {
             relatedResourceId: appointment._id
         });
 
+        try {
+            scheduleAppointmentClinicalEvent(req, appointment, 'approved');
+        } catch (_) {}
+
         res.status(200).json({
             success: true,
             message: 'Appointment approved successfully',
@@ -485,6 +494,10 @@ exports.rejectAppointment = async (req, res) => {
             relatedResourceType: 'Appointment',
             relatedResourceId: appointment._id
         });
+
+        try {
+            scheduleAppointmentClinicalEvent(req, appointment, 'rejected', { rejectionReason: rejectionReason.trim() });
+        } catch (_) {}
 
         res.status(200).json({
             success: true,
@@ -599,6 +612,10 @@ exports.rescheduleAppointment = async (req, res) => {
             relatedResourceId: appointment._id
         });
 
+        try {
+            scheduleAppointmentClinicalEvent(req, appointment, 'rescheduled', { newDate, newTime });
+        } catch (_) {}
+
         res.status(200).json({
             success: true,
             message: 'Appointment rescheduled successfully',
@@ -686,6 +703,10 @@ exports.completeAppointment = async (req, res) => {
             }
         }
 
+        try {
+            scheduleAppointmentClinicalEvent(req, appointment, 'completed');
+        } catch (_) {}
+
         res.status(200).json({
             success: true,
             message: 'Appointment completed',
@@ -752,6 +773,10 @@ exports.cancelAppointment = async (req, res) => {
             relatedResourceType: 'Appointment',
             relatedResourceId: appointment._id
         });
+
+        try {
+            scheduleAppointmentClinicalEvent(req, appointment, 'cancelled');
+        } catch (_) {}
 
         res.status(200).json({
             success: true,

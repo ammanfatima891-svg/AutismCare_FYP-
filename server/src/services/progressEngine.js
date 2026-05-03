@@ -11,6 +11,7 @@ const TherapyCase = require('../models/TherapyCase');
 const SessionLog = require('../models/SessionLog');
 const { HomeAssignment } = require('../models/HomeAssignment');
 const { parseResponseScore, parseScale1to5 } = require('../utils/sessionResponseScore');
+const { resolveMasteryRuleFromGoal } = require('../utils/masteryPresets');
 
 const CLINICAL_DOMAINS = ['communication', 'behavior', 'social'];
 
@@ -92,13 +93,31 @@ function classifyTrendThree(slope) {
   return 'stagnant';
 }
 
+const MEASUREMENT_ENUM = ['accuracy_trials', 'frequency', 'duration', 'latency', 'rating_1_5', 'score'];
+
+/** Infer measurement type when row omits it or data disagrees with declared type. */
+function inferEffectiveMeasurementType(row, goalDef) {
+  if (!row || typeof row !== 'object') return goalDef?.measurementType || 'rating_1_5';
+  const explicit = String(row.measurementType || '').trim();
+  if (explicit && MEASUREMENT_ENUM.includes(explicit)) {
+    if (explicit === 'accuracy_trials' && Number(row.trials) > 0) return explicit;
+    if (explicit === 'rating_1_5' && row.rating != null) return explicit;
+    if (explicit === 'frequency' && row.count != null) return explicit;
+    if ((explicit === 'duration' || explicit === 'latency') && row.seconds != null) return explicit;
+    if (explicit === 'score' && row.score != null) return explicit;
+  }
+  if (row.trials != null && Number(row.trials) > 0 && row.correct != null) return 'accuracy_trials';
+  if (row.rating != null) return 'rating_1_5';
+  if (row.count != null) return 'frequency';
+  if (row.seconds != null) return String(goalDef?.measurementType || '').includes('latency') ? 'latency' : 'duration';
+  if (row.score != null) return 'score';
+  return goalDef?.measurementType || 'rating_1_5';
+}
+
 function normalizedScoreFromGoalRow(row, goalDef) {
   if (!row) return null;
-  if (row.score != null && Number.isFinite(Number(row.score))) {
-    return Math.max(0, Math.min(100, (Number(row.score) / 5) * 100));
-  }
-  const t = row.measurementType;
-  if (t === 'score' && row.score != null) {
+  const t = inferEffectiveMeasurementType(row, goalDef);
+  if ((t === 'score' || t === 'rating_1_5') && row.score != null && Number.isFinite(Number(row.score))) {
     return Math.max(0, Math.min(100, (Number(row.score) / 5) * 100));
   }
   if (t === 'accuracy_trials' && row.trials > 0) {
@@ -165,7 +184,7 @@ function collectPlanGoalDefs(plan) {
     if (g._id) matchKeys.add(String(g._id));
     if (g.goalKey) matchKeys.add(String(g.goalKey).trim());
     if (g.goalId) matchKeys.add(String(g.goalId).trim());
-    const mr = g.masteryRule || {};
+    const resolvedMr = resolveMasteryRuleFromGoal(g);
     const measurementType = g.measurement?.type || 'rating_1_5';
     const baselineVal = g.baseline?.value != null ? Number(g.baseline.value) : null;
     const targetVal = g.target?.value != null ? Number(g.target.value) : null;
@@ -191,10 +210,10 @@ function collectPlanGoalDefs(plan) {
           : null,
       masteryCriteria: String(g.masteryCriteria || g.measurableCriteria || '').trim(),
       masteryRule: {
-        ruleType: mr.ruleType || 'threshold_out_of_n_sessions',
-        threshold: Number(mr.threshold) >= 0 ? Number(mr.threshold) : 80,
-        window: Number(mr.window) > 0 ? Number(mr.window) : 5,
-        minSessions: Number(mr.minSessions) > 0 ? Number(mr.minSessions) : 3,
+        ruleType: resolvedMr.ruleType,
+        threshold: resolvedMr.threshold,
+        window: resolvedMr.window,
+        minSessions: resolvedMr.minSessions,
       },
       targetValue: targetVal,
       targetSeconds: null,
@@ -247,30 +266,221 @@ function findGoalDataRow(session, goalDef) {
   }) || null;
 }
 
-function buildGoalSeries(sessionsAsc, goalDef) {
-  const points = [];
+function sessionTouchesGoal(session, goalDef) {
+  if (findGoalDataRow(session, goalDef)) return true;
+  const gt = Array.isArray(session.goalsTargeted) ? session.goalsTargeted : [];
+  return gt.some((x) => goalDef.matchKeys.has(String(x).trim()));
+}
+
+function smoothGoalSeriesPoints(points) {
+  if (points.length < 2) return points;
+  const vals = points.map((p) => p.scoreFive);
+  const sm = movingAverage3(vals);
+  return points.map((p, i) => {
+    const sf = sm[i];
+    return {
+      ...p,
+      scoreFive: Number(Number(sf).toFixed(3)),
+      pct: sf * 20,
+    };
+  });
+}
+
+function perPointConfidence(p) {
+  if (!p) return 0.45;
+  if (p.dataSource === 'goalData' && !p.inferredMeasurement) return 0.88;
+  if (p.dataSource === 'goalData') return 0.68;
+  return 0.52;
+}
+
+/** Raw + display (optional smoothing) series with per-point provenance for explainability. */
+function buildGoalSeriesDetailed(sessionsAsc, goalDef) {
+  const rawPoints = [];
   for (const s of sessionsAsc) {
     if (String(s.status || 'completed') !== 'completed') continue;
     const row = findGoalDataRow(s, goalDef);
     let pct = null;
+    let dataSource = 'childResponse';
+    let inferredMeasurement = false;
     if (row) {
-      pct = normalizedScoreFromGoalRow({ ...row, measurementType: row.measurementType || goalDef.measurementType }, goalDef);
+      const declared = String(row.measurementType || '').trim();
+      const effective = inferEffectiveMeasurementType(row, goalDef);
+      inferredMeasurement = !declared || (declared && declared !== effective);
+      dataSource = 'goalData';
+      pct = normalizedScoreFromGoalRow(row, goalDef);
     }
     if (pct == null) {
       const gt = Array.isArray(s.goalsTargeted) ? s.goalsTargeted : [];
       const hit = gt.some((x) => goalDef.matchKeys.has(String(x).trim()));
-      if (hit) pct = legacySessionPct(s);
+      if (hit) {
+        pct = legacySessionPct(s);
+        dataSource = 'childResponse';
+        inferredMeasurement = false;
+      }
     }
-    if (pct != null) {
-      points.push({
-        sessionId: String(s._id),
-        date: s.sessionDate ? new Date(s.sessionDate).toISOString() : null,
-        scoreFive: pctToFive(pct),
-        pct,
+    if (pct == null) continue;
+    rawPoints.push({
+      sessionId: String(s._id),
+      date: s.sessionDate ? new Date(s.sessionDate).toISOString() : null,
+      scoreFive: pctToFive(pct),
+      pct,
+      dataSource,
+      inferredMeasurement,
+    });
+  }
+
+  let smoothingApplied = false;
+  let displayPoints = rawPoints;
+  if (rawPoints.length >= 2) {
+    const vals = rawPoints.map((p) => p.scoreFive);
+    const v = varianceSample(vals);
+    if (v > 0.18 || (rawPoints.length <= 4 && vals.length >= 2)) {
+      displayPoints = smoothGoalSeriesPoints(rawPoints);
+      smoothingApplied = true;
+    }
+  }
+
+  let dominantSource = 'childResponse';
+  if (rawPoints.length) {
+    const nG = rawPoints.filter((p) => p.dataSource === 'goalData').length;
+    const ratioG = nG / rawPoints.length;
+    const nInf = rawPoints.filter((p) => p.inferredMeasurement).length;
+    const ratioInf = nInf / rawPoints.length;
+    if (ratioInf >= 0.45) dominantSource = 'inferred';
+    else if (ratioG >= 0.45) dominantSource = 'goalData';
+    else dominantSource = 'childResponse';
+  }
+
+  const structuredDataRatio =
+    rawPoints.length > 0 ? Number((rawPoints.filter((p) => p.dataSource === 'goalData').length / rawPoints.length).toFixed(3)) : 0;
+
+  const timeSeries = rawPoints.map((raw, i) => ({
+    date: raw.date,
+    score: raw.scoreFive,
+    smoothedScore:
+      smoothingApplied && displayPoints[i] ? Number(displayPoints[i].scoreFive.toFixed(3)) : undefined,
+    confidence: Number(perPointConfidence(raw).toFixed(2)),
+  }));
+
+  return {
+    rawPoints,
+    displayPoints,
+    smoothingApplied,
+    dominantSource,
+    structuredDataRatio,
+    sessionsUsed: rawPoints.length,
+    timeSeries,
+  };
+}
+
+function buildReasoningSummary(ctx) {
+  const {
+    goalName,
+    dominantSource,
+    sessionsUsed,
+    structuredDataRatio,
+    smoothingApplied,
+    inferredDominant,
+    trend,
+    gconfLabel,
+  } = ctx;
+  const src =
+    dominantSource === 'goalData'
+      ? 'structured session goal data'
+      : dominantSource === 'inferred'
+        ? 'mixed sources with inferred measurement handling'
+        : 'session-level responses linked to this goal';
+  const smooth = smoothingApplied ? ' Short-term smoothing was applied for sparse or jumpy signals.' : '';
+  const infer = inferredDominant ? ' Some rows relied on inferred measurement types.' : '';
+  return `"${goalName}" reflects ${sessionsUsed} session(s); primary input: ${src}. Structured data ratio ${Math.round(structuredDataRatio * 100)}%. Trend: ${trend}. Confidence ${gconfLabel}.${smooth}${infer}`;
+}
+
+function classifyOverallTrend(improvementRate, weeklySorted) {
+  if (weeklySorted && weeklySorted.length >= 3) {
+    const ys = weeklySorted.map((w) => w.y);
+    const slope = linearSlope(ys);
+    const t = classifyTrendThree(slope);
+    return t;
+  }
+  if (improvementRate > 0.03) return 'improving';
+  if (improvementRate < -0.03) return 'declining';
+  return 'stagnant';
+}
+
+function buildGoalInsights(trend, seriesScores, goalName, goalId) {
+  const insights = [];
+  const lastWindow = 5;
+  const recent = seriesScores.slice(-lastWindow);
+  if (trend === 'declining') {
+    insights.push({
+      severity: 'critical',
+      code: 'goal_declining',
+      goalId,
+      message: `Regression detected for "${goalName}" (recent trajectory declining).`,
+    });
+  }
+  if (recent.length >= 4) {
+    const v = varianceSample(recent);
+    if (v > 0.32) {
+      insights.push({
+        severity: 'warning',
+        code: 'goal_high_variability',
+        goalId,
+        message: `Inconsistent response pattern for "${goalName}" (high variability across recent sessions).`,
       });
     }
   }
-  return points;
+  if (trend === 'stagnant' && seriesScores.length >= 4) {
+    const lastN = Math.min(5, seriesScores.length);
+    const slice = seriesScores.slice(-lastN);
+    const slope = linearSlope(slice);
+    if (Math.abs(slope) < 0.06) {
+      insights.push({
+        severity: 'warning',
+        code: 'goal_no_improvement_recent',
+        goalId,
+        message: `No improvement in last ${lastN} session(s): "${goalName}".`,
+      });
+    }
+  }
+  return insights;
+}
+
+/**
+ * Per-goal confidence (0–1) from session depth, structured goalData usage, measurement consistency.
+ */
+function computeGoalConfidenceScore(goalDef, series, sessionsAsc) {
+  const completed = (sessionsAsc || []).filter((s) => String(s.status || 'completed') === 'completed');
+  let touchedSessions = 0;
+  let structuredHits = 0;
+  let typeAligned = 0;
+  let structuredTotal = 0;
+  for (const s of completed) {
+    if (!sessionTouchesGoal(s, goalDef)) continue;
+    touchedSessions += 1;
+    const row = findGoalDataRow(s, goalDef);
+    if (row) {
+      structuredHits += 1;
+      structuredTotal += 1;
+      const inf = inferEffectiveMeasurementType(row, goalDef);
+      if (inf === (goalDef.measurementType || 'rating_1_5')) typeAligned += 1;
+    }
+  }
+  const nPoints = series.length;
+  if (touchedSessions === 0 && nPoints === 0) {
+    return { score: 0, label: 'low' };
+  }
+  let c = 0.2 * Math.min(1, nPoints / 5);
+  c += 0.35 * (touchedSessions ? Math.min(1, structuredHits / Math.max(1, touchedSessions)) : 0);
+  c += 0.25 * (structuredTotal ? typeAligned / Math.max(1, structuredTotal) : 0.35);
+  c += 0.2 * Math.min(1, touchedSessions / 8);
+  const score = Number(Math.max(0, Math.min(1, c)).toFixed(3));
+  return { score, label: confidenceLabel(score) };
+}
+
+/** Display series (optionally smoothed). Backward-compatible with pre-v3 callers. */
+function buildGoalSeries(sessionsAsc, goalDef) {
+  return buildGoalSeriesDetailed(sessionsAsc, goalDef).displayPoints;
 }
 
 function evaluateMasteryPct(series, rule) {
@@ -339,6 +549,20 @@ function varianceSample(vals) {
   let s = 0;
   for (const v of vals) s += (v - m) ** 2;
   return s / vals.length;
+}
+
+/** Dynamic session vs home blend: no home → 100% session; volatile home ratings → lower home weight. */
+function computeAdaptiveBlendWeights(therapyScoresFive, homeScoresFive) {
+  const nT = therapyScoresFive.length;
+  const nH = homeScoresFive.length;
+  if (nH === 0) return { wSession: 1, wHome: 0 };
+  if (nT === 0) return { wSession: 0, wHome: 1 };
+  const varH = varianceSample(homeScoresFive);
+  let wHome = 0.22 + Math.min(0.38, nH * 0.055);
+  if (varH > 0.18) wHome *= 0.72;
+  if (varH > 0.32) wHome *= 0.82;
+  wHome = Math.min(0.48, Math.max(0.12, wHome));
+  return { wSession: Number((1 - wHome).toFixed(3)), wHome: Number(wHome.toFixed(3)) };
 }
 
 /**
@@ -441,6 +665,72 @@ function buildWeeklyTrendSeries(sessionsAsc) {
   }));
 }
 
+function buildPerGoalClinicalRecommendation(g) {
+  if (!g) return '';
+  if (g.trend === 'declining') {
+    return 'Prioritize reassessment and targeted practice for this goal.';
+  }
+  if (g.trend === 'stagnant' && Number(g.dataPoints || 0) >= 3) {
+    return 'Consider adjusting difficulty or measurement; trend is flat across recent sessions.';
+  }
+  if (String(g.confidenceLabel || '').toLowerCase() === 'low') {
+    return 'Collect more structured goal data in upcoming sessions to firm up this signal.';
+  }
+  if (g.mastery === true || String(g.masteryStatus || '') === 'mastered') {
+    return 'Maintain reinforcement; goal shows mastery pattern.';
+  }
+  return 'Continue planned intervention; signal is stable or improving.';
+}
+
+/**
+ * Case-level clinical triage for dashboards (no client-side progress math).
+ */
+function buildClinicalDecisionLayer(ctx) {
+  const { goalsPayload, smartAlerts, weakAreas, overallTrend, confidenceOverall } = ctx;
+  const crit = (smartAlerts || []).filter((a) => String(a.severity || '').toLowerCase() === 'critical');
+  const warn = (smartAlerts || []).some((a) => String(a.severity || '').toLowerCase() === 'warning');
+  const decliningGoals = (goalsPayload || []).filter((g) => g && g.trend === 'declining').length;
+  const stagnantMany = (goalsPayload || []).filter((g) => g && g.trend === 'stagnant' && Number(g.dataPoints || 0) >= 3).length;
+  const co = Number(confidenceOverall) || 0;
+
+  let overallClinicalStatus = 'on_track';
+  if (crit.length > 0 || decliningGoals >= 2 || (overallTrend === 'declining' && co >= 0.35)) {
+    overallClinicalStatus = 'high_concern';
+  } else if (
+    co < 0.4 ||
+    warn ||
+    overallTrend === 'declining' ||
+    stagnantMany >= 2 ||
+    (weakAreas || []).length >= 2
+  ) {
+    overallClinicalStatus = 'needs_attention';
+  }
+
+  const parts = [];
+  for (const w of weakAreas || []) {
+    if (parts.length >= 3) break;
+    parts.push(typeof w === 'string' ? w : w.reason || '');
+  }
+  for (const a of smartAlerts || []) {
+    if (parts.length >= 5) break;
+    if (a && a.message) parts.push(a.message);
+  }
+  const clinicalReasoning =
+    parts.filter(Boolean).join(' ').slice(0, 520) || 'No major clinical drivers flagged by the progress engine.';
+
+  let clinicalRecommendation =
+    'Maintain current therapy cadence and home practice; re-check progress in upcoming sessions.';
+  if (overallClinicalStatus === 'high_concern') {
+    clinicalRecommendation =
+      'Schedule a focused case review; align on plan changes, regression drivers, and family communication.';
+  } else if (overallClinicalStatus === 'needs_attention') {
+    clinicalRecommendation =
+      'Review therapist session notes and adherence; clarify measurement and short-term targets for drifting goals.';
+  }
+
+  return { overallClinicalStatus, clinicalReasoning, clinicalRecommendation };
+}
+
 /**
  * Core synchronous build from already-loaded documents.
  * @param {{ caseId: string, plan: object|null, sessions: object[], assignments: object[] }} input
@@ -486,9 +776,10 @@ function buildProgressEnginePayload(input) {
   const therapyScore = therapyScoresFive.length ? mean(therapyScoresFive) : null;
   const homeScore = homeScoresFive.length ? mean(homeScoresFive) : null;
 
+  const blend = computeAdaptiveBlendWeights(therapyScoresFive, homeScoresFive);
   let rawBlendScore = 0;
   if (therapyScore != null && homeScore != null) {
-    rawBlendScore = therapyScore * 0.6 + homeScore * 0.4;
+    rawBlendScore = therapyScore * blend.wSession + homeScore * blend.wHome;
   } else if (therapyScore != null) {
     rawBlendScore = therapyScore;
   } else if (homeScore != null) {
@@ -524,9 +815,12 @@ function buildProgressEnginePayload(input) {
   }
 
   const goalSeriesById = new Map();
+
   const goalsPayload = goalDefs.map((def) => {
-    const series = buildGoalSeries(sessionsAsc, def);
+    const detail = buildGoalSeriesDetailed(sessionsAsc, def);
+    const series = detail.displayPoints;
     goalSeriesById.set(def.goalId, series);
+
     const scoresFive = series.map((p) => p.scoreFive).filter((v) => v != null);
     const current = scoresFive.length ? Number(mean(scoresFive).toFixed(2)) : null;
     const recent = scoresFive.slice(-3);
@@ -553,6 +847,38 @@ function buildProgressEnginePayload(input) {
         ? Number(mean(assignRatings.map((r) => ratingToFive(r))).toFixed(2))
         : null;
 
+    const gconf = computeGoalConfidenceScore(def, series, sessionsAsc);
+    const mastered = mastery.mastered === true || masteryStatus === 'mastered';
+    const progressPercent =
+      currentRecent != null
+        ? Number(((currentRecent / 5) * 100).toFixed(2))
+        : mastered
+          ? 100
+          : null;
+
+    const inferredAny = detail.rawPoints.some((p) => p.inferredMeasurement);
+    const explanation = {
+      dataSource: detail.dominantSource,
+      sessionsUsed: detail.sessionsUsed,
+      structuredDataRatio: detail.structuredDataRatio,
+      smoothingApplied: detail.smoothingApplied,
+      inferredMeasurement: inferredAny,
+    };
+
+    const reasoningSummary = buildReasoningSummary({
+      goalName: def.goalName,
+      dominantSource: detail.dominantSource,
+      sessionsUsed: detail.sessionsUsed,
+      structuredDataRatio: detail.structuredDataRatio,
+      smoothingApplied: detail.smoothingApplied,
+      inferredDominant: detail.dominantSource === 'inferred',
+      trend,
+      gconfLabel: gconf.label,
+    });
+
+    const goalInsights = buildGoalInsights(trend, scoresFive, def.goalName, def.goalId);
+    const limitedDataUi = Boolean(gconf.score < 0.4);
+
     return {
       goalId: def.goalId,
       domain: def.clinicalDomain,
@@ -562,12 +888,20 @@ function buildProgressEnginePayload(input) {
       target: def.targetFive,
       trend,
       masteryStatus,
-      mastery: mastery.mastered === true,
+      mastery: mastered,
       goalName: def.goalName,
       measurementType: def.measurementType,
       dataPoints: series.length,
       linkedAssignmentsCount: linkedAssignments.length,
       assignmentRatingAvg,
+      confidenceScore: gconf.score,
+      confidenceLabel: gconf.label,
+      limitedDataUi,
+      progressPercent,
+      explanation,
+      reasoningSummary,
+      timeSeries: detail.timeSeries,
+      goalInsights,
     };
   });
 
@@ -579,13 +913,19 @@ function buildProgressEnginePayload(input) {
     if (!domainAgg[g.domain]) return;
     if (g.current != null) domainAgg[g.domain].scores.push(g.current);
   });
-  goalDefs.forEach((def, i) => {
-    const series = buildGoalSeries(sessionsAsc, def);
+  goalDefs.forEach((def) => {
+    const series = goalSeriesById.get(def.goalId) || [];
     const scoresFive = series.map((p) => p.scoreFive).filter((v) => v != null);
     const slopeSeries = scoresFive.slice(-Math.min(5, scoresFive.length));
-    const slope = slopeSeries.length >= 2 ? linearSlope(slopeSeries) : 0;
+    const slopeSeriesSlope = slopeSeries.length >= 2 ? linearSlope(slopeSeries) : 0;
     const dom = def.clinicalDomain;
-    if (domainAgg[dom]) domainAgg[dom].slopes.push(slope);
+    if (domainAgg[dom]) domainAgg[dom].slopes.push(slopeSeriesSlope);
+  });
+
+  const domainGoalConf = {};
+  for (const name of CLINICAL_DOMAINS) domainGoalConf[name] = [];
+  goalsPayload.forEach((g) => {
+    if (domainGoalConf[g.domain]) domainGoalConf[g.domain].push(Number(g.confidenceScore) || 0);
   });
 
   const domains = CLINICAL_DOMAINS.map((name) => {
@@ -593,7 +933,17 @@ function buildProgressEnginePayload(input) {
     const score = scores.length ? Number(mean(scores).toFixed(2)) : 0;
     const domSlope = slopes.length ? mean(slopes) : 0;
     const status = classifyTrendThree(domSlope);
-    return { name, score, status };
+    const trend = classifyTrendThree(domSlope);
+    const confArr = domainGoalConf[name] || [];
+    const confidenceScore = confArr.length ? Number(mean(confArr).toFixed(3)) : 0;
+    return {
+      name,
+      score,
+      status,
+      trend,
+      confidenceScore,
+      confidenceLabel: confidenceLabel(confidenceScore),
+    };
   });
 
   const weakAreas = [];
@@ -611,31 +961,77 @@ function buildProgressEnginePayload(input) {
   const activityCompletionRate =
     activityLinked.length > 0 ? Number((activityCompleted / activityLinked.length).toFixed(3)) : null;
 
+  const overallTrend = classifyOverallTrend(improvementRate, weeklySorted);
+  const shortFive = therapyScoresFive.slice(-Math.min(5, therapyScoresFive.length));
+  const shortTermTrend =
+    shortFive.length >= 2 ? classifyTrendThree(linearSlope(shortFive)) : 'stagnant';
+  const longTermTrend = overallTrend;
+  const overallExplanation = {
+    sessionWeight: blend.wSession,
+    homeWeight: blend.wHome,
+    confidenceScore: confidenceOverall,
+    dataQuality: confidence.label,
+  };
+  const domainScores = domains.map((d) => ({
+    name: d.name,
+    score: d.score,
+    confidence: d.confidenceScore,
+  }));
+
+  const smartAlertsDraft = buildSmartAlerts({
+    goalsPayload,
+    consistency,
+    totalAssignments,
+    goalSeriesById,
+    therapyScore,
+    homeScore,
+    sessionsAsc,
+    weeklySorted,
+    confidenceOverall,
+    hasProgressSignals: therapyScoresFive.length > 0 || homeScoresFive.length > 0,
+  });
+
+  const clinicalLayer = buildClinicalDecisionLayer({
+    goalsPayload,
+    smartAlerts: smartAlertsDraft,
+    weakAreas,
+    overallTrend,
+    confidenceOverall,
+  });
+
+  const goalsWithClinical = goalsPayload.map((g) => ({
+    ...g,
+    clinicalRecommendation: buildPerGoalClinicalRecommendation(g),
+  }));
+
+  const smartAlertsSorted = sortSmartAlertsBySeverity(smartAlertsDraft);
+
   return {
     caseId: String(caseId),
-    engineVersion: 1,
+    engineVersion: 3,
     overallScore: finalScore,
     rawBlendScore: Number(rawBlendScore.toFixed(3)),
     confidence,
+    overallTrend,
+    shortTermTrend,
+    longTermTrend,
+    overallConfidence: confidenceOverall,
+    overallExplanation,
+    overallClinicalStatus: clinicalLayer.overallClinicalStatus,
+    clinicalReasoning: clinicalLayer.clinicalReasoning,
+    clinicalRecommendation: clinicalLayer.clinicalRecommendation,
+    domainScores,
     improvementRate,
     consistency: consistency != null ? Number(consistency.toFixed(3)) : null,
     activityCompletionRate,
     domains,
-    goals: goalsPayload,
+    goals: goalsWithClinical,
     weeklyTrend: weeklySorted,
     weakAreas,
-    smartAlerts: buildSmartAlerts({
-      goalsPayload,
-      consistency,
-      totalAssignments,
-      goalSeriesById,
-      therapyScore,
-      homeScore,
-      sessionsAsc,
-      weeklySorted,
-    }),
+    smartAlerts: smartAlertsSorted,
     sessionInsights: buildSessionInsights(sessionsAsc, goalDefs),
     _meta: {
+      blendingWeights: blend,
       therapyScoreAvg: therapyScore != null ? Number(therapyScore.toFixed(2)) : null,
       homeScoreAvg: homeScore != null ? Number(homeScore.toFixed(2)) : null,
       sessionsCounted: therapyScoresFive.length,
@@ -643,6 +1039,21 @@ function buildProgressEnginePayload(input) {
       totalAssignments,
     },
   };
+}
+
+function severityRank(sev) {
+  const s = String(sev || '').toLowerCase();
+  if (s === 'critical' || s === 'error' || s === 'danger') return 0;
+  if (s === 'warning') return 1;
+  return 2;
+}
+
+function sortSmartAlertsBySeverity(alerts) {
+  return [...(alerts || [])].sort((a, b) => {
+    const d = severityRank(a.severity) - severityRank(b.severity);
+    if (d !== 0) return d;
+    return String(a.code || '').localeCompare(String(b.code || ''));
+  });
 }
 
 function buildSmartAlerts(ctx) {
@@ -655,12 +1066,41 @@ function buildSmartAlerts(ctx) {
     homeScore,
     sessionsAsc,
     weeklySorted,
+    confidenceOverall,
+    hasProgressSignals,
   } = ctx;
   const alerts = [];
+
+  if (hasProgressSignals && confidenceOverall < 0.4) {
+    alerts.push({
+      severity: 'warning',
+      code: 'low_confidence_overall',
+      message: 'Low confidence: insufficient or inconsistent data',
+    });
+  }
+
   for (const g of goalsPayload) {
     const series = goalSeriesById.get(g.goalId) || [];
     if (g.trend === 'stagnant' && g.dataPoints >= 2 && stagnantTwoWeeks(series)) {
       alerts.push({ severity: 'warning', code: 'goal_stagnant', message: `Goal stagnant for 2+ weeks: ${g.goalName}` });
+    }
+    if (g.explanation && g.explanation.structuredDataRatio < 0.35 && g.dataPoints >= 2) {
+      alerts.push({
+        severity: 'info',
+        code: 'inferred_progress_heavy',
+        goalId: g.goalId,
+        message: `Progress based mostly on inferred data: ${g.goalName}`,
+      });
+    }
+    if (Array.isArray(g.goalInsights)) {
+      for (const ins of g.goalInsights) {
+        alerts.push({
+          severity: ins.severity,
+          code: ins.code,
+          goalId: ins.goalId,
+          message: ins.message,
+        });
+      }
     }
   }
   if (consistency != null && totalAssignments >= 3 && consistency < 0.4) {

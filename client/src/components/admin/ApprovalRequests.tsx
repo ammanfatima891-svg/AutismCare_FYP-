@@ -5,6 +5,7 @@ import { Badge } from "../ui/badge";
 import { CheckCircle, XCircle, Clock, User, Stethoscope, Users, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import API from "../../api";
+import { resolveUploadsHref } from "../../utils/resolveUploadsUrl";
 
 interface Document {
   name: string;
@@ -174,7 +175,7 @@ export default function ApprovalRequests() {
                                 </p>
                               </div>
                               <Button
-                                onClick={() => window.open(doc.url, '_blank')}
+                                onClick={() => window.open(resolveUploadsHref(doc.url), '_blank', 'noopener,noreferrer')}
                                 variant="outline"
                                 size="sm"
                                 className="text-xs"

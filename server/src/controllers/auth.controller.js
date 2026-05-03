@@ -6,6 +6,13 @@ const crypto = require('crypto');
 const path = require('path');
 const { sendEmail } = require('../services/emailService');
 
+/** Avoid `CLIENT_URL` trailing slash + `/path` → `//path` (breaks SPA routes). */
+function buildClientAbsoluteUrl(pathname) {
+  const base = String(process.env.CLIENT_URL || '').trim().replace(/\/+$/, '') || 'http://localhost:5173';
+  const path = String(pathname || '').startsWith('/') ? pathname : `/${pathname}`;
+  return `${base}${path}`;
+}
+
 function shouldLogAuthRegistrationDebug() {
   return process.env.DEBUG_AUTH_REGISTRATION === 'true';
 }
@@ -61,10 +68,10 @@ exports.register = async (req, res) => {
     // 4. Handle document uploads for professionals
     let documents = [];
     if ((normalizedRole === 'clinician' || normalizedRole === 'therapist') && req.files && req.files.length > 0) {
-      const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4000}`;
+      // Store path-only URLs so the admin SPA (different origin/port) can open files via API host (see resolveUploadsHref on client).
       documents = req.files.map(file => ({
         name: file.originalname,
-        url: `${serverUrl}/uploads/documents/${file.filename}`,
+        url: `/uploads/documents/${file.filename}`,
         type: path.extname(file.originalname).toLowerCase()
       }));
     }
@@ -102,7 +109,7 @@ exports.register = async (req, res) => {
 
     // 6. Prepare verification email (NON-CRITICAL)
     // Note: Use the raw token in the URL, not the hashed one
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const verificationUrl = buildClientAbsoluteUrl(`/verify-email/${verificationToken}`);
 
     // Respond immediately; email send happens in background (never blocks user creation)
     if (normalizedRole === 'lab') {
@@ -258,7 +265,7 @@ exports.resendVerificationEmail = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // Send verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const verificationUrl = buildClientAbsoluteUrl(`/verify-email/${verificationToken}`);
 
     try {
       const resp = await sendEmail({
@@ -288,7 +295,7 @@ exports.forgotPassword = async (req, res) => {
     const resetToken = user.createPasswordResetToken();
     await user.save({ validateBeforeSave: false });
 
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    const resetUrl = buildClientAbsoluteUrl(`/reset-password/${resetToken}`);
     
     const resp = await sendEmail({
       to: user.email,

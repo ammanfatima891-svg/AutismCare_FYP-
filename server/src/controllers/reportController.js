@@ -524,13 +524,6 @@ exports.generateReport = async (req, res) => {
     ]);
 
     const sessionsAsc = [...sessions];
-    if (sessionsAsc.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Report generation not allowed: at least one session log is required.',
-        errorCode: 'NO_SESSIONS',
-      });
-    }
     const analytics = buildUnifiedCaseAnalytics({ plan, sessions: sessionsAsc, assignments });
     const childInfo = await loadChildDisplay(caseDoc);
 

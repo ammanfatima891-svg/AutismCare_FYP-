@@ -10,14 +10,18 @@ const {
   validateSessionGoalsAndActivities,
   validateSessionGoalData,
   buildActivityUsageRows,
+  findSessionContextPlan,
 } = require('../utils/sessionPlanValidation');
-const { getActiveEpisodeForCase } = require('../services/therapyEpisodeService');
+const { getActiveEpisodeForCase, ensureActiveEpisodeForPlan } = require('../services/therapyEpisodeService');
 const { completeMatchingSessionSlot, validateSessionSlotForNewLog } = require('../utils/sessionSlotLink');
-const { invalidateProgressEngineCache } = require('../services/progressEngine');
+const { invalidateProgressEngineCache, computeProgressEngineForCase } = require('../services/progressEngine');
+const { buildPostSessionProgressFeedback } = require('../utils/postSessionProgressFeedback');
 const { maybeLockPlanBaselineAfterSession } = require('../utils/planBaselineLock');
 const { collectGoalDataLinkageWarnings } = require('../utils/sessionGoalDataValidation');
 const TherapyCase = require('../models/TherapyCase');
 const { THERAPY_STATUS } = require('../constants/workflowEnums');
+const { scheduleEmitClinicalEvent, actorFromReq, slimProgressSnapshot } = require('../services/clinicalEventService');
+const { buildCrossDomainInsights, getLabContextForCase } = require('../services/clinicalCorrelationService');
 
 function childNameFromCase(caseDoc, parentById) {
   if (!caseDoc) return 'Child';
@@ -26,6 +30,19 @@ function childNameFromCase(caseDoc, parentById) {
   const found = parent.children.find((c) => c && c._id && c._id.toString() === caseDoc.childId.toString());
   if (!found) return 'Child';
   return `${found.firstName || ''} ${found.lastName || ''}`.trim() || 'Child';
+}
+
+/** Same plan document session APIs validate against (caseId + this therapist). */
+async function loadTherapyPlanForSession(caseId, therapistId) {
+  const planLean = await findSessionContextPlan(caseId, therapistId);
+  if (planLean) return { ok: true, planLean };
+  const anyPlan = await TherapyPlan.findOne({ caseId }).sort({ updatedAt: -1 }).select('therapistId').lean();
+  let message = 'A therapy plan is required before logging sessions for this case';
+  if (anyPlan && String(anyPlan.therapistId) !== String(therapistId)) {
+    message =
+      'A therapy plan exists for this case under a different therapist account. Log in as the assigned therapist and open Therapy Plans for this case, or duplicate the plan to your account so session logs match the plan your care team uses.';
+  }
+  return { ok: false, message };
 }
 
 /**
@@ -112,13 +129,15 @@ exports.createSession = async (req, res) => {
       });
     }
 
-    const planLean = await TherapyPlan.findOne({ caseId, therapistId }).sort({ updatedAt: -1 }).lean();
-    if (!planLean) {
+    const planLoad = await loadTherapyPlanForSession(caseId, therapistId);
+    if (!planLoad.ok) {
       return res.status(400).json({
         success: false,
-        message: 'A therapy plan is required before logging sessions for this case',
+        message: planLoad.message,
+        errorCode: 'THERAPY_PLAN_REQUIRED',
       });
     }
+    const { planLean } = planLoad;
 
     const planCheck = await validateSessionGoalsAndActivities(caseId, therapistId, v.payload.goalsTargeted, v.payload.activitiesUsed, {
       plan: planLean,
@@ -148,7 +167,15 @@ exports.createSession = async (req, res) => {
     const activityUsage = buildActivityUsageRows(p.activitiesUsed, planLean);
     const activitiesUsedDeduped = activityUsage.map((row) => row.displayName);
 
-    const activeEpisode = await getActiveEpisodeForCase(caseId);
+    let activeEpisode = await getActiveEpisodeForCase(caseId);
+    if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId) || !activeEpisode.isActive) {
+      try {
+        await ensureActiveEpisodeForPlan(planLean);
+      } catch (e) {
+        console.error('[POST /api/sessions] ensureActiveEpisodeForPlan:', e?.message || e);
+      }
+      activeEpisode = await getActiveEpisodeForCase(caseId);
+    }
     if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId)) {
       return res.status(400).json({
         success: false,
@@ -213,16 +240,60 @@ exports.createSession = async (req, res) => {
       /* ignore cache bust errors */
     }
 
+    let progressFeedback = null;
+    try {
+      progressFeedback = await buildPostSessionProgressFeedback(caseId, therapistId);
+    } catch (_) {
+      /* non-blocking */
+    }
+
     const planForWarnings = await TherapyPlan.findOne({ caseId, therapistId })
       .select('shortTermGoals goals')
       .lean();
     const warnings = collectGoalDataLinkageWarnings(planForWarnings, Array.isArray(p.goalData) ? p.goalData : []);
+
+    try {
+      const act = actorFromReq(req);
+      let peSnap = null;
+      let cross = [];
+      if (progressFeedback) {
+        peSnap = {
+          overallScore: progressFeedback.overallScore,
+          overallTrend: progressFeedback.overallTrend,
+          clinicalRecommendation: progressFeedback.clinicalRecommendation,
+          overallClinicalStatus: progressFeedback.overallClinicalStatus,
+        };
+        try {
+          const full = await computeProgressEngineForCase(caseId, { therapistId, useCache: false });
+          if (full.success && full.data) {
+            peSnap = slimProgressSnapshot(full.data);
+            const labCtx = await getLabContextForCase(caseId);
+            cross = buildCrossDomainInsights(full.data, labCtx);
+          }
+        } catch (_) {
+          /* keep peSnap from progressFeedback */
+        }
+      }
+      scheduleEmitClinicalEvent({
+        eventType: 'PROGRESS_UPDATED',
+        caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy', 'progress'],
+        payload: { sessionId: String(created._id), trigger: 'session_created' },
+        progressEngineSnapshot: peSnap || undefined,
+        crossDomainInsight: cross.length ? cross : undefined,
+      });
+    } catch (evErr) {
+      console.error('clinical event session create:', evErr);
+    }
 
     return res.status(201).json({
       success: true,
       message: 'Session saved successfully',
       data: created,
       ...(warnings.length ? { warnings } : {}),
+      ...(progressFeedback ? { progressFeedback } : {}),
     });
   } catch (error) {
     console.error('createSession:', error);
@@ -305,13 +376,15 @@ exports.updateSession = async (req, res) => {
       return res.status(400).json({ success: false, message: v.message });
     }
 
-    const planLean = await TherapyPlan.findOne({ caseId: session.caseId, therapistId }).sort({ updatedAt: -1 }).lean();
-    if (!planLean) {
+    const planLoad = await loadTherapyPlanForSession(session.caseId, therapistId);
+    if (!planLoad.ok) {
       return res.status(400).json({
         success: false,
-        message: 'A therapy plan is required before logging sessions for this case',
+        message: planLoad.message,
+        errorCode: 'THERAPY_PLAN_REQUIRED',
       });
     }
+    const { planLean } = planLoad;
 
     const planCheck = await validateSessionGoalsAndActivities(
       session.caseId,
@@ -331,7 +404,15 @@ exports.updateSession = async (req, res) => {
       return res.status(400).json({ success: false, message: goalDataCheck.message });
     }
 
-    const activeEpisode = await getActiveEpisodeForCase(session.caseId);
+    let activeEpisode = await getActiveEpisodeForCase(session.caseId);
+    if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId) || !activeEpisode.isActive) {
+      try {
+        await ensureActiveEpisodeForPlan(planLean);
+      } catch (e) {
+        console.error('[PATCH /api/sessions] ensureActiveEpisodeForPlan:', e?.message || e);
+      }
+      activeEpisode = await getActiveEpisodeForCase(session.caseId);
+    }
     if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId) || !activeEpisode.isActive) {
       return res.status(400).json({
         success: false,
@@ -362,6 +443,31 @@ exports.updateSession = async (req, res) => {
       invalidateProgressEngineCache(session.caseId);
     } catch (_) {
       /* ignore */
+    }
+    try {
+      const act = actorFromReq(req);
+      let peSnap = null;
+      let cross = [];
+      try {
+        const full = await computeProgressEngineForCase(session.caseId, { therapistId, useCache: false });
+        if (full.success && full.data) {
+          peSnap = slimProgressSnapshot(full.data);
+          const labCtx = await getLabContextForCase(session.caseId);
+          cross = buildCrossDomainInsights(full.data, labCtx);
+        }
+      } catch (_) {}
+      scheduleEmitClinicalEvent({
+        eventType: 'PROGRESS_UPDATED',
+        caseId: session.caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy', 'progress'],
+        payload: { sessionId: String(session._id), trigger: 'session_updated' },
+        progressEngineSnapshot: peSnap || undefined,
+        crossDomainInsight: cross.length ? cross : undefined,
+      });
+    } catch (evErr) {
+      console.error('clinical event session update:', evErr);
     }
     const planForWarnings = await TherapyPlan.findOne({ caseId: session.caseId, therapistId })
       .select('shortTermGoals goals')
@@ -413,6 +519,20 @@ exports.signSession = async (req, res) => {
       invalidateProgressEngineCache(session.caseId);
     } catch (_) {
       /* ignore */
+    }
+
+    try {
+      const act = actorFromReq(req);
+      scheduleEmitClinicalEvent({
+        eventType: 'SESSION_COMPLETED',
+        caseId: session.caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy'],
+        payload: { sessionId: String(session._id), signedAt: session.signedAt },
+      });
+    } catch (evErr) {
+      console.error('clinical event session sign:', evErr);
     }
 
     return res.status(200).json({ success: true, data: session.toObject() });

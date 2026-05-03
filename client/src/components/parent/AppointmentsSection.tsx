@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, Filter, X, ChevronLeft, ChevronRight, FileText, Upload, AlertCircle, CheckCircle } from 'lucide-react';
@@ -9,6 +9,13 @@ import { appointmentAPI, parentAPI } from '../../api';
 import { childAPI } from '../../api';
 import { APPOINTMENT_STATUS, normalizeAppointmentStatus } from '../../utils/workflowStatus';
 import { CaseStatusBadge } from '../CaseStatusBadge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 
 // ─── Status Config ───────────────────────────────────────────────────────────
 
@@ -85,10 +92,17 @@ interface Appointment {
 
 // ─── Booking Form Component ──────────────────────────────────────────────────
 
-function BookingForm({ children, onClose, onSuccess }: {
+function BookingForm({
+  children,
+  onClose,
+  onSuccess,
+  embedded = false,
+}: {
   children: Child[];
   onClose: () => void;
   onSuccess: () => void;
+  /** When true, render as a main-panel card (sidebar stays visible) instead of a modal dialog. */
+  embedded?: boolean;
 }) {
   const [formData, setFormData] = useState({
     childId: '',
@@ -181,17 +195,8 @@ function BookingForm({ children, onClose, onSuccess }: {
   today.setDate(today.getDate() + 1);
   const minDate = today.toISOString().split('T')[0];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-border bg-card p-6">
-          <h3 className="text-xl font-bold text-foreground">Book Appointment</h3>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="form p-6">
+  const formInner = (
+    <>
           {error && (
             <div className="p-3 bg-muted border rounded-lg flex items-center gap-2 text-destructive text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -204,6 +209,7 @@ function BookingForm({ children, onClose, onSuccess }: {
             <label className="block text-sm font-medium text-foreground">Select Child *</label>
             <select
               required
+              autoFocus
               value={formData.childId}
               onChange={e => setFormData(prev => ({ ...prev, childId: e.target.value }))}
               className="input"
@@ -382,9 +388,46 @@ function BookingForm({ children, onClose, onSuccess }: {
               {loading ? 'Submitting...' : 'Book Appointment'}
             </Button>
           </div>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <Card className="w-full max-w-3xl border-border shadow-md">
+        <CardHeader className="border-b pb-4">
+          <CardTitle>Book Appointment</CardTitle>
+          <CardDescription>Schedule a healthcare appointment for your child.</CardDescription>
+        </CardHeader>
+        <CardContent className="max-h-[calc(100dvh-12rem)] overflow-y-auto pt-6">
+          <form onSubmit={handleSubmit} className="form">
+            {formInner}
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 text-left">
+          <DialogTitle>Book Appointment</DialogTitle>
+          <DialogDescription>Schedule a healthcare appointment for your child.</DialogDescription>
+        </DialogHeader>
+
+        <form
+          onSubmit={handleSubmit}
+          className="form max-h-[calc(90vh-9rem)] min-h-0 overflow-y-auto overscroll-contain px-6 py-4"
+        >
+          {formInner}
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -502,10 +545,11 @@ export function AppointmentsSection({ initialShowBooking = false, formOnly = fal
 
   if (formOnly) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         {showBooking ? (
           <BookingForm
             children={children}
+            embedded
             onClose={() => setShowBooking(false)}
             onSuccess={handleBookingSuccess}
           />

@@ -8,9 +8,11 @@ const { User } = require('../models/User');
 const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
 const { recordAuditEvent } = require('../utils/auditLog');
 const { mergeShortTermGoalsPreservingLockedBaselines } = require('../utils/planBaselineLock');
-const { invalidateProgressEngineCache } = require('../services/progressEngine');
+const { invalidateProgressEngineCache, computeProgressEngineForCase } = require('../services/progressEngine');
+const { resolveMasteryRuleFromGoal, PRESET_KEYS } = require('../utils/masteryPresets');
 const { THERAPY_STATUS } = require('../constants/workflowEnums');
 const { startNewEpisode } = require('../services/therapyEpisodeService');
+const { scheduleEmitClinicalEvent, actorFromReq } = require('../services/clinicalEventService');
 
 const THERAPY_DOMAIN_OPTIONS = TherapyPlan.THERAPY_DOMAIN_OPTIONS;
 const SHORT_TERM_GOAL_STATUS = TherapyPlan.SHORT_TERM_GOAL_STATUS;
@@ -31,52 +33,43 @@ function resolvePlanStatus(body, existingStatus = 'draft') {
   return existingStatus;
 }
 
-function defaultMasteryRule(input) {
-  const mr = input && typeof input === 'object' ? input : {};
-  const ruleType =
-    mr.ruleType === 'threshold_consecutive_sessions' ? 'threshold_consecutive_sessions' : 'threshold_out_of_n_sessions';
-  const threshold = Number(mr.threshold);
-  const window = Number(mr.window);
-  const minSessions = Number(mr.minSessions);
-  return {
-    ruleType,
-    threshold: Number.isFinite(threshold) && threshold >= 0 ? threshold : 80,
-    window: Number.isFinite(window) && window > 0 ? window : 5,
-    minSessions: Number.isFinite(minSessions) && minSessions > 0 ? minSessions : 3,
-  };
-}
-
 function normalizeShortTermGoals(raw) {
   if (!Array.isArray(raw)) return [];
   const MT = TherapyPlan.MEASUREMENT_TYPES || ['rating_1_5'];
   return raw
     .filter((g) => g && String(g.title || '').trim())
-    .map((g) => ({
-      goalId: String(g.goalId || '').trim(),
-      goalKey: String(g.goalKey || '').trim() || crypto.randomUUID(),
-      title: String(g.title).trim(),
-      measurableCriteria: String(g.measurableCriteria || '').trim(),
-      masteryCriteria: String(g.masteryCriteria || '').trim(),
-      reviewDate: g.reviewDate ? new Date(g.reviewDate) : null,
-      status: SHORT_TERM_GOAL_STATUS.includes(g.status) ? g.status : 'Active',
-      domain: isValidDomain(g.domain) ? g.domain : 'Speech',
-      measurement: {
-        type: MT.includes(g.measurement?.type || g.measurementType)
-          ? g.measurement?.type || g.measurementType
-          : 'rating_1_5',
-        unit: String(g.measurement?.unit || '').trim(),
-      },
-      baseline: {
-        value: g.baseline?.value != null && Number.isFinite(Number(g.baseline.value)) ? Number(g.baseline.value) : null,
-        date: g.baseline?.date ? new Date(g.baseline.date) : null,
-        notes: String(g.baseline?.notes || '').trim(),
-      },
-      target: {
-        value: g.target?.value != null && Number.isFinite(Number(g.target.value)) ? Number(g.target.value) : null,
-        notes: String(g.target?.notes || '').trim(),
-      },
-      masteryRule: defaultMasteryRule(g.masteryRule),
-    }));
+    .map((g) => {
+      const mp = String(g.masteryPreset || '')
+        .trim()
+        .toLowerCase();
+      return {
+        goalId: String(g.goalId || '').trim(),
+        goalKey: String(g.goalKey || '').trim() || crypto.randomUUID(),
+        title: String(g.title).trim(),
+        measurableCriteria: String(g.measurableCriteria || '').trim(),
+        masteryCriteria: String(g.masteryCriteria || '').trim(),
+        reviewDate: g.reviewDate ? new Date(g.reviewDate) : null,
+        status: SHORT_TERM_GOAL_STATUS.includes(g.status) ? g.status : 'Active',
+        domain: isValidDomain(g.domain) ? g.domain : 'Speech',
+        measurement: {
+          type: MT.includes(g.measurement?.type || g.measurementType)
+            ? g.measurement?.type || g.measurementType
+            : 'rating_1_5',
+          unit: String(g.measurement?.unit || '').trim(),
+        },
+        baseline: {
+          value: g.baseline?.value != null && Number.isFinite(Number(g.baseline.value)) ? Number(g.baseline.value) : null,
+          date: g.baseline?.date ? new Date(g.baseline.date) : null,
+          notes: String(g.baseline?.notes || '').trim(),
+        },
+        target: {
+          value: g.target?.value != null && Number.isFinite(Number(g.target.value)) ? Number(g.target.value) : null,
+          notes: String(g.target?.notes || '').trim(),
+        },
+        masteryPreset: PRESET_KEYS.includes(mp) ? mp : '',
+        masteryRule: resolveMasteryRuleFromGoal({ masteryPreset: mp, masteryRule: g.masteryRule }),
+      };
+    });
 }
 
 function normalizeActivities(raw) {
@@ -161,7 +154,7 @@ function domainToDisplayLabel(d) {
   return m[d] || String(d);
 }
 
-/** Same shape as GET /therapy-plan list items (childName, goalsCount, progressPercent, …). */
+/** Same shape as GET /therapy-plan list items (childName, goalsCount, …). Clinical % comes from progress engine on the case. */
 function enrichPlanForList(plan, caseMap, parentMap) {
   const c = caseMap.get(String(plan.caseId));
   let childName = 'Child';
@@ -172,7 +165,6 @@ function enrichPlanForList(plan, caseMap, parentMap) {
   const st = Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [];
   const total = st.length;
   const achieved = st.filter((g) => g.status === 'Achieved').length;
-  const progressPercent = total === 0 ? 0 : Math.round((achieved / total) * 100);
   const domains = Array.isArray(plan.domains) ? plan.domains : [];
   const primaryDomainLabel =
     domains.length === 0
@@ -186,7 +178,6 @@ function enrichPlanForList(plan, caseMap, parentMap) {
     childName,
     goalsCount: total,
     achievedGoalsCount: achieved,
-    progressPercent,
     domainsPrimaryLabel: primaryDomainLabel,
     domainsDisplay: domains.map(domainToDisplayLabel).filter(Boolean).join(' · '),
   };
@@ -733,6 +724,16 @@ exports.assignTherapyPlan = async (req, res) => {
       enriched.status === 'final' ||
       enriched.draft === false;
 
+    let engineProgressPercent = 0;
+    try {
+      const pe = await computeProgressEngineForCase(caseId, { therapistId, useCache: false });
+      if (pe.success && pe.data?.overallScore != null) {
+        engineProgressPercent = Math.round((Number(pe.data.overallScore) / 5) * 100);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
     return res.status(200).json({
       success: true,
       /** Full list-row shape (matches GET /therapy-plan) for immediate UI merge */
@@ -741,7 +742,7 @@ exports.assignTherapyPlan = async (req, res) => {
         id: String(planLean._id),
         domain: enriched.domainsPrimaryLabel || 'Therapy plan',
         goals: st,
-        progress: enriched.progressPercent ?? 0,
+        progress: engineProgressPercent,
         status: displayActive ? 'Active' : 'Draft',
       },
     });
@@ -778,6 +779,15 @@ exports.updateTherapyPlan = async (req, res) => {
       if (!plan) {
         return res.status(404).json({ success: false, message: 'Therapy plan not found' });
       }
+
+      const previousState = {
+        planVersion: plan.planVersion,
+        domains: JSON.parse(JSON.stringify(plan.domains || [])),
+        longTermGoalTitle: plan.longTermGoal?.title || '',
+        shortTermGoalsCount: (plan.shortTermGoals || []).length,
+        approvalStatus: plan.approval?.status || '',
+        planStatus: plan.planStatus,
+      };
 
       const existingStatus =
         plan.status === 'final' || plan.status === 'draft'
@@ -881,6 +891,31 @@ exports.updateTherapyPlan = async (req, res) => {
             console.error('therapy episode on revision:', epErr);
           }
         }
+
+        try {
+          const act = actorFromReq(req);
+          const newState = {
+            planVersion: plan.planVersion,
+            domains: JSON.parse(JSON.stringify(plan.domains || [])),
+            longTermGoalTitle: plan.longTermGoal?.title || '',
+            shortTermGoalsCount: (plan.shortTermGoals || []).length,
+            approvalStatus: plan.approval?.status || '',
+            planStatus: plan.planStatus,
+          };
+          scheduleEmitClinicalEvent({
+            eventType: 'THERAPY_PLAN_UPDATED',
+            caseId: plan.caseId,
+            actorRole: act.actorRole,
+            actorId: act.actorId,
+            linkedModules: ['therapy'],
+            payload: { planId: String(plan._id), publishRevision: Boolean(publishRevision) },
+            previousState,
+            newState,
+          });
+        } catch (evErr) {
+          console.error('clinical event therapy plan update:', evErr);
+        }
+
         return res.status(200).json({ success: true, data: plan.toObject() });
       } catch (saveError) {
         if (saveError?.name === 'VersionError' && attempt === 0) {
@@ -925,6 +960,8 @@ exports.submitTherapyPlanForApproval = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Plan is already pending approval' });
     }
 
+    const previousApprovalStatus = st;
+
     const domainList = Array.isArray(plan.domains) ? plan.domains.filter((d) => THERAPY_DOMAIN_OPTIONS.includes(d)) : [];
     const vf = validateFinalPlan({
       domains: domainList,
@@ -964,6 +1001,22 @@ exports.submitTherapyPlanForApproval = async (req, res) => {
       summary: 'Therapy plan submitted for clinician approval',
     });
 
+    try {
+      const act = actorFromReq(req);
+      scheduleEmitClinicalEvent({
+        eventType: 'THERAPY_PLAN_UPDATED',
+        caseId: plan.caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy'],
+        payload: { planId: String(plan._id), trigger: 'submit_for_approval' },
+        previousState: { approvalStatus: previousApprovalStatus },
+        newState: { approvalStatus: String(plan.approval?.status || 'pending') },
+      });
+    } catch (evErr) {
+      console.error('clinical event plan submit:', evErr);
+    }
+
     return res.status(200).json({ success: true, data: plan.toObject() });
   } catch (error) {
     console.error('submitTherapyPlanForApproval:', error);
@@ -997,6 +1050,8 @@ exports.approveTherapyPlanByClinician = async (req, res) => {
     if (String(plan.approval?.status || '') !== 'pending') {
       return res.status(400).json({ success: false, message: 'Plan is not pending clinician approval' });
     }
+
+    const previousApprovalStatus = String(plan.approval?.status || 'pending');
 
     const domainList = Array.isArray(plan.domains) ? plan.domains.filter((d) => THERAPY_DOMAIN_OPTIONS.includes(d)) : [];
     const vf = validateFinalPlan({
@@ -1058,6 +1113,22 @@ exports.approveTherapyPlanByClinician = async (req, res) => {
       });
     } catch (e) {
       console.error('audit therapy_plan_approved:', e);
+    }
+
+    try {
+      const act = actorFromReq(req);
+      scheduleEmitClinicalEvent({
+        eventType: 'THERAPY_PLAN_UPDATED',
+        caseId: plan.caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy'],
+        payload: { planId: String(plan._id), trigger: 'clinician_approved' },
+        previousState: { approvalStatus: previousApprovalStatus },
+        newState: { approvalStatus: 'approved', approvedBy: String(clinicianId) },
+      });
+    } catch (evErr) {
+      console.error('clinical event plan approve:', evErr);
     }
 
     return res.status(200).json({ success: true, data: plan.toObject() });

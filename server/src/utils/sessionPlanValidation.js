@@ -4,14 +4,49 @@
  */
 
 const TherapyPlan = require('../models/TherapyPlan');
+const TherapyCase = require('../models/TherapyCase');
 const Activity = require('../models/Activity');
+const { THERAPY_STATUS } = require('../constants/workflowEnums');
 const { templateBaseQuery } = require('./activityShared');
-const { planAllowsSessions } = require('./therapyPlanLifecycle');
+const { planAllowsSessions, activateTherapyPlanWhenTherapyStarts } = require('./therapyPlanLifecycle');
+
+/** If therapy is already ACTIVE but plan stayed `final` after approval, flip plan → active (idempotent). */
+async function healStuckApprovedPlan(caseId, therapistId, plan) {
+  if (!plan || planAllowsSessions(plan) || String(plan.approval?.status || '') !== 'approved') return;
+  const tc = await TherapyCase.findOne({
+    caseId,
+    therapistId,
+    status: THERAPY_STATUS.ACTIVE,
+  })
+    .select('_id')
+    .lean();
+  if (!tc) return;
+  await activateTherapyPlanWhenTherapyStarts(caseId, therapistId);
+}
+
+/**
+ * Plan row used for session validation: prefer session-eligible / sign-off rows over a newer draft
+ * that happens to have a later `updatedAt` (otherwise clinician-approved plans are ignored).
+ */
+async function findSessionContextPlan(caseId, therapistId) {
+  const active = await TherapyPlan.findOne({ caseId, therapistId, planStatus: 'active' })
+    .sort({ updatedAt: -1 })
+    .lean();
+  if (active) return active;
+  const approved = await TherapyPlan.findOne({
+    caseId,
+    therapistId,
+    'approval.status': 'approved',
+    planStatus: { $nin: ['archived'] },
+  })
+    .sort({ updatedAt: -1 })
+    .lean();
+  if (approved) return approved;
+  return TherapyPlan.findOne({ caseId, therapistId }).sort({ updatedAt: -1 }).lean();
+}
 
 async function loadAllowedGoals(caseId, therapistId, preloadedPlan = null) {
-  const plan =
-    preloadedPlan ||
-    (await TherapyPlan.findOne({ caseId, therapistId }).sort({ updatedAt: -1 }).lean());
+  const plan = preloadedPlan || (await findSessionContextPlan(caseId, therapistId));
   if (!plan) {
     return { allowedGoals: [], allowedGoalKeys: [], allowedGoalIds: [], plan: null };
   }
@@ -49,7 +84,11 @@ async function loadAllowedActivityNames(therapistId) {
  * @returns {Promise<{ ok: boolean, message?: string }>}
  */
 async function validateSessionGoalsAndActivities(caseId, therapistId, goalsTargeted, activitiesUsed, opts = {}) {
-  const { allowedGoals, plan } = await loadAllowedGoals(caseId, therapistId, opts.plan || null);
+  let { allowedGoals, plan } = await loadAllowedGoals(caseId, therapistId, opts.plan || null);
+  if (plan && !planAllowsSessions(plan)) {
+    await healStuckApprovedPlan(caseId, therapistId, plan);
+    ({ allowedGoals, plan } = await loadAllowedGoals(caseId, therapistId, null));
+  }
 
   if (!plan) {
     return { ok: false, message: 'A therapy plan is required before logging sessions for this case' };
@@ -109,11 +148,15 @@ async function validateSessionGoalsAndActivities(caseId, therapistId, goalsTarge
 async function validateSessionGoalData(caseId, therapistId, goalData, opts = {}) {
   if (!goalData || goalData.length === 0) return { ok: true };
   const preloadedPlan = opts && typeof opts === 'object' && opts.plan != null ? opts.plan : null;
-  const { allowedGoals, allowedGoalKeys, allowedGoalIds, plan } = await loadAllowedGoals(
+  let { allowedGoals, allowedGoalKeys, allowedGoalIds, plan } = await loadAllowedGoals(
     caseId,
     therapistId,
     preloadedPlan
   );
+  if (plan && !planAllowsSessions(plan)) {
+    await healStuckApprovedPlan(caseId, therapistId, plan);
+    ({ allowedGoals, allowedGoalKeys, allowedGoalIds, plan } = await loadAllowedGoals(caseId, therapistId, null));
+  }
   if (!plan) {
     return { ok: false, message: 'A therapy plan is required before logging sessions for this case' };
   }
@@ -186,6 +229,7 @@ function buildActivityUsageRows(activitiesUsed, planLean) {
 
 module.exports = {
   loadAllowedGoals,
+  findSessionContextPlan,
   loadAllowedActivityNames,
   validateSessionGoalsAndActivities,
   validateSessionGoalData,

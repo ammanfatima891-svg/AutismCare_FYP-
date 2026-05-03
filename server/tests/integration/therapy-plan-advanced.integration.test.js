@@ -129,11 +129,13 @@ describe('Therapy Plan Advanced Lifecycle Integration', () => {
       childId: sourceChildId,
       parentId,
       clinicianId: new mongoose.Types.ObjectId(),
+      status: 'THERAPY',
     });
     const targetCase = await ChildCase.create({
       childId: targetChildId,
       parentId,
       clinicianId: new mongoose.Types.ObjectId(),
+      status: 'THERAPY',
     });
 
     sourceCaseId = String(sourceCase._id);

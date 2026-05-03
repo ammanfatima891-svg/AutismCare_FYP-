@@ -16,6 +16,16 @@ function getPublicUploadPath(relativePath) {
   return `/uploads/${relativePath.replace(/^[\\/]+/, '').replace(/\\/g, '/')}`;
 }
 
+/** Display-only separation metric (0–99) from model probability vs threshold; not statistical confidence. */
+function confidencePercentFromPayload(payload) {
+  const prob = payload?.probability;
+  const thr = payload?.threshold;
+  if (typeof prob !== 'number' || typeof thr !== 'number' || Number.isNaN(prob) || Number.isNaN(thr)) {
+    return null;
+  }
+  return Math.max(0, Math.min(99, Math.round(Math.abs(prob - thr) * 200)));
+}
+
 async function saveBlurredCopy(buffer, ext) {
   const safeExt = (ext || '.jpg').toLowerCase();
   const outExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(safeExt) ? safeExt : '.jpg';
@@ -107,7 +117,12 @@ async function predictFacialScreening(req, res) {
 
     // Don’t cache sensitive screening responses.
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ ...payload, blurredImageUrl });
+    const confidencePercent = confidencePercentFromPayload(payload);
+    return res.json({
+      ...payload,
+      blurredImageUrl,
+      ...(confidencePercent !== null ? { confidencePercent } : {}),
+    });
   } catch (err) {
     return res.status(500).json({
       message: 'Failed to predict facial screening',

@@ -36,7 +36,7 @@ type PlanRow = {
   updatedAt?: string;
   childName?: string;
   goalsCount?: number;
-  progressPercent?: number;
+  achievedGoalsCount?: number;
   domainsPrimaryLabel?: string;
   domainsDisplay?: string;
   assignedChildId?: string | { toString: () => string };
@@ -239,7 +239,7 @@ export function TherapyPlans() {
           {plans.map((plan) => {
             const cid = caseIdStr(plan.caseId);
             const goals = plan.goalsCount ?? 0;
-            const pct = plan.progressPercent ?? 0;
+            const achieved = plan.achievedGoalsCount ?? 0;
             const domainLine = plan.domainsPrimaryLabel || plan.domainsDisplay || 'Therapy plan';
             return (
               <li
@@ -254,17 +254,12 @@ export function TherapyPlans() {
                   <span className={cn('shrink-0', planStatusBadgeClass(plan))}>{planStatusLabel(plan)}</span>
                 </div>
 
-                <div className="mt-6 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-foreground">Overall progress</span>
-                    <span className="tabular-nums text-foreground">{pct}%</span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width]"
-                      style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-                    />
-                  </div>
+                <div className="mt-6 space-y-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">Plan goals</p>
+                  <p>
+                    {achieved} of {goals} marked achieved on the plan. Clinical progress uses session data — open the case
+                    Progress tab for engine scores.
+                  </p>
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-end justify-between gap-2 border-t border pt-4 text-xs text-muted-foreground">

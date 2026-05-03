@@ -14,8 +14,9 @@ const {
   validateSessionGoalsAndActivities,
   validateSessionGoalData,
   buildActivityUsageRows,
+  findSessionContextPlan,
 } = require('../utils/sessionPlanValidation');
-const { getActiveEpisodeForCase } = require('../services/therapyEpisodeService');
+const { getActiveEpisodeForCase, ensureActiveEpisodeForPlan } = require('../services/therapyEpisodeService');
 const { collectGoalDataLinkageWarnings } = require('../utils/sessionGoalDataValidation');
 const { completeMatchingSessionSlot, validateSessionSlotForNewLog } = require('../utils/sessionSlotLink');
 const { invalidateProgressEngineCache } = require('../services/progressEngine');
@@ -253,7 +254,7 @@ exports.createSessionLog = async (req, res) => {
       });
     }
 
-    const planLean = await TherapyPlan.findOne({ caseId, therapistId }).sort({ updatedAt: -1 }).lean();
+    const planLean = await findSessionContextPlan(caseId, therapistId);
     if (!planLean) {
       return res.status(400).json({
         success: false,
@@ -289,7 +290,15 @@ exports.createSessionLog = async (req, res) => {
     const activityUsage = buildActivityUsageRows(p.activitiesUsed, planLean);
     const activitiesUsedDeduped = activityUsage.map((row) => row.displayName);
 
-    const activeEpisode = await getActiveEpisodeForCase(caseId);
+    let activeEpisode = await getActiveEpisodeForCase(caseId);
+    if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId) || !activeEpisode.isActive) {
+      try {
+        await ensureActiveEpisodeForPlan(planLean);
+      } catch (e) {
+        console.error('[createSessionLog] ensureActiveEpisodeForPlan:', e?.message || e);
+      }
+      activeEpisode = await getActiveEpisodeForCase(caseId);
+    }
     if (!activeEpisode || String(activeEpisode.therapistId) !== String(therapistId) || !activeEpisode.isActive) {
       return res.status(400).json({
         success: false,

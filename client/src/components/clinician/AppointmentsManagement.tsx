@@ -50,11 +50,7 @@ interface Appointment {
   createdAt: string;
 }
 
-
 // ─── Main Component ──────────────────────────────────────────────────────────
-
-const mockAppointments: Appointment[] = [];
-
 
 export function AppointmentsManagement() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -69,9 +65,6 @@ export function AppointmentsManagement() {
   const [modalData, setModalData] = useState<any>({});
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
-
-  const filteredAppointments = mockAppointments;
-
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);

@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import React, { Suspense, lazy, useEffect } from "react";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import AuthForm from "./components/AuthForm";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Toaster } from "./components/ui/sonner";
@@ -44,11 +44,27 @@ function RouteFallback() {
   );
 }
 
+/** Email links with `CLIENT_URL/` + `/verify-email/...` produced `//verify-email/...`, which React Router does not match. */
+function CollapseDuplicatePathSlashes() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const raw = location.pathname;
+    if (!raw || !raw.includes("//")) return;
+    const normalized = raw.replace(/\/{2,}/g, "/");
+    if (normalized !== raw) {
+      navigate(`${normalized}${location.search}${location.hash}`, { replace: true });
+    }
+  }, [location.pathname, location.search, location.hash, navigate]);
+  return null;
+}
+
 function App() {
   return (
     <>
       <Toaster position="top-center" richColors closeButton />
       <Suspense fallback={<RouteFallback />}>
+        <CollapseDuplicatePathSlashes />
         <Routes>
           <Route path="/" element={<Onboarding />} />
           <Route path="/login" element={<AuthForm />} />

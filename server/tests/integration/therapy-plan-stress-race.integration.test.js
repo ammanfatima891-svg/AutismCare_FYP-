@@ -223,8 +223,8 @@ describe('Therapy Plan Stress + Race + Long-Horizon Integration', () => {
     const row = listRes.body.data.find((item) => String(item.caseId) === caseId);
     expect(row).toBeTruthy();
     expect(row.goalsCount).toBe(36);
-    expect(row.progressPercent).toBeGreaterThanOrEqual(0);
-    expect(row.progressPercent).toBeLessThanOrEqual(100);
+    expect(row).not.toHaveProperty('progressPercent');
+    expect(typeof row.achievedGoalsCount).toBe('number');
     expect(row.childName).toMatch(/Stress Child/i);
     expect(row.status).toBe('final');
   });

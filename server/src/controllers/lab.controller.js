@@ -16,6 +16,7 @@ const { validateFileStrict, wrapMulter } = require('../middleware/uploadValidati
 const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
 const { validateCaseState } = require('../middleware/validateCaseState');
 const { ACTIONS } = require('../services/actionPermissionService');
+const { scheduleEmitClinicalEvent, actorFromReq } = require('../services/clinicalEventService');
 
 // -------------------------------------------------------------------
 // Multer configuration for lab report uploads
@@ -272,6 +273,27 @@ exports.uploadReport = [
                 }
             } catch (emailErr) {
                 console.error('Parent notification failed:', emailErr.message);
+            }
+
+            try {
+                if (testRequest.caseId) {
+                    const act = actorFromReq(req);
+                    scheduleEmitClinicalEvent({
+                        eventType: 'LAB_REPORT_UPLOADED',
+                        caseId: testRequest.caseId,
+                        actorRole: act.actorRole,
+                        actorId: act.actorId,
+                        linkedModules: ['lab'],
+                        payload: {
+                            reportId: String(report._id),
+                            testRequestId: String(testRequest._id),
+                            fileName: report.fileName,
+                            testType: testRequest.testType,
+                        },
+                    });
+                }
+            } catch (evErr) {
+                console.error('clinical event lab upload:', evErr);
             }
 
             res.status(201).json({ success: true, data: report, message: 'Report uploaded successfully' });

@@ -1,27 +1,915 @@
-import React from 'react';
-import { cn } from '../ui/utils';
+import React, { useState } from 'react';
+import {
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Home,
+  Lightbulb,
+  StickyNote,
+  Stethoscope,
+  Target,
+  TrendingUp,
+  User,
+} from 'lucide-react';
+import {
+  DomainBarChart,
+  GoalProgressTable,
+  MetricsCard,
+  ProgressBar,
+  ReportChartsZone,
+  ReportDetailsZone,
+  ReportHeader,
+  ReportHeaderZone,
+  ReportLayout,
+  ReportRecommendationsZone,
+  ReportSection,
+  ReportSummaryZone,
+  SessionsTable,
+  TrendLineChart,
+} from './ui';
+import {
+  ClinicalAlertsPanel,
+  DomainPerformanceBarChart,
+  GoalClinicalCard,
+  GoalProgressLineChart,
+  GoalWhyModal,
+  LowConfidenceBanner,
+  trendIcon,
+} from '../progress-clinical';
 
-function Section({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+type AnyRecord = Record<string, any>;
+
+type SummaryMetric = {
+  label: string;
+  value: string | number;
+  suffix?: string;
+  highlight?: 'blue' | 'green' | 'yellow' | 'neutral';
+};
+
+type GoalRow = {
+  goalName?: string;
+  baseline?: number | null;
+  current?: number | null;
+  target?: number | null;
+  trend?: string;
+  masteryStatus?: string;
+};
+
+function asRecord(value: unknown): AnyRecord {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as AnyRecord)
+    : {};
+}
+
+function asArray<T = AnyRecord>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function fmtDate(value: unknown): string {
+  if (!value) return '—';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function normalizeTrendData(data: AnyRecord): Array<{ x: string; y: number }> {
+  const rawTrend = asRecord(data.trendGraphData);
+  const series = asArray<any>(rawTrend.weeklyTrend || rawTrend.monthlyTrend || data.trendGraphData);
+  return series
+    .map((item) => {
+      const point = asRecord(item);
+      const x = String(point.x || point.label || point.week || point.date || '');
+      const y = toNumber(point.y ?? point.value ?? point.score);
+      if (!x || y == null) return null;
+      return { x, y };
+    })
+    .filter((item): item is { x: string; y: number } => Boolean(item));
+}
+
+function normalizeDomainData(
+  data: AnyRecord
+): Array<{ name: string; score: number; status?: string }> {
+  const domains = asArray<any>(data.domainPerformance || data.domainProgress);
+  return domains
+    .map((item) => {
+      const row = asRecord(item);
+      const name = String(row.name || row.domain || '');
+      const score = toNumber(row.score ?? row.progressPercent ?? row.progress);
+      if (!name || score == null) return null;
+      const normalized = row.progressPercent != null && row.score == null ? score / 20 : score;
+      return {
+        name,
+        score: Math.max(0, Math.min(5, normalized)),
+        status: row.status || row.trend,
+      };
+    })
+    .filter((item): item is { name: string; score: number; status?: string } => Boolean(item));
+}
+
+function normalizeGoalRows(data: AnyRecord): GoalRow[] {
+  const source = asArray<any>(
+    data.goalProgressTable || asRecord(data.progressSummary).goalProgress || asRecord(data.goalsProgress).goals
+  );
+  return source.map((row) => {
+    const item = asRecord(row);
+    return {
+      goalName: item.goalName || item.title,
+      baseline: toNumber(item.baseline),
+      current: toNumber(item.current ?? item.progressPercent),
+      target: toNumber(item.target),
+      trend: item.trend,
+      masteryStatus: item.masteryStatus || item.status,
+    };
+  });
+}
+
+function normalizeRecommendations(data: AnyRecord): string[] {
+  const list = data.recommendations;
+  if (Array.isArray(list)) return list.map((item) => String(item)).filter(Boolean);
+  if (typeof list === 'string') {
+    return list
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function InsufficientDataBanner() {
   return (
-    <section
-      className={cn(
-        'rounded-lg border/90 bg-card shadow-sm print:border print:shadow-none',
-        className
-      )}
-    >
-      <div className="border-b border-blue-100 bg-blue-50/60 px-4 py-2.5 md:px-5">
-        <h3 className="text-sm font-semibold text-blue-950">{title}</h3>
+    <div className="rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4 text-sm text-yellow-900 shadow-sm">
+      <div className="flex items-center gap-2 font-medium">
+        <AlertTriangle className="h-4 w-4" />
+        Insufficient data
       </div>
-      <div className="px-4 py-3 text-sm text-foreground md:px-5 md:py-4">{children}</div>
-    </section>
+      <p className="mt-1 text-yellow-800/80">
+        Add a therapy plan, session logs, or home assignments to generate a full report.
+      </p>
+    </div>
+  );
+}
+
+function InfoGrid({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  if (!rows.length) return <p className="text-sm text-slate-400">No details available.</p>;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {rows.map((row) => (
+        <div key={row.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide text-slate-400">{row.label}</p>
+          <p className="mt-1 font-medium text-slate-800">{row.value || '—'}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RecommendationsList({ items }: { items: string[] }) {
+  if (!items.length) {
+    return <p className="text-sm text-slate-400">No recommendations at this time.</p>;
+  }
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item, index) => (
+        <li
+          key={`${item}-${index}`}
+          className="flex gap-3 rounded-lg bg-yellow-50/60 p-3 text-sm text-yellow-900"
+        >
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600" />
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TextList({
+  items,
+  emptyText,
+  tone = 'neutral',
+}: {
+  items: string[];
+  emptyText: string;
+  tone?: 'neutral' | 'green' | 'yellow';
+}) {
+  if (!items.length) return <p className="text-sm text-slate-400">{emptyText}</p>;
+
+  const toneClass =
+    tone === 'green'
+      ? 'bg-green-50 text-green-900'
+      : tone === 'yellow'
+      ? 'bg-yellow-50 text-yellow-900'
+      : 'bg-slate-50 text-slate-700';
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`} className={`rounded-lg p-3 text-sm ${toneClass}`}>
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function UnifiedReportTemplate({
+  reportType,
+  data,
+  summaryMetrics,
+  topDetails,
+  extraDetails,
+}: {
+  reportType: string;
+  data: AnyRecord;
+  summaryMetrics: SummaryMetric[];
+  topDetails?: React.ReactNode;
+  extraDetails?: React.ReactNode;
+}) {
+  const childInfo = asRecord(data.childInfo);
+  const goalRows = normalizeGoalRows(data);
+  const trendData = normalizeTrendData(data);
+  const domainData = normalizeDomainData(data);
+  const recommendations = normalizeRecommendations(data);
+
+  return (
+    <ReportLayout>
+      <ReportHeaderZone>
+        <ReportHeader
+          reportType={reportType}
+          childName={childInfo.childName}
+          age={toNumber(childInfo.age)}
+          generatedAt={String(data.generatedAt || '')}
+        />
+      </ReportHeaderZone>
+
+      {!!summaryMetrics.length && (
+        <ReportSummaryZone>
+          {summaryMetrics.map((metric) => (
+            <MetricsCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              suffix={metric.suffix}
+              highlight={metric.highlight || 'neutral'}
+            />
+          ))}
+        </ReportSummaryZone>
+      )}
+
+      {topDetails}
+
+      {(trendData.length > 0 || domainData.length > 0) && (
+        <ReportChartsZone>
+          {!!trendData.length && (
+            <ReportSection title="Progress Trend" icon={<TrendingUp className="h-4 w-4" />} highlight="blue">
+              <TrendLineChart data={trendData} xLabel="Period" yLabel="Score" />
+            </ReportSection>
+          )}
+          {!!domainData.length && (
+            <ReportSection title="Domain Performance" icon={<BarChart3 className="h-4 w-4" />} highlight="green">
+              <DomainBarChart data={domainData} />
+            </ReportSection>
+          )}
+        </ReportChartsZone>
+      )}
+
+      <ReportDetailsZone>
+        {!!goalRows.length && (
+          <ReportSection title="Goal Progress" icon={<Target className="h-4 w-4" />} highlight="neutral">
+            <GoalProgressTable data={goalRows} />
+          </ReportSection>
+        )}
+        {extraDetails}
+      </ReportDetailsZone>
+
+      <ReportRecommendationsZone>
+        <ReportSection
+          title="Recommendations"
+          icon={<Lightbulb className="h-4 w-4" />}
+          highlight={recommendations.length ? 'yellow' : 'neutral'}
+        >
+          <RecommendationsList items={recommendations} />
+        </ReportSection>
+      </ReportRecommendationsZone>
+    </ReportLayout>
+  );
+}
+
+function IntegratedReportEngineView({ data, engine }: { data: AnyRecord; engine: AnyRecord }) {
+  const duration = asRecord(data.therapyDuration);
+  const therapistNotes = asArray<string>(data.therapistNotes);
+  const recommendations = normalizeRecommendations(data);
+  const childInfo = asRecord(data.childInfo);
+  const conf = asRecord(engine.confidence);
+  const overallLimited = Boolean((toNumber(conf.overall) ?? 1) < 0.4);
+  const domainRows = asArray<any>(engine.domainScores?.length ? engine.domainScores : engine.domains).map(
+    (row) => {
+      const r = asRecord(row);
+      const score = toNumber(r.score);
+      const confidence = toNumber(r.confidence ?? r.confidenceScore) ?? undefined;
+      return {
+        name: String(r.name || ''),
+        score: score != null ? Math.max(0, Math.min(5, score)) : 0,
+        confidence,
+      };
+    }
+  );
+  const goals = asArray<any>(engine.goals);
+  const alerts = asArray<any>(engine.smartAlerts);
+  const weekly = asArray<any>(engine.weeklyTrend).map((w) => {
+    const row = asRecord(w);
+    return {
+      x: String(row.x || row.week || ''),
+      y: toNumber(row.y) ?? 0,
+    };
+  });
+  const [whyGoal, setWhyGoal] = useState<AnyRecord | null>(null);
+
+  const summary: SummaryMetric[] = [
+    {
+      label: 'Overall Score (0–5)',
+      value: overallLimited ? 'Limited data' : String(toNumber(engine.overallScore)?.toFixed(2) ?? '—'),
+      suffix: overallLimited ? undefined : '',
+      highlight: 'blue',
+    },
+    {
+      label: 'Overall trend',
+      value: `${trendIcon(String(engine.overallTrend || ''))} ${String(engine.overallTrend || '—')}`,
+      highlight: 'green',
+    },
+    {
+      label: 'Confidence',
+      value: `${String(conf.label || '—')}${conf.overall != null ? ` (${(Number(conf.overall) * 100).toFixed(0)}%)` : ''}`,
+      highlight: 'yellow',
+    },
+  ];
+
+  return (
+    <ReportLayout>
+      <ReportHeaderZone>
+        <ReportHeader
+          reportType="integrated"
+          childName={childInfo.childName}
+          age={toNumber(childInfo.age)}
+          generatedAt={String(data.generatedAt || '')}
+        />
+      </ReportHeaderZone>
+
+      <LowConfidenceBanner
+        visible={overallLimited}
+        message="Interpret with caution: overall confidence is low (limited or inconsistent session data)."
+      />
+
+      <ReportSummaryZone>
+        {summary.map((metric) => (
+          <MetricsCard
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+            suffix={metric.suffix}
+            highlight={metric.highlight || 'neutral'}
+          />
+        ))}
+      </ReportSummaryZone>
+
+      <ReportChartsZone>
+        <ReportSection title="Composite trend (engine)" icon={<TrendingUp className="h-4 w-4" />} highlight="blue">
+          {weekly.length > 0 ? (
+            <TrendLineChart data={weekly} xLabel="Session period" yLabel="Score (0–5)" />
+          ) : (
+            <p className="text-sm text-slate-400">Insufficient points for composite trend.</p>
+          )}
+        </ReportSection>
+        <ReportSection title="Domains (confidence-colored)" icon={<BarChart3 className="h-4 w-4" />} highlight="green">
+          <DomainPerformanceBarChart data={domainRows} height={240} />
+        </ReportSection>
+      </ReportChartsZone>
+
+      <ReportSection title="Therapy Timeline" icon={<Calendar className="h-4 w-4" />} highlight="blue">
+        <InfoGrid
+          rows={[
+            { label: 'Sessions Completed', value: String(duration.completedSessionCount ?? '—') },
+            { label: 'Duration Span', value: duration.spanDays != null ? `${duration.spanDays} days` : '—' },
+            { label: 'First Session', value: fmtDate(duration.firstSessionDate) },
+            { label: 'Last Session', value: fmtDate(duration.lastSessionDate) },
+          ]}
+        />
+      </ReportSection>
+
+      {goals.length > 0 ? (
+        <ReportDetailsZone>
+          <ReportSection title="Goals — progress engine only" icon={<Target className="h-4 w-4" />} highlight="neutral">
+            <div className="space-y-8">
+              {goals.map((g: AnyRecord, idx: number) => (
+                <div key={String(g.goalId || idx)} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <GoalClinicalCard
+                    goal={{
+                      goalId: g.goalId,
+                      goalName: g.goalName,
+                      current: toNumber(g.current),
+                      trend: g.trend,
+                      confidenceLabel: g.confidenceLabel,
+                      confidenceScore: toNumber(g.confidenceScore) ?? undefined,
+                      limitedDataUi: Boolean(g.limitedDataUi ?? (String(g.confidenceLabel) === 'low')),
+                    }}
+                    onWhy={() => setWhyGoal(g)}
+                  />
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Session trajectory</p>
+                    <GoalProgressLineChart
+                      height={200}
+                      data={asArray<AnyRecord>(g.timeSeries).map((t) => ({
+                        date: (t.date as string) || null,
+                        score: Number(t.score ?? 0),
+                        smoothedScore:
+                          t.smoothedScore != null && Number.isFinite(Number(t.smoothedScore))
+                            ? Number(t.smoothedScore)
+                            : undefined,
+                        confidence:
+                          t.confidence != null && Number.isFinite(Number(t.confidence))
+                            ? Number(t.confidence)
+                            : undefined,
+                      }))}
+                      explanationSnippet={String(g.reasoningSummary || '').slice(0, 120)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ReportSection>
+        </ReportDetailsZone>
+      ) : null}
+
+      <ReportSection title="Clinical alerts" icon={<AlertTriangle className="h-4 w-4" />} highlight="yellow">
+        <ClinicalAlertsPanel alerts={alerts} />
+      </ReportSection>
+
+      <ReportRecommendationsZone>
+        <ReportSection title="Recommendations (engine-informed)" icon={<Lightbulb className="h-4 w-4" />}>
+          <RecommendationsList items={recommendations} />
+        </ReportSection>
+      </ReportRecommendationsZone>
+
+      <ReportSection title="Therapist Notes" icon={<StickyNote className="h-4 w-4" />}>
+        {therapistNotes.length ? (
+          <ul className="space-y-2">
+            {therapistNotes.slice(-8).map((note, index) => (
+              <li key={`${note}-${index}`} className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                {note}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-400">No notes captured.</p>
+        )}
+      </ReportSection>
+
+      <GoalWhyModal
+        open={Boolean(whyGoal)}
+        onOpenChange={(open) => {
+          if (!open) setWhyGoal(null);
+        }}
+        goal={whyGoal}
+      />
+    </ReportLayout>
+  );
+}
+
+function IntegratedReportLegacyView({ data }: { data: AnyRecord }) {
+  const duration = asRecord(data.therapyDuration);
+  const metrics = asRecord(data.overallMetrics);
+  const therapistNotes = asArray<string>(data.therapistNotes);
+
+  const summary: SummaryMetric[] = [
+    {
+      label: 'Overall Score',
+      value: toNumber(metrics.overallScore)?.toFixed(2) || '—',
+      suffix: '/ 5',
+      highlight: 'blue',
+    },
+    {
+      label: 'Improvement Rate',
+      value: toNumber(metrics.improvementRate) ?? '—',
+      suffix: '%',
+      highlight: 'green',
+    },
+    {
+      label: 'Consistency',
+      value: toNumber(metrics.consistency) != null ? `${Math.round((metrics.consistency || 0) * 100)}` : '—',
+      suffix: '%',
+      highlight: 'yellow',
+    },
+  ];
+
+  return (
+    <UnifiedReportTemplate
+      reportType="integrated"
+      data={data}
+      summaryMetrics={summary}
+      topDetails={
+        <ReportSection title="Therapy Timeline" icon={<Calendar className="h-4 w-4" />} highlight="blue">
+          <InfoGrid
+            rows={[
+              { label: 'Sessions Completed', value: String(duration.completedSessionCount ?? '—') },
+              { label: 'Duration Span', value: duration.spanDays != null ? `${duration.spanDays} days` : '—' },
+              { label: 'First Session', value: fmtDate(duration.firstSessionDate) },
+              { label: 'Last Session', value: fmtDate(duration.lastSessionDate) },
+            ]}
+          />
+        </ReportSection>
+      }
+      extraDetails={
+        <ReportSection title="Therapist Notes" icon={<StickyNote className="h-4 w-4" />}>
+          {therapistNotes.length ? (
+            <ul className="space-y-2">
+              {therapistNotes.slice(-8).map((note, index) => (
+                <li key={`${note}-${index}`} className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                  {note}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-400">No notes captured.</p>
+          )}
+        </ReportSection>
+      }
+    />
+  );
+}
+
+function IntegratedReportView({ data }: { data: AnyRecord }) {
+  const pe = data.progressEngine;
+  if (pe && typeof pe === 'object') {
+    return <IntegratedReportEngineView data={data} engine={pe as AnyRecord} />;
+  }
+  return <IntegratedReportLegacyView data={data} />;
+}
+
+function MonthlyView({ data }: { data: AnyRecord }) {
+  const progress = asRecord(data.goalsProgress);
+  const sessionSummary = asRecord(data.sessionsSummary);
+  const assignment = asRecord(data.assignmentCompliance);
+  const clinicalContext = asRecord(data.clinicalContext);
+  const goalRows = asArray<any>(progress.goals);
+  const activities = asArray<any>(data.activitiesUsed).map((row) =>
+    String(asRecord(row).activity || asRecord(row).name || row || '').trim()
+  ).filter(Boolean);
+  const notes = asArray<string>(data.therapistNotes).map((n) => String(n).trim()).filter(Boolean);
+  const assignmentPercent =
+    toNumber(assignment.compliancePercent) ??
+    (() => {
+      const completed = toNumber(assignment.completed);
+      const total = toNumber(assignment.total);
+      if (completed == null || total == null || total <= 0) return null;
+      return Math.round((completed / total) * 100);
+    })();
+
+  const normalizedData = {
+    ...data,
+    goalProgressTable: goalRows,
+  };
+
+  return (
+    <UnifiedReportTemplate
+      reportType="monthly"
+      data={normalizedData}
+      summaryMetrics={[
+        {
+          label: 'Overall Goal Progress',
+          value: toNumber(progress.overallProgressPercent) ?? 0,
+          suffix: '%',
+          highlight: 'blue',
+        },
+        {
+          label: 'Sessions Logged',
+          value: toNumber(sessionSummary.totalSessions) ?? 0,
+          highlight: 'green',
+        },
+        {
+          label: 'Assignment Compliance',
+          value: assignmentPercent ?? '—',
+          suffix: assignmentPercent != null ? '%' : '',
+          highlight: 'yellow',
+        },
+      ]}
+      topDetails={
+        <ReportSection title="Monthly Snapshot" icon={<ClipboardList className="h-4 w-4" />} highlight="green">
+          <InfoGrid
+            rows={[
+              { label: 'Therapy Domains', value: asArray<string>(data.therapyDomains).join(', ') || '—' },
+              {
+                label: 'Avg Child Response',
+                value:
+                  toNumber(sessionSummary.avgChildResponse) != null
+                    ? String(toNumber(sessionSummary.avgChildResponse)?.toFixed(1))
+                    : '—',
+              },
+            ]}
+          />
+        </ReportSection>
+      }
+      extraDetails={
+        <>
+          <ReportSection title="Activity Focus" icon={<BarChart3 className="h-4 w-4" />}>
+            <TextList items={activities.slice(0, 8)} emptyText="No activity usage data available." />
+          </ReportSection>
+          <ReportSection title="Therapist Notes" icon={<StickyNote className="h-4 w-4" />}>
+            <TextList items={notes.slice(0, 8)} emptyText="No therapist notes available." />
+          </ReportSection>
+          <ReportSection title="Clinical Context" icon={<User className="h-4 w-4" />}>
+            <InfoGrid
+              rows={[
+                { label: 'Diagnosis Summary', value: String(clinicalContext.diagnosisSummary || '—') },
+                { label: 'Clinical Recommendation', value: String(clinicalContext.recommendations || '—') },
+              ]}
+            />
+          </ReportSection>
+        </>
+      }
+    />
+  );
+}
+
+function TherapyView({ data }: { data: AnyRecord }) {
+  const therapyPlan = asRecord(data.therapyPlanSummary);
+  const progress = asRecord(data.progress);
+  const domains = asArray<any>(progress.domains);
+  const shortGoals = asArray<any>(therapyPlan.shortTermGoals);
+  const activities = asArray<any>(therapyPlan.activities);
+  const normalizedData = {
+    ...data,
+    goalProgressTable: asArray<any>(progress.goals),
+    domainPerformance: domains,
+    recommendations: activities
+      .slice(0, 8)
+      .map((row) => String(asRecord(row).title || '').trim())
+      .filter(Boolean),
+  };
+
+  return (
+    <UnifiedReportTemplate
+      reportType="therapy"
+      data={normalizedData}
+      summaryMetrics={[
+        { label: 'Overall Progress', value: toNumber(progress.overallProgressPercent) ?? '—', suffix: '%', highlight: 'blue' },
+        { label: 'Short-Term Goals', value: shortGoals.length, highlight: 'green' },
+        { label: 'Activities Planned', value: activities.length, highlight: 'yellow' },
+      ]}
+      topDetails={
+        <ReportSection title="Therapy Plan" icon={<Stethoscope className="h-4 w-4" />} highlight="green">
+          <InfoGrid
+            rows={[
+              { label: 'Domains', value: asArray<string>(therapyPlan.domains).join(', ') || '—' },
+              { label: 'Long-Term Goal', value: String(asRecord(therapyPlan.longTermGoal).title || '—') },
+            ]}
+          />
+        </ReportSection>
+      }
+      extraDetails={
+        <ReportSection title="Domain Progress Snapshot" icon={<BarChart3 className="h-4 w-4" />} highlight="blue">
+          {domains.length ? (
+            <div className="space-y-3">
+              {domains.map((row, index) => (
+                <ProgressBar
+                  key={`${row.domain || row.name || index}`}
+                  label={String(row.domain || row.name || `Domain ${index + 1}`)}
+                  percent={toNumber(row.progressPercent) || 0}
+                  trend={String(row.trend || row.status || '')}
+                />
+              ))}
+            </div>
+          ) : <p className="text-sm text-slate-400">No domain details available.</p>}
+        </ReportSection>
+      }
+    />
+  );
+}
+
+function SessionView({ data }: { data: AnyRecord }) {
+  const sessionSummary = asRecord(data.sessionSummary);
+  const recentSessions = asArray<any>(sessionSummary.recentSessions || data.sessions);
+
+  return (
+    <UnifiedReportTemplate
+      reportType="session"
+      data={data}
+      summaryMetrics={[
+        { label: 'Total Sessions', value: toNumber(sessionSummary.totalSessions) ?? 0, highlight: 'blue' },
+        {
+          label: 'Average Response',
+          value: toNumber(sessionSummary.avgChildResponse)?.toFixed(1) || '—',
+          highlight: 'green',
+        },
+      ]}
+      extraDetails={
+        <ReportSection title="Recent Sessions" icon={<FileText className="h-4 w-4" />} highlight="neutral">
+          <SessionsTable data={recentSessions} />
+        </ReportSection>
+      }
+    />
+  );
+}
+
+function ProgressView({ data }: { data: AnyRecord }) {
+  const progress = asRecord(data.progressSummary);
+  const flags = asArray<any>(data.redFlags);
+  const normalizedData = {
+    ...data,
+    goalProgressTable: asArray<any>(progress.goalProgress),
+    domainPerformance: asArray<any>(progress.domainProgress),
+    trendGraphData: { weeklyTrend: asArray<any>(progress.sessionTrend) },
+  };
+
+  return (
+    <UnifiedReportTemplate
+      reportType="progress"
+      data={normalizedData}
+      summaryMetrics={[
+        {
+          label: 'Overall Progress',
+          value: toNumber(progress.overallProgressPercent) ?? 0,
+          suffix: '%',
+          highlight: 'blue',
+        },
+      ]}
+      extraDetails={
+        <ReportSection title="Attention Areas" icon={<AlertTriangle className="h-4 w-4" />} highlight="yellow">
+          {flags.length ? (
+            <ul className="space-y-2">
+              {flags.map((flag, index) => (
+                <li key={index} className="rounded-lg bg-yellow-50 p-3 text-sm text-yellow-900">
+                  <span className="font-medium">{String(flag.domain || 'Domain')}</span>:&nbsp;
+                  {String(flag.progressPercent ?? '—')}% ({String(flag.trend || 'stable')})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
+              No major attention flags from current analytics.
+            </div>
+          )}
+        </ReportSection>
+      }
+    />
+  );
+}
+
+function IepView({ data }: { data: AnyRecord }) {
+  const longTermGoals = asArray<any>(data.longTermGoals);
+  const shortTermGoals = asArray<any>(data.shortTermGoals);
+  const statusSummary = asArray<any>(data.goalStatusSummary);
+  const strategies = asArray<any>(data.recommendedStrategies);
+  const reviewTimeline = asRecord(data.reviewTimeline);
+  const normalizedData = {
+    ...data,
+    goalProgressTable: statusSummary.map((row) => ({
+      goalName: row.goalName,
+      current: toNumber(row.progressPercent),
+      masteryStatus: row.status || 'Active',
+    })),
+    recommendations: strategies
+      .map((row) => {
+        const item = asRecord(row);
+        const title = String(item.title || '').trim();
+        const description = String(item.description || '').trim();
+        if (!title) return '';
+        return description ? `${title}: ${description}` : title;
+      })
+      .filter(Boolean),
+  };
+
+  return (
+    <UnifiedReportTemplate
+      reportType="iep"
+      data={normalizedData}
+      summaryMetrics={[
+        { label: 'Long-Term Goals', value: longTermGoals.length, highlight: 'blue' },
+        { label: 'Short-Term Goals', value: shortTermGoals.length, highlight: 'green' },
+      ]}
+      topDetails={
+        <ReportSection title="IEP Focus" icon={<BookOpen className="h-4 w-4" />} highlight="blue">
+          <InfoGrid
+            rows={[
+              {
+                label: 'Domains',
+                value:
+                  Array.from(
+                    new Set(shortTermGoals.map((row) => String(asRecord(row).domain || '').trim()).filter(Boolean))
+                  ).join(', ') || '—',
+              },
+              { label: 'Suggested Review', value: fmtDate(reviewTimeline.suggestedReviewBy) },
+            ]}
+          />
+        </ReportSection>
+      }
+    />
+  );
+}
+
+function ClinicianView({ data }: { data: AnyRecord }) {
+  const diagnosis = asRecord(data.diagnosis);
+  const therapySummary = asRecord(data.therapyProgressSummary);
+  const observations = asArray<string>(data.therapistObservations);
+  const redFlags = asArray<any>(data.redFlags);
+  const normalizedData = {
+    ...data,
+    goalProgressTable: asArray<any>(therapySummary.goalProgress),
+    domainPerformance: asArray<any>(data.domainAnalysis),
+  };
+
+  return (
+    <UnifiedReportTemplate
+      reportType="clinician"
+      data={normalizedData}
+      summaryMetrics={[
+        { label: 'Overall Progress', value: toNumber(therapySummary.overallProgress) ?? '—', suffix: '%', highlight: 'blue' },
+        { label: 'Red Flags', value: redFlags.length, highlight: 'yellow' },
+        { label: 'Recent Observations', value: observations.length, highlight: 'green' },
+      ]}
+      topDetails={
+        <ReportSection title="Clinical Snapshot" icon={<User className="h-4 w-4" />} highlight="green">
+          <InfoGrid
+            rows={[
+              { label: 'Diagnosis', value: String(diagnosis.diagnosis || diagnosis.message || '—') },
+              { label: 'Comorbidities', value: asArray<string>(diagnosis.comorbidConditions).join(', ') || '—' },
+            ]}
+          />
+        </ReportSection>
+      }
+      extraDetails={
+        <>
+          <ReportSection title="Therapist Observations" icon={<StickyNote className="h-4 w-4" />}>
+            <TextList items={observations} emptyText="No therapist observations captured." />
+          </ReportSection>
+          <ReportSection title="Attention Areas" icon={<AlertTriangle className="h-4 w-4" />} highlight="yellow">
+            <TextList
+              items={redFlags.map((row) => {
+                const item = asRecord(row);
+                return `${String(item.domain || 'Domain')}: ${String(item.reason || 'Needs attention')} (${String(item.progressPercent ?? '—')}%, ${String(item.trend || 'stable')})`;
+              })}
+              emptyText="No critical red flags detected."
+              tone="yellow"
+            />
+          </ReportSection>
+        </>
+      }
+    />
+  );
+}
+
+function ParentView({ data }: { data: AnyRecord }) {
+  const improvements = asArray<string>(data.improvements).map((item) => String(item)).filter(Boolean);
+  const attention = asArray<string>(data.areasNeedingAttention).map((item) => String(item)).filter(Boolean);
+  const tips = asArray<string>(data.homeGuidanceTips).map((item) => String(item)).filter(Boolean);
+  const normalizedData = {
+    ...data,
+    recommendations: tips,
+  };
+
+  return (
+    <UnifiedReportTemplate
+      reportType="parent"
+      data={normalizedData}
+      summaryMetrics={[
+        { label: 'Improvements', value: improvements.length, highlight: 'green' },
+        { label: 'Areas to Support', value: attention.length, highlight: 'yellow' },
+      ]}
+      topDetails={
+        <ReportSection title="Parent Summary" icon={<Home className="h-4 w-4" />} highlight="blue">
+          <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+            {String(data.progressSummary || 'No summary available.')}
+          </p>
+        </ReportSection>
+      }
+      extraDetails={
+        <>
+          <ReportSection title="Positive Progress" icon={<TrendingUp className="h-4 w-4" />} highlight="green">
+            <TextList items={improvements} emptyText="No specific improvements listed yet." tone="green" />
+          </ReportSection>
+          <ReportSection title="Needs Attention" icon={<AlertTriangle className="h-4 w-4" />} highlight="yellow">
+            <TextList items={attention} emptyText="No attention areas listed." tone="yellow" />
+          </ReportSection>
+        </>
+      }
+    />
   );
 }
 
@@ -33,632 +921,39 @@ export function ReportDocumentView({
   payload: Record<string, unknown>;
 }) {
   if (payload?.insufficientData && reportType !== 'integrated') {
-    return (
-      <div className="rounded-lg border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-        Insufficient data to generate a full report: add a therapy plan, session logs, or home assignments for this
-        case.
-      </div>
-    );
+    return <InsufficientDataBanner />;
   }
 
+  const data = asRecord(payload);
   switch (reportType) {
-    case 'monthly':
-      return <MonthlyView data={payload} />;
-    case 'therapy':
-      return <TherapyView data={payload} />;
-    case 'session':
-      return <SessionView data={payload} />;
-    case 'progress':
-      return <ProgressView data={payload} />;
-    case 'iep':
-      return <IepView data={payload} />;
-    case 'clinician':
-      return <ClinicianView data={payload} />;
-    case 'parent':
-      return <ParentView data={payload} />;
     case 'integrated':
-      return <IntegratedReportView data={payload} />;
+      return <IntegratedReportView data={data} />;
+    case 'monthly':
+      return <MonthlyView data={data} />;
+    case 'therapy':
+      return <TherapyView data={data} />;
+    case 'session':
+      return <SessionView data={data} />;
+    case 'progress':
+      return <ProgressView data={data} />;
+    case 'iep':
+      return <IepView data={data} />;
+    case 'clinician':
+      return <ClinicianView data={data} />;
+    case 'parent':
+      return <ParentView data={data} />;
     default:
-      return <pre className="max-h-[480px] overflow-auto rounded border bg-background p-3 text-xs">{JSON.stringify(payload, null, 2)}</pre>;
+      return (
+        <ReportLayout>
+          <ReportHeaderZone>
+            <ReportHeader reportType={reportType} generatedAt={String(data.generatedAt || '')} />
+          </ReportHeaderZone>
+          <ReportSection title="Raw Report Data" icon={<FileText className="h-4 w-4" />}>
+            <pre className="max-h-[480px] overflow-auto rounded-xl bg-slate-50 p-4 text-xs text-slate-600">
+              {JSON.stringify(payload, null, 2)}
+            </pre>
+          </ReportSection>
+        </ReportLayout>
+      );
   }
-}
-
-function IntegratedReportView({ data }: { data: Record<string, unknown> }) {
-  const childInfo = data.childInfo as { childName?: string; age?: number | null } | undefined;
-  const duration = data.therapyDuration as
-    | { firstSessionDate?: string; lastSessionDate?: string; spanDays?: number | null; completedSessionCount?: number }
-    | undefined;
-  const goals = (data.goalProgressTable || []) as Array<{
-    goalName?: string;
-    baseline?: number | null;
-    current?: number | null;
-    target?: number | null;
-    trend?: string;
-    masteryStatus?: string;
-  }>;
-  const domains = (data.domainPerformance || []) as Array<{ name?: string; score?: number; status?: string }>;
-  const weekly = (data.trendGraphData as { weeklyTrend?: { x?: string; y?: number }[] } | undefined)?.weeklyTrend || [];
-  const metrics = data.overallMetrics as { overallScore?: number; improvementRate?: number; consistency?: number } | undefined;
-  const notes = (data.therapistNotes || []) as string[];
-  const rec = (data.recommendations || []) as string[];
-
-  return (
-    <div className="space-y-4">
-      <Section title="Child & case">
-        <p className="font-medium text-foreground">{childInfo?.childName || 'Child'}</p>
-        {childInfo?.age != null ? <p className="text-muted-foreground">Age: {childInfo.age} yrs</p> : null}
-      </Section>
-      <Section title="Therapy duration">
-        <p className="text-foreground">
-          Sessions completed: {duration?.completedSessionCount ?? '—'}
-          {duration?.spanDays != null ? ` · span ~${duration.spanDays} days` : ''}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          First: {duration?.firstSessionDate ? new Date(duration.firstSessionDate).toLocaleDateString() : '—'} · Last:{' '}
-          {duration?.lastSessionDate ? new Date(duration.lastSessionDate).toLocaleDateString() : '—'}
-        </p>
-      </Section>
-      <Section title="Overall metrics (progress engine)">
-        <ul className="list-inside list-disc space-y-1 text-foreground">
-          <li>Composite score (0–5): {metrics?.overallScore != null ? metrics.overallScore.toFixed(2) : '—'}</li>
-          <li>Improvement rate: {metrics?.improvementRate != null ? metrics.improvementRate : '—'}</li>
-          <li>Assignment consistency: {metrics?.consistency != null ? `${(metrics.consistency * 100).toFixed(0)}%` : '—'}</li>
-        </ul>
-      </Section>
-      <Section title="Domain performance (clinical buckets)">
-        <ul className="space-y-1">
-          {domains.map((d) => (
-            <li key={String(d.name)} className="flex justify-between gap-2">
-              <span className="capitalize">{d.name}</span>
-              <span className="text-muted-foreground">
-                {d.score?.toFixed(2)} / 5 · {d.status}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title="Weekly trend (chart-ready)">
-        <ul className="space-y-1 text-xs text-muted-foreground">
-          {weekly.length === 0 ? <li>No weekly aggregates yet.</li> : null}
-          {weekly.map((w, i) => (
-            <li key={i}>
-              {w.x}: {w.y}
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title="Goal progress">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="py-1 pr-2">Goal</th>
-                <th className="py-1 pr-2">Base</th>
-                <th className="py-1 pr-2">Current</th>
-                <th className="py-1 pr-2">Target</th>
-                <th className="py-1">Trend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {goals.map((g, i) => (
-                <tr key={i} className="border-b border-border/60">
-                  <td className="py-1 pr-2 font-medium text-foreground">{g.goalName || '—'}</td>
-                  <td className="py-1 pr-2 tabular-nums">{g.baseline ?? '—'}</td>
-                  <td className="py-1 pr-2 tabular-nums">{g.current ?? '—'}</td>
-                  <td className="py-1 pr-2 tabular-nums">{g.target ?? '—'}</td>
-                  <td className="py-1 capitalize">{g.trend}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-      <Section title="Therapist notes (recent)">
-        {notes.length ? (
-          <ul className="list-inside list-disc space-y-1">
-            {notes.slice(-8).map((n, i) => (
-              <li key={i}>{n}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground">No notes captured.</p>
-        )}
-      </Section>
-      <Section title="Recommendations">
-        <ul className="list-inside list-disc space-y-1">
-          {rec.map((r, i) => (
-            <li key={i}>{r}</li>
-          ))}
-        </ul>
-      </Section>
-    </div>
-  );
-}
-
-function TherapyView({ data }: { data: Record<string, unknown> }) {
-  const plan = data.therapyPlanSummary as
-    | {
-        domains?: string[];
-        longTermGoal?: { title?: string; description?: string } | null;
-        shortTermGoals?: { title?: string; domain?: string; status?: string }[];
-      }
-    | undefined;
-  const progress = data.progress as
-    | {
-        overallProgressPercent?: number;
-        domains?: { domain?: string; progressPercent?: number; trend?: string }[];
-      }
-    | undefined;
-
-  return (
-    <div className="space-y-4">
-      <Section title="Therapy plan summary">
-        <p className="font-medium text-foreground">
-          Domains: {Array.isArray(plan?.domains) && plan?.domains?.length ? plan.domains.join(', ') : '—'}
-        </p>
-        {plan?.longTermGoal?.title ? (
-          <p className="mt-2 text-foreground">
-            Long-term goal: <span className="font-medium">{plan.longTermGoal.title}</span>
-          </p>
-        ) : null}
-      </Section>
-
-      <Section title="Short-term goals">
-        <ul className="space-y-1.5">
-          {(plan?.shortTermGoals || []).map((g, i) => (
-            <li key={i} className="flex justify-between gap-2">
-              <span>{g.title}</span>
-              <span className="text-muted-foreground">
-                {g.domain} · {g.status}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title="Progress">
-        <p className="mb-2">
-          Overall progress: <span className="font-semibold text-blue-900">{progress?.overallProgressPercent ?? 0}%</span>
-        </p>
-        <ul className="space-y-1">
-          {(progress?.domains || []).map((d, i) => (
-            <li key={i} className="text-foreground">
-              {d.domain}: {d.progressPercent}% ({d.trend})
-            </li>
-          ))}
-        </ul>
-      </Section>
-    </div>
-  );
-}
-
-function SessionView({ data }: { data: Record<string, unknown> }) {
-  const s = data.sessionSummary as
-    | {
-        totalSessions?: number;
-        avgChildResponse?: number | null;
-        skipped?: boolean;
-        recentSessions?: { sessionDate?: string; duration?: number; status?: string }[];
-      }
-    | undefined;
-  return (
-    <div className="space-y-4">
-      <Section title="Session overview">
-        {s?.skipped ? (
-          <p className="text-muted-foreground">No sessions available for this case.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            <li>Total sessions: {s?.totalSessions ?? 0}</li>
-            <li>Average child response: {s?.avgChildResponse != null ? s.avgChildResponse : '—'}</li>
-          </ul>
-        )}
-      </Section>
-      <Section title="Recent sessions">
-        <ul className="space-y-1.5">
-          {(s?.recentSessions || []).map((row, i) => (
-            <li key={i} className="flex justify-between gap-2 border-b border pb-1 last:border-0">
-              <span>{row.sessionDate ? new Date(row.sessionDate).toLocaleDateString() : 'Session'}</span>
-              <span className="text-muted-foreground">
-                {row.duration || 0} min · {row.status || 'completed'}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-    </div>
-  );
-}
-
-function ProgressView({ data }: { data: Record<string, unknown> }) {
-  const p = data.progressSummary as
-    | {
-        overallProgressPercent?: number;
-        domainProgress?: { domain?: string; progressPercent?: number; trend?: string }[];
-        goalProgress?: { goalName?: string; progressPercent?: number }[];
-      }
-    | undefined;
-  const flags = (data.redFlags as { domain?: string; trend?: string; progressPercent?: number }[]) || [];
-
-  return (
-    <div className="space-y-4">
-      <Section title="Overall progress">
-        <p className="text-lg font-semibold text-blue-900">{p?.overallProgressPercent ?? 0}%</p>
-      </Section>
-      <Section title="Domain progress">
-        <ul className="space-y-1.5">
-          {(p?.domainProgress || []).map((d, i) => (
-            <li key={i} className="flex justify-between gap-2">
-              <span>{d.domain}</span>
-              <span className="text-muted-foreground">
-                {d.progressPercent}% · {d.trend}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title="Goal progress">
-        <ul className="space-y-1.5">
-          {(p?.goalProgress || []).map((g, i) => (
-            <li key={i} className="flex justify-between gap-2">
-              <span>{g.goalName}</span>
-              <span className="text-muted-foreground">{g.progressPercent}%</span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title="Attention areas">
-        {flags.length === 0 ? (
-          <p className="text-blue-800">No major attention flags from current analytics.</p>
-        ) : (
-          <ul className="space-y-1">
-            {flags.map((f, i) => (
-              <li key={i}>
-                {f.domain}: {f.progressPercent}% ({f.trend})
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </div>
-  );
-}
-
-function MonthlyView({ data }: { data: Record<string, unknown> }) {
-  const childInfo = data.childInfo as Record<string, unknown> | undefined;
-  const goals = data.goalsProgress as { overallProgressPercent?: number; goals?: unknown[] } | undefined;
-  const sess = data.sessionsSummary as { totalSessions?: number; avgChildResponse?: number | null; skipped?: boolean };
-  const activities = (data.activitiesUsed as unknown[]) || [];
-  const notes = data.therapistNotes as string[] | undefined;
-  const assign = data.assignmentCompliance as Record<string, unknown> | undefined;
-
-  return (
-    <div className="space-y-4 print:space-y-3">
-      <Section title="Child information">
-        <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Name</dt>
-            <dd className="font-medium text-foreground">{String(childInfo?.childName ?? '—')}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Age</dt>
-            <dd>{childInfo?.age != null ? `${childInfo.age} years` : '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Case status</dt>
-            <dd>{String(childInfo?.caseStatus ?? '—')}</dd>
-          </div>
-        </dl>
-      </Section>
-
-      <Section title="Therapy domains">
-        <ul className="list-inside list-disc text-foreground">
-          {Array.isArray(data.therapyDomains) && (data.therapyDomains as string[]).length ? (
-            (data.therapyDomains as string[]).map((d) => <li key={d}>{d}</li>)
-          ) : (
-            <li className="text-muted-foreground">No domains listed on the current plan.</li>
-          )}
-        </ul>
-      </Section>
-
-      <Section title="Goals progress">
-        <p className="mb-2 text-muted-foreground">
-          Overall: <span className="font-semibold text-blue-900">{goals?.overallProgressPercent ?? 0}%</span>
-        </p>
-        <ul className="space-y-1.5">
-          {(goals?.goals || []).map((g: { goalName?: string; progressPercent?: number; status?: string }, i: number) => (
-            <li key={i} className="flex flex-wrap justify-between gap-2 border-b border pb-1 last:border-0">
-              <span>{g.goalName}</span>
-              <span className="text-muted-foreground">
-                {g.progressPercent}% · {g.status}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title="Session summary">
-        {sess?.skipped ? (
-          <p className="text-muted-foreground">No session logs for this period.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            <li>Total sessions: {sess?.totalSessions ?? 0}</li>
-            <li>
-              Average child response score:{' '}
-              {sess?.avgChildResponse != null ? `${sess.avgChildResponse}` : '—'}
-            </li>
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Activities used (from session logs)">
-        {activities.length === 0 ? (
-          <p className="text-muted-foreground">No activities recorded in sessions.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {activities.slice(0, 12).map((row: { activityName?: string; usageCount?: number; avgChildResponse?: number | null }, i: number) => (
-              <li key={i} className="flex justify-between gap-2">
-                <span>{row.activityName}</span>
-                <span className="text-muted-foreground">
-                  {row.usageCount} uses
-                  {row.avgChildResponse != null ? ` · avg ${row.avgChildResponse}` : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      {notes && notes.length ? (
-        <Section title="Therapist notes (recent)">
-          <ul className="list-inside list-disc space-y-1">
-            {notes.map((n, i) => (
-              <li key={i}>{n}</li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
-      <Section title="Home assignment compliance">
-        {assign ? (
-          <ul className="space-y-1.5 text-foreground">
-            <li>Total assignments: {String(assign.total ?? 0)}</li>
-            <li>Pending: {String(assign.pending ?? 0)}</li>
-            <li>Submitted / reviewed: {String(assign.submitted ?? 0)}</li>
-            <li>Completed: {String(assign.completed ?? 0)}</li>
-            {assign.percentages ? (
-              <li className="text-xs text-muted-foreground">
-                Distribution: pending {String((assign.percentages as { pending?: number }).pending ?? 0)}% · submitted{' '}
-                {String((assign.percentages as { submitted?: number }).submitted ?? 0)}% · completed{' '}
-                {String((assign.percentages as { completed?: number }).completed ?? 0)}%
-              </li>
-            ) : null}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground">No assignment data.</p>
-        )}
-      </Section>
-    </div>
-  );
-}
-
-function IepView({ data }: { data: Record<string, unknown> }) {
-  const lt = (data.longTermGoals as unknown[]) || [];
-  const st = (data.shortTermGoals as unknown[]) || [];
-  const strategies = (data.recommendedStrategies as { title?: string; description?: string }[]) || [];
-  const timeline = data.reviewTimeline as { weeksRange?: { min?: number; max?: number }; suggestedReviewBy?: string };
-
-  return (
-    <div className="space-y-4">
-      <Section title="Long-term goals">
-        {lt.length === 0 ? (
-          <p className="text-muted-foreground">No long-term goals recorded.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {lt.map((g: { title?: string; description?: string; timeline?: string }, i: number) => (
-              <li key={i} className="rounded-lg border bg-background/50 p-3">
-                <p className="font-medium text-foreground">{g.title}</p>
-                {g.description ? <p className="mt-1 text-muted-foreground">{g.description}</p> : null}
-                {g.timeline ? <p className="mt-1 text-xs text-muted-foreground">Timeline: {g.timeline}</p> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Short-term goals">
-        {st.length === 0 ? (
-          <p className="text-muted-foreground">No short-term goals recorded.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {st.map(
-              (
-                g: { title?: string; domain?: string; status?: string; measurableCriteria?: string; reviewDate?: string | null },
-                i: number
-              ) => (
-                <li key={i} className="flex flex-col gap-0.5 border-b border pb-2 last:border-0">
-                  <span className="font-medium text-foreground">{g.title}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {g.domain} · {g.status}
-                    {g.reviewDate ? ` · review ${new Date(g.reviewDate).toLocaleDateString()}` : ''}
-                  </span>
-                  {g.measurableCriteria ? <span className="text-sm text-muted-foreground">{g.measurableCriteria}</span> : null}
-                </li>
-              )
-            )}
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Goal status (from analytics)">
-        <ul className="space-y-1">
-          {((data.goalStatusSummary as { goalName?: string; status?: string; progressPercent?: number }[]) || []).map(
-            (g, i) => (
-              <li key={i} className="flex justify-between gap-2">
-                <span>{g.goalName}</span>
-                <span className="text-muted-foreground">
-                  {g.status} · {g.progressPercent}%
-                </span>
-              </li>
-            )
-          )}
-        </ul>
-      </Section>
-
-      <Section title="Recommended strategies (from plan activities)">
-        {strategies.length === 0 ? (
-          <p className="text-muted-foreground">No activities listed on the plan.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {strategies.map((s, i) => (
-              <li key={i}>
-                <span className="font-medium">{s.title}</span>
-                {s.description ? <span className="text-muted-foreground"> — {s.description}</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Review timeline">
-        <p className="text-foreground">
-          Typical review cadence: {timeline?.weeksRange?.min ?? 4}–{timeline?.weeksRange?.max ?? 6} weeks.
-        </p>
-        {timeline?.suggestedReviewBy ? (
-          <p className="mt-2 text-sm text-muted-foreground">
-            Next suggested review anchor: {new Date(timeline.suggestedReviewBy).toLocaleDateString()}
-          </p>
-        ) : null}
-      </Section>
-    </div>
-  );
-}
-
-function ClinicianView({ data }: { data: Record<string, unknown> }) {
-  const dx = data.diagnosis as Record<string, unknown> | undefined;
-  const summary = data.therapyProgressSummary as { overallProgress?: number; goalProgress?: unknown[] } | undefined;
-  const domains = (data.domainAnalysis as { domain?: string; progressPercent?: number; trend?: string }[]) || [];
-  const flags = (data.redFlags as { domain?: string; reason?: string }[]) || [];
-  const obs = (data.therapistObservations as string[]) || [];
-
-  return (
-    <div className="space-y-4">
-      <Section title="Diagnosis & clinical context">
-        {dx?.message ? (
-          <p className="text-muted-foreground">{String(dx.message)}</p>
-        ) : (
-          <>
-            {dx?.diagnosis ? <p className="font-medium text-foreground">{String(dx.diagnosis)}</p> : null}
-            {Array.isArray(dx?.comorbidConditions) && (dx!.comorbidConditions as string[]).length ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Comorbid: {(dx!.comorbidConditions as string[]).join(', ')}
-              </p>
-            ) : null}
-            {dx?.developmentalSummary ? (
-              <p className="mt-2 text-sm text-foreground">{String(dx.developmentalSummary)}</p>
-            ) : null}
-            {dx?.observations ? (
-              <p className="mt-2 text-sm text-foreground">{String(dx.observations)}</p>
-            ) : null}
-          </>
-        )}
-      </Section>
-
-      <Section title="Therapy progress summary">
-        <p className="mb-2">
-          Overall progress index:{' '}
-          <span className="font-semibold text-blue-900">{summary?.overallProgress ?? 0}%</span>
-        </p>
-        <ul className="space-y-1 text-sm">
-          {(summary?.goalProgress || []).map((g: { goalName?: string; progressPercent?: number }, i: number) => (
-            <li key={i}>
-              {g.goalName}: {g.progressPercent}%
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title="Domain analysis">
-        <ul className="space-y-1.5">
-          {domains.map((d, i) => (
-            <li key={i} className="flex flex-wrap justify-between gap-2">
-              <span>{d.domain}</span>
-              <span className="text-muted-foreground">
-                {d.progressPercent}% · trend: {d.trend}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title="Alerts (low progress / declining trend)">
-        {flags.length === 0 ? (
-          <p className="text-blue-800">No automated red flags from current analytics data.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {flags.map((f, i) => (
-              <li key={i} className="rounded-lg border-yellow-200 bg-yellow-50 px-3 py-2 text-yellow-900">
-                <span className="font-medium">{f.domain}</span>: {f.reason}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Therapist observations (recent session notes)">
-        {obs.length === 0 ? (
-          <p className="text-muted-foreground">No session notes available.</p>
-        ) : (
-          <ul className="list-inside list-disc space-y-1">
-            {obs.map((o, i) => (
-              <li key={i}>{o}</li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </div>
-  );
-}
-
-function ParentView({ data }: { data: Record<string, unknown> }) {
-  const childInfo = data.childInfo as Record<string, unknown> | undefined;
-  const imp = (data.improvements as string[]) || [];
-  const att = (data.areasNeedingAttention as string[]) || [];
-  const tips = (data.homeGuidanceTips as string[]) || [];
-
-  return (
-    <div className="space-y-4">
-      <Section title="Your child">
-        <p className="text-lg font-semibold text-foreground">{String(childInfo?.childName ?? 'Child')}</p>
-        <p className="text-sm text-muted-foreground">This summary is generated from therapy sessions and goals — read-only.</p>
-      </Section>
-
-      <Section title="Progress summary">
-        <p className="leading-relaxed text-foreground">{String(data.progressSummary ?? '')}</p>
-      </Section>
-
-      <Section title="What is going well">
-        <ul className="list-inside list-disc space-y-1">
-          {imp.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title="Areas to focus on">
-        <ul className="list-inside list-disc space-y-1">
-          {att.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title="Ideas for home">
-        <ul className="list-inside list-disc space-y-1.5">
-          {tips.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
-      </Section>
-    </div>
-  );
 }

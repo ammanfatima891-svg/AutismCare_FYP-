@@ -12,10 +12,23 @@ import { ProgressMonitoringTab } from '../progress/ProgressMonitoringTab';
 import { ClinicianCaseReports } from '../reports/ClinicianCaseReports';
 import { cn } from '../ui/utils';
 import { ChildCaseLabModule } from './ChildCaseLabModule';
+import { CaseTimelineView } from './CaseTimelineView';
+
+export type ChildCaseDetailTab =
+  | 'timeline'
+  | 'overview'
+  | 'evaluation'
+  | 'referrals'
+  | 'therapy'
+  | 'progress'
+  | 'reports'
+  | 'lab';
 
 export interface ChildCaseDetailProps {
   caseId: string;
   onBack: () => void;
+  /** When opening from clinician cockpit quick actions. */
+  initialTab?: ChildCaseDetailTab;
 }
 
 const riskBadgeClass: Record<string, string> = {
@@ -40,15 +53,17 @@ function snapshotTrendClass(t?: string) {
   return 'border-slate-200 bg-slate-50 text-slate-800';
 }
 
-export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
+export function ChildCaseDetail({ caseId, onBack, initialTab = 'overview' }: ChildCaseDetailProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [peSummary, setPeSummary] = useState<ProgressEngineCaseSummary | null>(null);
   const [peSummaryLoading, setPeSummaryLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'evaluation' | 'referrals' | 'therapy' | 'progress' | 'reports' | 'lab'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<ChildCaseDetailTab>('overview');
+
+  useEffect(() => {
+    setActiveTab(initialTab || 'overview');
+  }, [caseId, initialTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,11 +162,20 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
             value={activeTab}
             onValueChange={(v) =>
               setActiveTab(
-                v as 'overview' | 'evaluation' | 'referrals' | 'therapy' | 'progress' | 'reports' | 'lab'
+                v as
+                  | 'timeline'
+                  | 'overview'
+                  | 'evaluation'
+                  | 'referrals'
+                  | 'therapy'
+                  | 'progress'
+                  | 'reports'
+                  | 'lab'
               )
             }
           >
             <TabsList className="w-full justify-start sm:w-auto">
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="evaluation">Clinical Evaluation</TabsTrigger>
               <TabsTrigger value="referrals">Referrals</TabsTrigger>
@@ -163,6 +187,10 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
                 Lab
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="timeline" className="pt-2">
+              <CaseTimelineView caseId={caseId} />
+            </TabsContent>
 
             <TabsContent value="overview" className="space-y-6 pt-2">
               <Card className="overflow-hidden border border-slate-200/90 bg-card shadow-md">
@@ -439,7 +467,15 @@ export function ChildCaseDetail({ caseId, onBack }: ChildCaseDetailProps) {
             </TabsContent>
 
             <TabsContent value="lab" className="pt-2">
-              <ChildCaseLabModule childId={data?.childProfile?.id ? String(data.childProfile.id) : undefined} />
+              <ChildCaseLabModule
+                childId={
+                  data?.childProfile?.id
+                    ? String(data.childProfile.id)
+                    : data?.childId
+                      ? String(data.childId)
+                      : undefined
+                }
+              />
             </TabsContent>
           </Tabs>
         </>

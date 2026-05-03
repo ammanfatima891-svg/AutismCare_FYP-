@@ -118,63 +118,154 @@ function domainTrend(sessionsSortedAsc, domainGoals) {
   return trendLabel(lastAvg, prevAvg);
 }
 
-/**
- * @param {{ plan: object|null, sessions: object[], assignments: object[] }} params
- * @returns {object} Same shape as GET /api/analytics/:caseId `data`
- */
-function buildCaseAnalyticsSnapshot({ plan, sessions, assignments }) {
-  const planSafe = plan || {};
-  const sessionsAsc = [...sessions].sort((a, b) => new Date(a.sessionDate) - new Date(b.sessionDate));
-  const goals = collectGoalsFromPlan(planSafe);
+function legacyEngineDomainToBucket(legacyDomain) {
+  const d = String(legacyDomain || '');
+  if (d.includes('Occupational')) return 'OT';
+  if (d === 'Behavioral') return 'Behavioral';
+  if (d === 'Sensory') return 'Sensory';
+  return 'Speech';
+}
 
-  const goalProgress = goals.map((g) => {
-    const rel = sessionsForGoal(sessionsAsc, g.matchKeys);
-    const totalSessions = rel.length;
-    let successfulSessions = 0;
-    for (const s of rel) {
-      if (sessionResponseSuccessful(s.childResponse)) successfulSessions += 1;
-    }
-    const progressPercent =
-      totalSessions > 0 ? Number(((successfulSessions / totalSessions) * 100).toFixed(2)) : 0;
-    return {
-      goalId: g.goalId,
-      goalName: g.goalName,
-      domain: g.domain,
-      progressPercent,
-      status: g.status,
-    };
-  });
+function planStatusForGoalName(planSafe, goalName) {
+  const short = Array.isArray(planSafe?.shortTermGoals) ? planSafe.shortTermGoals : [];
+  const hit = short.find((g) => String(g?.title || '').trim() === String(goalName || '').trim());
+  if (hit) return String(hit.status || 'Active');
+  const leg = Array.isArray(planSafe?.goals) ? planSafe.goals : [];
+  const h2 = leg.find((g) => g && g.type !== 'long-term' && String(g?.title || '').trim() === String(goalName || '').trim());
+  return h2 ? String(h2.status || 'Active') : 'Active';
+}
 
-  const overallProgress =
-    goalProgress.length > 0
-      ? Number(
-          (goalProgress.reduce((sum, x) => sum + x.progressPercent, 0) / goalProgress.length).toFixed(2)
-        )
-      : 0;
+function sessionTrendFromEngineWeekly(weekly) {
+  return (weekly || [])
+    .map((w) => ({
+      date: w.week ? String(w.week) : null,
+      childResponse: w.y != null ? Math.round(Number(w.y) * 20) : null,
+    }))
+    .filter((row) => row.date);
+}
 
-  const domainProgress = DOMAIN_BUCKETS.map((bucket) => {
-    const dg = goals.filter((g) => g.domain === bucket);
+function buildGoalProgressFromEngine(progressEngine, planSafe) {
+  const goals = Array.isArray(progressEngine?.goals) ? progressEngine.goals : [];
+  return goals.map((g) => ({
+    goalId: g.goalId,
+    goalName: g.goalName,
+    domain: legacyEngineDomainToBucket(g.legacyDomain),
+    progressPercent:
+      g.progressPercent != null
+        ? Number(g.progressPercent)
+        : g.mastery === true
+          ? 100
+          : 0,
+    status: g.mastery === true ? 'Achieved' : planStatusForGoalName(planSafe, g.goalName),
+    trend: g.trend,
+    confidenceScore: g.confidenceScore,
+    confidenceLabel: g.confidenceLabel,
+    currentFive: g.current,
+  }));
+}
+
+function buildDomainProgressFromEngineGoals(goalProgress) {
+  return DOMAIN_BUCKETS.map((bucket) => {
     const gp = goalProgress.filter((x) => x.domain === bucket);
     const avg =
-      gp.length > 0 ? Number((gp.reduce((s, x) => s + x.progressPercent, 0) / gp.length).toFixed(2)) : 0;
-    const trend = domainTrend(sessionsAsc, dg);
+      gp.length > 0 ? Number((gp.reduce((s, x) => s + Number(x.progressPercent || 0), 0) / gp.length).toFixed(2)) : 0;
+    const trends = gp.map((x) => x.trend);
+    const trend = trends.includes('declining') ? 'declining' : trends.includes('improving') ? 'improving' : 'stable';
+    const confs = gp.map((x) => Number(x.confidenceScore) || 0).filter((n) => n > 0);
+    const confidenceScore = confs.length ? Number(mean(confs).toFixed(3)) : 0;
+    const confidenceLabel = confidenceScore > 0.7 ? 'high' : confidenceScore > 0.4 ? 'medium' : 'low';
     return {
       domain: bucket,
       progressPercent: avg,
       trend,
+      confidenceScore,
+      confidenceLabel,
     };
   });
+}
 
-  const sessionTrend = sessionsAsc
-    .map((s) => {
-      const score = parseResponseScore(s.childResponse);
-      const date = safeIsoFromSessionDate(s.sessionDate);
+/**
+ * @param {{ plan: object|null, sessions: object[], assignments: object[] }} params
+ * @param {object|null} [progressEngine] — when sessions exist, pass engine so goal/domain/overall align with progressEngine.js
+ * @returns {object} Same shape as GET /api/analytics/:caseId `data`
+ */
+function buildCaseAnalyticsSnapshot({ plan, sessions, assignments }, progressEngine = null) {
+  const planSafe = plan || {};
+  const sessionsAsc = [...sessions].sort((a, b) => new Date(a.sessionDate) - new Date(b.sessionDate));
+  const goals = collectGoalsFromPlan(planSafe);
+  const sessionsLen = sessionsAsc.length;
+
+  let goalProgress;
+  let overallProgress;
+  let domainProgress;
+  let sessionTrend;
+
+  const useEngine =
+    progressEngine &&
+    sessionsLen > 0 &&
+    Array.isArray(progressEngine.goals) &&
+    progressEngine.goals.length > 0;
+
+  if (useEngine) {
+    goalProgress = buildGoalProgressFromEngine(progressEngine, planSafe);
+    overallProgress =
+      progressEngine.overallScore != null
+        ? Number(((Number(progressEngine.overallScore) / 5) * 100).toFixed(2))
+        : 0;
+    domainProgress = buildDomainProgressFromEngineGoals(goalProgress);
+    sessionTrend = sessionTrendFromEngineWeekly(progressEngine.weeklyTrend);
+  } else {
+    goalProgress = goals.map((g) => {
+      const rel = sessionsForGoal(sessionsAsc, g.matchKeys);
+      const totalSessions = rel.length;
+      let successfulSessions = 0;
+      for (const s of rel) {
+        if (sessionResponseSuccessful(s.childResponse)) successfulSessions += 1;
+      }
+      const progressPercent =
+        totalSessions > 0 ? Number(((successfulSessions / totalSessions) * 100).toFixed(2)) : 0;
       return {
-        date,
-        childResponse: score != null ? Math.round(score) : null,
+        goalId: g.goalId,
+        goalName: g.goalName,
+        domain: g.domain,
+        progressPercent,
+        status: g.status,
       };
-    })
-    .filter((row) => row.date);
+    });
+
+    overallProgress =
+      goalProgress.length > 0
+        ? Number(
+            (goalProgress.reduce((sum, x) => sum + x.progressPercent, 0) / goalProgress.length).toFixed(2)
+          )
+        : 0;
+
+    domainProgress = DOMAIN_BUCKETS.map((bucket) => {
+      const dg = goals.filter((g) => g.domain === bucket);
+      const gp = goalProgress.filter((x) => x.domain === bucket);
+      const avg =
+        gp.length > 0 ? Number((gp.reduce((s, x) => s + x.progressPercent, 0) / gp.length).toFixed(2)) : 0;
+      const trend = domainTrend(sessionsAsc, dg);
+      return {
+        domain: bucket,
+        progressPercent: avg,
+        trend,
+        confidenceScore: 0,
+        confidenceLabel: 'low',
+      };
+    });
+
+    sessionTrend = sessionsAsc
+      .map((s) => {
+        const score = parseResponseScore(s.childResponse);
+        const date = safeIsoFromSessionDate(s.sessionDate);
+        return {
+          date,
+          childResponse: score != null ? Math.round(score) : null,
+        };
+      })
+      .filter((row) => row.date);
+  }
 
   const activityMap = new Map();
   for (const s of sessionsAsc) {
@@ -258,7 +349,6 @@ const { buildProgressEnginePayload } = require('./progressEngine');
  * @param {object} [precomputedEngine] — optional; if omitted, engine is built from the same inputs.
  */
 function buildUnifiedCaseAnalytics(params, precomputedEngine = undefined) {
-  const legacy = buildCaseAnalyticsSnapshot(params);
   const stakeholder = buildStakeholderAnalyticsBlock(params);
   const cid =
     params.plan?.caseId ||
@@ -274,16 +364,13 @@ function buildUnifiedCaseAnalytics(params, precomputedEngine = undefined) {
           sessions: params.sessions,
           assignments: params.assignments || [],
         });
-  const enginePct =
-    progressEngine && progressEngine.overallScore != null
-      ? Number(((progressEngine.overallScore / 5) * 100).toFixed(2))
-      : null;
+  const snapshot = buildCaseAnalyticsSnapshot(params, progressEngine);
   return {
     schemaVersion: 2,
-    ...legacy,
-    ...(enginePct != null ? { overallProgress: enginePct } : {}),
+    ...snapshot,
     ...stakeholder,
-    ...(progressEngine != null ? { progressEngine } : {}),
+    progressEngine,
+    progressSource: (params.sessions || []).length > 0 ? 'progressEngine' : 'fallback',
   };
 }
 

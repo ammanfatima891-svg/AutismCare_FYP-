@@ -113,6 +113,8 @@ const ShortTermGoalSchema = new Schema(
     baseline: { type: BaselineSchema, default: () => ({}) },
     target: { type: TargetSchema, default: () => ({}) },
     masteryRule: { type: MasteryRuleSchema, default: () => ({}) },
+    /** easy | moderate | strict — resolves default mastery thresholds when set */
+    masteryPreset: { type: String, trim: true, default: '' },
   },
   { _id: true }
 );

@@ -70,7 +70,7 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
       form.append('image', selectedFile);
 
       const res = await facialScreeningAPI.predict(form);
-      const { probability, threshold, label, blurredImageUrl } = res.data || {};
+      const { probability, threshold, label, blurredImageUrl, confidencePercent } = res.data || {};
 
       const prob = typeof probability === 'number' ? probability : 0.5;
       const thr = typeof threshold === 'number' ? threshold : 0.5;
@@ -79,10 +79,10 @@ export function FacialScreening({ child, onComplete }: FacialScreeningProps) {
       const riskLevel =
         prob >= thr + 0.2 ? 'high' : prob >= thr + 0.05 ? 'medium' : 'low';
 
-      const confidence = Math.max(
-        50,
-        Math.min(99, Math.round(Math.abs(prob - thr) * 200))
-      );
+      const confidence =
+        typeof confidencePercent === 'number' && !Number.isNaN(confidencePercent)
+          ? Math.max(0, Math.min(99, Math.round(confidencePercent)))
+          : null;
 
       const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/api\/?$/, '');
       const blurredSrc =

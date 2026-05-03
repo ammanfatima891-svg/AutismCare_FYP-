@@ -11,7 +11,9 @@ const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
 const { createNotification } = require('../utils/notification');
 const { NOTIFICATION_TYPES } = require('../models/Notification');
 const { activityAccessFilter } = require('../utils/activityShared');
-const { invalidateProgressEngineCache } = require('../services/progressEngine');
+const { invalidateProgressEngineCache, computeProgressEngineForCase } = require('../services/progressEngine');
+const { scheduleEmitClinicalEvent, actorFromReq, slimProgressSnapshot } = require('../services/clinicalEventService');
+const { buildCrossDomainInsights, getLabContextForCase } = require('../services/clinicalCorrelationService');
 
 const ASSIGN_POPULATE = [
   { path: 'activityId', select: 'name instructions objective procedure materials domain frequency difficulty' },
@@ -185,6 +187,20 @@ exports.createHomeAssignment = async (req, res) => {
       invalidateProgressEngineCache(caseId);
     } catch (_) {
       /* ignore */
+    }
+
+    try {
+      const act = actorFromReq(req);
+      scheduleEmitClinicalEvent({
+        eventType: 'PROGRESS_UPDATED',
+        caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy', 'assignments'],
+        payload: { assignmentId: String(created._id), trigger: 'assignment_created', title: resolvedTitle },
+      });
+    } catch (e) {
+      console.error('clinical event assignment create:', e);
     }
 
     return res.status(201).json({
@@ -413,6 +429,37 @@ exports.reviewAssignment = async (req, res) => {
       /* ignore */
     }
 
+    try {
+      const act = actorFromReq(req);
+      let peSnap = null;
+      let cross = [];
+      try {
+        const full = await computeProgressEngineForCase(doc.caseId, { therapistId, useCache: false });
+        if (full.success && full.data) {
+          peSnap = slimProgressSnapshot(full.data);
+          const labCtx = await getLabContextForCase(doc.caseId);
+          cross = buildCrossDomainInsights(full.data, labCtx);
+        }
+      } catch (_) {}
+      scheduleEmitClinicalEvent({
+        eventType: 'PROGRESS_UPDATED',
+        caseId: doc.caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy', 'assignments', 'progress'],
+        payload: {
+          assignmentId: String(updated._id),
+          trigger: 'assignment_reviewed',
+          newStatus,
+          rating: updated?.therapistFeedback?.rating ?? null,
+        },
+        progressEngineSnapshot: peSnap || undefined,
+        crossDomainInsight: cross.length ? cross : undefined,
+      });
+    } catch (e) {
+      console.error('clinical event assignment review:', e);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Assignment updated',
@@ -609,6 +656,32 @@ exports.submitParentAssignment = async (req, res) => {
       invalidateProgressEngineCache(doc.caseId);
     } catch (_) {
       /* ignore */
+    }
+
+    try {
+      const act = actorFromReq(req);
+      let peSnap = null;
+      let cross = [];
+      try {
+        const full = await computeProgressEngineForCase(doc.caseId, { useCache: false });
+        if (full.success && full.data) {
+          peSnap = slimProgressSnapshot(full.data);
+          const labCtx = await getLabContextForCase(doc.caseId);
+          cross = buildCrossDomainInsights(full.data, labCtx);
+        }
+      } catch (_) {}
+      scheduleEmitClinicalEvent({
+        eventType: 'HOME_ASSIGNMENT_SUBMITTED',
+        caseId: doc.caseId,
+        actorRole: act.actorRole,
+        actorId: act.actorId,
+        linkedModules: ['therapy', 'assignments', 'progress'],
+        payload: { assignmentId: String(updated._id), title: String(doc.title || '').slice(0, 200) },
+        progressEngineSnapshot: peSnap || undefined,
+        crossDomainInsight: cross.length ? cross : undefined,
+      });
+    } catch (e) {
+      console.error('clinical event assignment submit:', e);
     }
 
     return res.status(200).json({

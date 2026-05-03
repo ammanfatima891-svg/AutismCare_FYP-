@@ -221,6 +221,22 @@ exports.getCaseProgress = async (req, res) => {
 };
 
 /**
+ * Therapy plan for case summary — must align with session logging, which uses (caseId, assigned therapistId).
+ * Using only caseId could surface another therapist's plan and confuse parents when the assigned therapist has no plan yet.
+ */
+async function therapyPlanForCaseSummary(caseDoc) {
+  const cid = caseDoc._id;
+  const tid = caseDoc.therapistId;
+  if (tid) {
+    const forTherapist = await TherapyPlan.findOne({ caseId: cid, therapistId: tid })
+      .sort({ updatedAt: -1 })
+      .lean();
+    if (forTherapist) return forTherapist;
+  }
+  return TherapyPlan.findOne({ caseId: cid }).sort({ updatedAt: -1 }).lean();
+}
+
+/**
  * GET /api/case/:caseId/summary
  * Aggregated child + therapy plan + sessions + assignments + progress.
  */
@@ -238,7 +254,7 @@ exports.getCaseSummary = async (req, res) => {
 
     const [childInfo, therapyPlan, sessionDocs, assignmentDocs, overview, labRequests] = await Promise.all([
       buildChildInfo(caseDoc),
-      TherapyPlan.findOne({ caseId }).lean(),
+      therapyPlanForCaseSummary(caseDoc),
       SessionLog.find({ caseId }).sort({ sessionDate: -1 }).lean(),
       HomeAssignment.find({ caseId }).populate(ASSIGN_POPULATE).sort({ dueDate: 1 }).lean(),
       computeCaseProgressOverview(caseId),

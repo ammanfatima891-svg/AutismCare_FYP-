@@ -27,8 +27,8 @@ export function DecisionSummaryCard({ decisionSupport }) {
   if (!decisionSupport) return null;
 
   const tone = toneForUrgency(decisionSupport.urgencyLevel);
-  const icon =
-    tone === "bad" ? <AlertTriangle className="h-5 w-5" /> : tone === "warn" ? <Activity className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />;
+  const AlertIcon =
+    tone === "bad" ? AlertTriangle : tone === "warn" ? Activity : CheckCircle;
 
   return (
     <Card className="border-2">
@@ -58,8 +58,8 @@ export function DecisionSummaryCard({ decisionSupport }) {
           </div>
         </div>
 
-        <Alert className="border-border bg-card">
-          <div className="mt-0.5 text-primary">{icon}</div>
+        <Alert className="border-border bg-card [&>svg]:text-primary">
+          <AlertIcon className="h-5 w-5 shrink-0" />
           <AlertDescription className="text-foreground">
             {decisionSupport.safetyNote || "This summary is decision support only and not a diagnosis."}
           </AlertDescription>

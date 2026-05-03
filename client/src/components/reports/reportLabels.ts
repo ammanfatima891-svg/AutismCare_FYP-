@@ -11,6 +11,7 @@ export type ReportListRow = {
 
 export const REPORT_TYPE_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '__all__', label: 'All types' },
+  { value: 'integrated', label: 'Integrated' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'iep', label: 'IEP' },
   { value: 'clinician', label: 'Clinician' },
@@ -21,6 +22,11 @@ export const REPORT_TYPE_FILTER_OPTIONS: Array<{ value: string; label: string }>
 ];
 
 export const GENERATE_TYPE_OPTIONS: Array<{ value: string; label: string; description: string }> = [
+  {
+    value: 'integrated',
+    label: 'Integrated',
+    description: 'End-to-end clinical overview with analytics, trends, and recommendations',
+  },
   {
     value: 'monthly',
     label: 'Monthly',
@@ -61,6 +67,7 @@ export const GENERATE_TYPE_OPTIONS: Array<{ value: string; label: string; descri
 export function reportTypeLabel(type: string): string {
   const t = String(type || '').toLowerCase();
   const map: Record<string, string> = {
+    integrated: 'Integrated',
     monthly: 'Monthly',
     iep: 'IEP',
     clinician: 'Clinician',
@@ -78,6 +85,8 @@ export function reportCardSummary(row: ReportListRow): string {
     return `${label} — Limited case data at generation time. Add plan, sessions, or assignments for a fuller document.`;
   }
   switch (String(row.type).toLowerCase()) {
+    case 'integrated':
+      return `${label} — Unified clinical view with trends, domain performance, and recommendations.`;
     case 'monthly':
       return `${label} — Progress across goals, session activity, and home assignment follow-through.`;
     case 'iep':

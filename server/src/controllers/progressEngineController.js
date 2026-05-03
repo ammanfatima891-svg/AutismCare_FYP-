@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { assertUserCaseAccess } = require('../utils/caseAccess');
 const { computeProgressEngineForCase } = require('../services/progressEngine');
+const { getLabContextForCase, buildCrossDomainInsights } = require('../services/clinicalCorrelationService');
 
 function parentSummary(full) {
   if (!full) return null;
@@ -11,17 +12,60 @@ function parentSummary(full) {
   if (sessionsN === 0 && homeRatingsN === 0 && assignN === 0) {
     return null;
   }
+  const confOverall = Number(full.confidence?.overall ?? 0);
+  const limited = confOverall > 0 && confOverall < 0.4;
   const pct = full.overallScore != null ? Math.round((full.overallScore / 5) * 100) : null;
-  const trendLabel =
-    (full.improvementRate || 0) > 0.03 ? 'improving' : (full.improvementRate || 0) < -0.03 ? 'needs_attention' : 'steady';
+
+  let trendLabel = 'steady';
+  const ot = String(full.overallTrend || '').toLowerCase();
+  if (ot === 'improving') trendLabel = 'improving';
+  else if (ot === 'declining') trendLabel = 'needs_attention';
+
   const consistency = full.consistency;
+  const domainRows = (full.domainScores && full.domainScores.length ? full.domainScores : full.domains || []).map(
+    (d) => ({
+      name: d.name || '—',
+      score: typeof d.score === 'number' ? d.score : 0,
+      confidence: typeof d.confidence === 'number' ? d.confidence : d.confidenceScore,
+    })
+  );
+
+  const goalsBrief = Array.isArray(full.goals)
+    ? full.goals.slice(0, 12).map((g) => ({
+        goalId: g.goalId,
+        goalName: g.goalName,
+        trend: g.trend,
+        current: limited ? null : g.current,
+        confidenceLabel: g.confidenceLabel,
+        limitedDataUi: limited || Boolean(g.limitedDataUi),
+      }))
+    : [];
+
+  const alerts = (full.smartAlerts || []).slice(0, 12).map((a) => ({
+    severity: a.severity || 'warning',
+    message: a.message,
+    code: a.code,
+  }));
+
   return {
-    progressPercent: pct,
+    progressPercent: limited ? null : pct,
     trendLabel,
-    headline: trendLabel === 'improving' ? 'Great momentum' : trendLabel === 'needs_attention' ? 'Needs attention' : 'Steady progress',
+    headline:
+      trendLabel === 'improving'
+        ? 'Great momentum'
+        : trendLabel === 'needs_attention'
+          ? 'Needs attention'
+          : 'Steady progress',
     consistencyPercent: consistency != null ? Math.round(Number(consistency) * 100) : null,
     homeProgramOnTrack: consistency == null ? null : consistency >= 0.5,
-    message: 'Your care team can share more detail in visits and written updates.',
+    message: limited
+      ? 'Progress direction is uncertain with current data. Your care team will interpret this with you.'
+      : 'Your care team can share more detail in visits and written updates.',
+    confidenceLabel: full.confidence?.label,
+    interpretWithCaution: limited,
+    domainScores: domainRows,
+    goalsBrief,
+    alertsParent: alerts,
   };
 }
 
@@ -70,10 +114,15 @@ exports.getProgressEngineSummary = async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ success: false, message: result.message || 'Failed to compute summary' });
     }
+    let crossDomainInsights = [];
+    try {
+      const labCtx = await getLabContextForCase(caseId);
+      crossDomainInsights = buildCrossDomainInsights(result.data, labCtx);
+    } catch (_) {}
     return res.status(200).json({
       success: true,
       data: buildSummaryPayload(result.data),
-      meta: { role, cached: Boolean(result.cached) },
+      meta: { role, cached: Boolean(result.cached), crossDomainInsights },
     });
   } catch (error) {
     console.error('getProgressEngineSummary:', error);
@@ -112,10 +161,18 @@ exports.getProgressEngine = async (req, res) => {
       data = parentSummary(data);
     }
 
+    let crossDomainInsights = [];
+    if (role !== 'parent') {
+      try {
+        const labCtx = await getLabContextForCase(caseId);
+        crossDomainInsights = buildCrossDomainInsights(result.data, labCtx);
+      } catch (_) {}
+    }
+
     return res.status(200).json({
       success: true,
       data,
-      meta: { role, scope: role === 'parent' ? 'summary' : 'full', cached: Boolean(result.cached) },
+      meta: { role, scope: role === 'parent' ? 'summary' : 'full', cached: Boolean(result.cached), crossDomainInsights },
     });
   } catch (error) {
     console.error('getProgressEngine:', error);

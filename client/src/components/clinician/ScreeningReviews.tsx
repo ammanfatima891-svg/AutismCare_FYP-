@@ -380,6 +380,30 @@ export function ScreeningReviews() {
           {!loadingDetail && selectedSubmission && (
             <div className="space-y-4">
               <div className="text-sm text-foreground space-y-1">
+                {selectedSubmission.childDisplayName && selectedSubmission.childDisplayName !== '—' ? (
+                  <div>
+                    <span className="font-medium">Child:</span> {selectedSubmission.childDisplayName}
+                    {selectedSubmission.childDobText && selectedSubmission.childDobText !== '—' ? (
+                      <span className="text-muted-foreground"> · DOB {selectedSubmission.childDobText}</span>
+                    ) : null}
+                    {typeof selectedSubmission.childAgeYears === 'number' &&
+                    !Number.isNaN(selectedSubmission.childAgeYears) ? (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        (~{selectedSubmission.childAgeYears}{' '}
+                        {selectedSubmission.childAgeYears === 1 ? 'year' : 'years'} old)
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {selectedSubmission.parentDisplayName && selectedSubmission.parentDisplayName !== '—' ? (
+                  <div>
+                    <span className="font-medium">Parent:</span> {selectedSubmission.parentDisplayName}
+                    {selectedSubmission.parentEmail ? (
+                      <span className="text-muted-foreground"> ({selectedSubmission.parentEmail})</span>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div>
                   <span className="font-medium">Questionnaire:</span> {selectedSubmission.questionnaireType}
                 </div>

@@ -1,7 +1,9 @@
 const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
+const mongoose = require('mongoose');
 const Questionnaire = require("../models/Questionnaire");
 const Submission = require("../models/Submission");
 const { User, ROLES } = require("../models/User");
+const { ChildCase } = require('../models/ChildCase');
 const { scoreMCHATFromDB } = require("../utils/MchatScoring");
 const { scoreASQ } = require("../utils/ASQscoring");
 const ASQ_CUTOFFS = require("../utils/asqCutoffs");
@@ -14,6 +16,7 @@ const { buildScreeningSummaryForChild } = require('../services/childCase.service
 const { transitionCase, CASE_EVENTS } = require('../services/caseLifecycleService');
 const { getScreeningPlan } = require('../services/screeningOrchestrator');
 const { screeningResultTemplate } = require('../emailTemplates/screeningResultTemplate');
+const { scheduleEmitClinicalEvent, actorFromReq, resolveCaseIdFromParentChild } = require('../services/clinicalEventService');
 
 function computeAgeMonths(dob) {
   const dt = dob ? new Date(dob) : null;
@@ -21,6 +24,14 @@ function computeAgeMonths(dob) {
   const ageDays = Math.floor((getCurrentTimeMs() - dt.getTime()) / (1000 * 60 * 60 * 24));
   const ageMonths = ageDays / 30.44;
   return Number.isFinite(ageMonths) ? ageMonths : null;
+}
+
+/** Submission.childId has no Mongoose `ref`; never use `submission.childId._id` (undefined on ObjectId). */
+function submissionChildIdString(submission) {
+  const cid = submission && submission.childId;
+  if (cid == null || cid === '') return '';
+  if (typeof cid === 'object' && cid._id != null) return String(cid._id);
+  return String(cid);
 }
 
 function asqDomainStatusToZone(raw) {
@@ -322,6 +333,29 @@ exports.calculateScreening = async (req, res) => {
       console.error('[calculateScreening] case lifecycle transition failed:', e?.message || e);
     }
 
+    try {
+      const parentKey = req.user._id || req.user.id;
+      const caseIdStr = await resolveCaseIdFromParentChild(parentKey, childId);
+      if (caseIdStr) {
+        const act = actorFromReq(req);
+        scheduleEmitClinicalEvent({
+          eventType: 'SCREENING_COMPLETED',
+          caseId: caseIdStr,
+          actorRole: act.actorRole,
+          actorId: act.actorId,
+          linkedModules: ['screening'],
+          payload: {
+            submissionId: String(submission._id),
+            questionnaireType,
+            riskLevel,
+            result,
+          },
+        });
+      }
+    } catch (evErr) {
+      console.error('clinical event screening:', evErr);
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -528,8 +562,8 @@ exports.getScreeningHistory = async (req, res) => {
     const childIds = user.children.map(child => child._id);
 
     const submissions = await Submission.find({ childId: { $in: childIds } })
-      .populate("childId", "name dob")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -568,7 +602,7 @@ exports.getSubmissionById = async (req, res) => {
         });
       }
       const childIds = (user.children || []).map((c) => String(c._id));
-      const sid = submission.childId ? String(submission.childId) : "";
+      const sid = submissionChildIdString(submission);
       if (!sid || !childIds.includes(sid)) {
         return res.status(403).json({
           success: false,
@@ -577,9 +611,46 @@ exports.getSubmissionById = async (req, res) => {
       }
     }
 
+    const cidStr = submissionChildIdString(submission);
+    let parentLean = await User.findOne({ role: ROLES.PARENT, 'children._id': submission.childId })
+      .select('firstName lastName email children')
+      .lean();
+    let childLean = parentLean?.children?.find((c) => String(c._id) === cidStr) || null;
+
+    if (!childLean && submission.childId && mongoose.Types.ObjectId.isValid(cidStr)) {
+      const cc = await ChildCase.findOne({ childId: submission.childId }).select('parentId').lean();
+      if (cc?.parentId) {
+        parentLean = await User.findById(cc.parentId).select('firstName lastName email children').lean();
+        childLean = parentLean?.children?.find((c) => String(c._id) === cidStr) || null;
+      }
+    }
+
+    const childDisplayName = childLean
+      ? `${childLean.firstName || ''} ${childLean.lastName || ''}`.trim() || 'Child'
+      : '—';
+    const parentDisplayName = parentLean
+      ? `${parentLean.firstName || ''} ${parentLean.lastName || ''}`.trim() || 'Parent'
+      : '—';
+    const dobSource = childLean?.dateOfBirth || submission.dob;
+    const childDobText =
+      dobSource && !Number.isNaN(new Date(dobSource).getTime())
+        ? new Date(dobSource).toLocaleDateString()
+        : '—';
+    const ageMonths = computeAgeMonths(dobSource);
+    const childAgeYears =
+      typeof ageMonths === 'number' && Number.isFinite(ageMonths) ? Math.floor(ageMonths / 12) : null;
+
+    const payload = submission.toObject();
     res.status(200).json({
       success: true,
-      data: submission,
+      data: {
+        ...payload,
+        childDisplayName,
+        parentDisplayName,
+        parentEmail: typeof parentLean?.email === 'string' ? parentLean.email : '',
+        childDobText,
+        childAgeYears,
+      },
     });
   } catch (error) {
     console.error("Error fetching submission:", error);
@@ -807,8 +878,7 @@ exports.downloadSubmissionReport = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // Get submission with child details
-    const submission = await Submission.findById(id).populate('childId', 'firstName lastName dateOfBirth');
+    const submission = await Submission.findById(id);
 
     if (!submission) {
       return res.status(404).json({
@@ -817,8 +887,7 @@ exports.downloadSubmissionReport = async (req, res) => {
       });
     }
 
-    // Verify the submission belongs to the user
-    const user = await User.findById(userId).populate("children");
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -826,7 +895,8 @@ exports.downloadSubmissionReport = async (req, res) => {
       });
     }
 
-    const child = user.children.find(c => c._id.toString() === submission.childId._id.toString());
+    const childIdStr = submissionChildIdString(submission);
+    const child = (user.children || []).find((c) => String(c._id) === childIdStr);
     if (!child) {
       return res.status(404).json({
         success: false,
@@ -834,12 +904,25 @@ exports.downloadSubmissionReport = async (req, res) => {
       });
     }
 
-    // Generate PDF report with branding (same body as email attachment)
+    const firstName = child.firstName || 'Child';
+    const lastName = child.lastName || '';
+    const dobVal = child.dateOfBirth || submission.dob;
+    const dobText =
+      dobVal && !Number.isNaN(new Date(dobVal).getTime())
+        ? new Date(dobVal).toLocaleDateString()
+        : '—';
+
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ margin: 50 });
 
+    const safeFn = String(firstName).replace(/[^\w\-]+/g, '_');
+    const safeLn = String(lastName).replace(/[^\w\-]+/g, '_');
+
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="AutismCare_Screening_Report_${submission.childId.firstName}_${submission.childId.lastName}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="AutismCare_Screening_Report_${safeFn}_${safeLn}.pdf"`
+    );
     doc.pipe(res);
 
     // Branding header
@@ -853,8 +936,8 @@ exports.downloadSubmissionReport = async (req, res) => {
 
     doc.fontSize(18).text(`${submission.questionnaireType} Screening Report`);
     doc.moveDown(1);
-    doc.fontSize(12).text(`Child: ${submission.childId.firstName} ${submission.childId.lastName}`);
-    doc.text(`Date of birth: ${new Date(submission.childId.dateOfBirth).toLocaleDateString()}`);
+    doc.fontSize(12).text(`Child: ${firstName} ${lastName}`.trim());
+    doc.text(`Date of birth: ${dobText}`);
     doc.text(`Screening date: ${new Date(submission.createdAt).toLocaleDateString()}`);
     doc.moveDown(1);
 

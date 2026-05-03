@@ -147,7 +147,8 @@ export function TherapyOversightTab({ caseId }: TherapyOversightTabProps) {
                         </p>
                         <Button
                           type="button"
-                          className="mt-3 bg-blue-700 text-white hover:bg-blue-800"
+                          variant="default"
+                          className="mt-3 bg-blue-600 text-white shadow-sm hover:bg-blue-700"
                           disabled={approving}
                           onClick={() => void approveTherapyPlan()}
                         >

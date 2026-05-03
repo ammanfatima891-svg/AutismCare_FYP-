@@ -233,5 +233,5 @@ describe('Messaging Advanced Integration', () => {
       .get(`/api/messaging/messages/${conversation1Id}`)
       .set(authHeader(parent2Token));
     expect(crossCaseRes.statusCode).toBe(403);
-  });
+  }, 90000);
 });

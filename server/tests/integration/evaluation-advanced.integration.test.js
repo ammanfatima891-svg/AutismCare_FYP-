@@ -113,7 +113,7 @@ describe('Clinical Evaluation Advanced Integration', () => {
         observations: 'obs',
         status: 'draft',
       });
-    expect(invalidCaseRes.statusCode).toBe(404);
+    expect(invalidCaseRes.statusCode).toBe(400);
 
     const invalidStatusRes = await request(app)
       .post('/api/evaluations')

@@ -24,8 +24,17 @@ function formatAge(ageMonths) {
   return `${years}y ${rem}m`;
 }
 
+function normalizeQuestionnaireType(type) {
+  const raw = String(type || "").trim().toUpperCase();
+  const compact = raw.replace(/[^A-Z0-9]/g, "");
+  if (compact.includes("MCHAT")) return "MCHAT-R";
+  if (compact.includes("ASQ")) return "ASQ-3";
+  return "";
+}
+
 export default function ScreeningGuide({ child, selectedType, onBack, onStart }) {
   const ageMonths = useMemo(() => ageMonthsFromDob(child?.dateOfBirth), [child?.dateOfBirth]);
+  const normalizedSelectedType = useMemo(() => normalizeQuestionnaireType(selectedType), [selectedType]);
   const [plan, setPlan] = useState(null);
   const [caseRow, setCaseRow] = useState(null);
 
@@ -72,11 +81,30 @@ export default function ScreeningGuide({ child, selectedType, onBack, onStart })
   const mchatCompleted = screeningProgress?.mchatCompleted === true;
   const asqCompleted = screeningProgress?.asqCompleted === true;
   const bothCompleted = mchatCompleted && asqCompleted;
+  const selectedIsMchat = normalizedSelectedType === "MCHAT-R";
+  const selectedIsAsq = normalizedSelectedType === "ASQ-3";
 
   const recommendedFlow = suggestMchatFirst ? ["M-CHAT-R", "ASQ-3"] : ["ASQ-3"];
 
   const startMchat = () => onStart("MCHAT-R", { origin: "guide", flow: "guided", skippedMchat: false, orderFollowed: true });
   const startAsq = (opts) => onStart("ASQ-3", { origin: "guide", flow: "guided", ...(opts || {}) });
+  const startSelected = () => {
+    // Parent explicitly selected a tool in previous step: honor that choice.
+    if (selectedIsMchat) {
+      startMchat();
+      return;
+    }
+    if (selectedIsAsq) {
+      startAsq({ skippedMchat: mchatAllowed && !mchatCompleted, orderFollowed: !mchatAllowed || mchatCompleted });
+      return;
+    }
+    if (mchatAllowed && !mchatCompleted) {
+      startMchat();
+      return;
+    }
+    startAsq({ skippedMchat: mchatAllowed && !mchatCompleted, orderFollowed: true });
+  };
+  const selectedLabel = selectedIsMchat ? "M-CHAT-R" : selectedIsAsq ? "ASQ-3" : (selectedType || "—");
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-2 sm:px-6">
@@ -102,10 +130,23 @@ export default function ScreeningGuide({ child, selectedType, onBack, onStart })
       <Alert className="border-border bg-card">
         <Info className="h-4 w-4 text-primary" />
         <AlertDescription className="text-foreground">
-          These questionnaires are <span className="font-medium">screening tools</span>. They can help guide next steps,
-          but they do <span className="font-medium">not</span> diagnose autism or any medical condition.
+          Screening helps decide next steps. It does <span className="font-medium">not</span> diagnose.
         </AlertDescription>
       </Alert>
+
+      <Card className="border border-border bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Quick plan</CardTitle>
+          <CardDescription>Read this first</CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-foreground">
+          <ul className="list-inside list-disc space-y-1">
+            <li>Take one screen now: <span className="font-medium">{selectedLabel}</span>.</li>
+            <li>Share results with your pediatrician.</li>
+            <li>Still concerned? Ask for referral now.</li>
+          </ul>
+        </CardContent>
+      </Card>
 
       <Card className="border border-border bg-muted/20">
         <CardHeader className="pb-2">
@@ -127,14 +168,14 @@ export default function ScreeningGuide({ child, selectedType, onBack, onStart })
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="border-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">1) What is ASQ-3?</CardTitle>
-            <CardDescription>Development across 5 skill areas</CardDescription>
+            <CardTitle className="text-base">ASQ-3</CardTitle>
+            <CardDescription>General development screen</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <ul className="list-inside list-disc space-y-1">
-              <li>Checks communication, motor skills, problem solving, and social skills</li>
-              <li>Results are shown by area (on track / monitoring / below cutoff)</li>
-              <li>Useful for routine developmental monitoring at many ages</li>
+              <li>30 items</li>
+              <li>5 skill areas</li>
+              <li>Works across many ages</li>
             </ul>
             <Badge variant="secondary">Recommended for most ages</Badge>
           </CardContent>
@@ -142,14 +183,14 @@ export default function ScreeningGuide({ child, selectedType, onBack, onStart })
 
         <Card className="border-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">2) What is M-CHAT-R?</CardTitle>
-            <CardDescription>Autism screening for toddlers</CardDescription>
+            <CardTitle className="text-base">M-CHAT-R</CardTitle>
+            <CardDescription>Autism screen for toddlers</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <ul className="list-inside list-disc space-y-1">
-              <li>20 yes/no questions about social communication behaviors</li>
-              <li>Only valid for about <span className="font-medium">16–30 months</span></li>
-              <li>Higher scores mean higher likelihood and need for clinician review</li>
+              <li>20 yes/no questions</li>
+              <li>Best at 16–30 months</li>
+              <li>Higher risk = faster follow-up</li>
             </ul>
             <Badge className={mchatAllowed ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}>
               {mchatAllowed ? "Available for this age" : "Not used for this age"}
@@ -159,29 +200,17 @@ export default function ScreeningGuide({ child, selectedType, onBack, onStart })
 
         <Card className="border-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">3) Which should I take first?</CardTitle>
-            <CardDescription>Age-aware guidance</CardDescription>
+            <CardTitle className="text-base">Your next step</CardTitle>
+            <CardDescription>We will open your selected tool</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            {!mchatAllowed && (
-              <p>
-                For this age, we’ll use <span className="font-medium">ASQ-3</span>. (M-CHAT-R is only for 16–30 months.)
-              </p>
-            )}
-            {suggestMchatFirst && (
-              <p>
-                For toddlers 16–30 months, it’s usually helpful to start with{" "}
-                <span className="font-medium">M-CHAT-R</span>, then complete <span className="font-medium">ASQ-3</span>.
-              </p>
-            )}
             <div className="rounded-lg border bg-muted/30 p-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your selection</div>
-              <div className="mt-1 text-sm text-foreground">{selectedType || "—"}</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Selected</div>
+              <div className="mt-1 text-sm text-foreground">{selectedLabel}</div>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recommended flow</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested order</div>
               <div className="mt-1 text-sm text-foreground">{recommendedFlow.join(" → ")}</div>
-              {plan?.message ? <div className="mt-1 text-xs text-muted-foreground">{plan.message}</div> : null}
             </div>
           </CardContent>
         </Card>
@@ -204,6 +233,11 @@ export default function ScreeningGuide({ child, selectedType, onBack, onStart })
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         {bothCompleted ? (
           <Badge className="bg-primary text-primary-foreground">All recommended screening completed</Badge>
+        ) : (selectedIsMchat || selectedIsAsq) ? (
+          <Button onClick={startSelected} className="sm:order-2">
+            Start {selectedLabel}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         ) : mchatAllowed && !mchatCompleted ? (
           <>
             <Button onClick={startMchat} className="sm:order-2">

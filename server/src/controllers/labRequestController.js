@@ -10,6 +10,7 @@ const { User } = require('../models/User');
 const { assertTherapistCaseAccess } = require('../utils/therapistCaseAccess');
 const { createNotification, NOTIFICATION_TYPES } = require('../utils/notification');
 const { validateFileStrict, wrapMulter } = require('../middleware/uploadValidation');
+const { scheduleEmitClinicalEvent, actorFromReq } = require('../services/clinicalEventService');
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -353,6 +354,26 @@ exports.uploadLabReport = [
             })
           : Promise.resolve(null),
       ]);
+
+      try {
+        if (caseDoc?._id) {
+          const act = actorFromReq(req);
+          scheduleEmitClinicalEvent({
+            eventType: 'LAB_REPORT_UPLOADED',
+            caseId: caseDoc._id,
+            actorRole: act.actorRole,
+            actorId: act.actorId,
+            linkedModules: ['lab'],
+            payload: {
+              labRequestId: String(request._id),
+              reportUrl: finalReportUrl,
+              legacyFlow: true,
+            },
+          });
+        }
+      } catch (evErr) {
+        console.error('clinical event legacy lab upload:', evErr);
+      }
 
       return res.status(200).json({ success: true, data: updated });
     } catch (error) {

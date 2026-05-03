@@ -12,6 +12,7 @@ const TherapyCase = require('../models/TherapyCase');
 const { SessionSlot } = require('../models/SessionSlot');
 const { HomeAssignment } = require('../models/HomeAssignment');
 const SessionLog = require('../models/SessionLog');
+const { computeProgressEngineForCase } = require('../services/progressEngine');
 const { REFERRAL_STATUS } = require('../constants/workflowEnums');
 
 const UPCOMING_SESSION_LIMIT = 8;
@@ -230,7 +231,7 @@ async function loadTherapistDashboardData(req) {
   const parents = await User.find({ _id: { $in: parentIds } }).select('children').lean();
   const parentMap = new Map(parents.map((p) => [String(p._id), p]));
 
-  const assignedCases = referrals
+  const assignedCasesRaw = referrals
     .map((ref) => {
       const c = caseMap.get(String(ref.caseId));
       if (!c) return null;
@@ -249,7 +250,25 @@ async function loadTherapistDashboardData(req) {
     })
     .filter(Boolean);
 
-  // Canonical workflow: referrals do not have an "in-progress" state; therapy lifecycle is tracked on TherapyCase.
+  // Referral document stays ACCEPTED after "Start therapy"; TherapyCase ACTIVE is the source of truth for UI.
+  const caseOidList = [...new Set(assignedCasesRaw.map((r) => r.caseId).filter(Boolean))];
+  const activeTherapyRows =
+    caseOidList.length > 0
+      ? await TherapyCase.find({
+          therapistId,
+          caseId: { $in: caseOidList },
+          status: 'ACTIVE',
+        })
+          .select('caseId')
+          .lean()
+      : [];
+  const activeTherapyByCase = new Set(activeTherapyRows.map((t) => String(t.caseId)));
+
+  const assignedCases = assignedCasesRaw.map((row) => ({
+    ...row,
+    referralStatus: activeTherapyByCase.has(String(row.caseId)) ? 'in-progress' : row.referralStatus,
+  }));
+
   const activeCases = await TherapyCase.countDocuments({ therapistId, status: 'ACTIVE' });
 
   const upcomingSessions = await buildUpcomingSessions(therapistId, startOfToday, UPCOMING_SESSION_LIMIT);
@@ -319,24 +338,22 @@ async function loadTherapistDashboardData(req) {
     sessionDate: { $gte: startOfToday, $lt: endOfToday },
   });
 
-  const allPlans = await TherapyPlan.find({ therapistId }).select('shortTermGoals goals').lean();
-  let totalGoals = 0;
-  let achievedGoals = 0;
-  for (const plan of allPlans) {
-    const st = Array.isArray(plan.shortTermGoals) ? plan.shortTermGoals : [];
-    for (const g of st) {
-      totalGoals += 1;
-      if (String(g.status) === 'Achieved') achievedGoals += 1;
-    }
-    const legacy = Array.isArray(plan.goals) ? plan.goals : [];
-    for (const g of legacy) {
-      totalGoals += 1;
-      const s = String(g.status || '').toLowerCase();
-      if (s.includes('achiev') || s === 'completed' || s === 'done') achievedGoals += 1;
+  const activeCaseRows = await TherapyCase.find({ therapistId, status: 'ACTIVE' }).select('caseId').limit(20).lean();
+  const engineScores = [];
+  for (const row of activeCaseRows) {
+    try {
+      const pe = await computeProgressEngineForCase(String(row.caseId), { therapistId, useCache: true });
+      if (pe.success && pe.data?.overallScore != null && Number.isFinite(Number(pe.data.overallScore))) {
+        engineScores.push(Number(pe.data.overallScore));
+      }
+    } catch (_) {
+      /* ignore per-case failures */
     }
   }
   const overallProgress =
-    totalGoals === 0 ? 0 : Math.min(100, Math.round((achievedGoals / totalGoals) * 100));
+    engineScores.length === 0
+      ? 0
+      : Math.min(100, Math.round((engineScores.reduce((a, b) => a + b, 0) / engineScores.length / 5) * 100));
 
   return {
     assignedCases,

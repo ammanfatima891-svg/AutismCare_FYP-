@@ -1,6 +1,6 @@
 const { getCurrentTime, getCurrentTimeMs } = require('../utils/time.js');
 const express = require('express');
-const { getPendingProfessionals, updateProfessionalStatus } = require('../controllers/admin.controller');
+const { getPendingProfessionals, updateProfessionalStatus, getDashboardMetrics } = require('../controllers/admin.controller');
 const { protect, restrictTo } = require('../middleware/auth.middleware');
 
 const router = express.Router();
@@ -33,6 +33,8 @@ router.use(restrictTo('admin'));
 
 // Get all pending professionals
 router.get('/pending-professionals', getPendingProfessionals);
+
+router.get('/dashboard-metrics', getDashboardMetrics);
 
 // Update professional status (approve/reject)
 router.post('/update-professional-status', adminModerationThrottle, updateProfessionalStatus);

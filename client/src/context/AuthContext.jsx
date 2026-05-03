@@ -13,18 +13,29 @@ export const AuthContext = createContext({
   logout: noop,
 });
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
+/** Read persisted session synchronously so the first paint keeps protected routes (fixes refresh → login flash). */
+function readStoredSessionUser() {
+  if (typeof window === 'undefined') return null;
+  try {
     // Prefer sessionStorage so a fresh login without "remember me" wins over stale localStorage
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     const role = sessionStorage.getItem('role') || localStorage.getItem('role');
     const firstName = sessionStorage.getItem('firstName') || localStorage.getItem('firstName');
     const lastName = sessionStorage.getItem('lastName') || localStorage.getItem('lastName');
     const email = sessionStorage.getItem('email') || localStorage.getItem('email');
-    if (token && role) setUser({ token, role, firstName, lastName, email });
+    if (token && role) return { token, role, firstName, lastName, email };
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(readStoredSessionUser);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    setUser(readStoredSessionUser());
   }, []);
 
   const login = async (email, password, rememberMe = false) => {

@@ -25,6 +25,7 @@ describe('Referrals Exceptional and BVA Integration', () => {
   let speechTherapistToken;
   let clinicianId;
   let fakeCaseId;
+  let validCaseId;
 
   beforeAll(async () => {
     await connectTestDb();
@@ -76,6 +77,21 @@ describe('Referrals Exceptional and BVA Integration', () => {
     clinicianId = String(clinicianDoc._id);
 
     fakeCaseId = new mongoose.Types.ObjectId().toString();
+
+    const caseDoc = await ChildCase.create({
+      childId: new mongoose.Types.ObjectId(),
+      parentId: new mongoose.Types.ObjectId(),
+      clinicianId,
+      status: 'DIAGNOSIS_READY',
+    });
+    validCaseId = String(caseDoc._id);
+
+    await ClinicalEvaluation.create({
+      caseId: caseDoc._id,
+      clinicianId,
+      observations: 'final eval for referral validation cases',
+      status: 'FINALIZED',
+    });
   });
 
   afterAll(async () => {
@@ -126,7 +142,7 @@ describe('Referrals Exceptional and BVA Integration', () => {
       .post('/api/referrals')
       .set(authHeader(clinicianToken))
       .send({
-        caseId: fakeCaseId,
+        caseId: validCaseId,
         therapistType: 'Invalid Type',
         priority: 'high',
       });
@@ -139,7 +155,7 @@ describe('Referrals Exceptional and BVA Integration', () => {
       .post('/api/referrals')
       .set(authHeader(clinicianToken))
       .send({
-        caseId: fakeCaseId,
+        caseId: validCaseId,
         therapistType: 'Speech Therapist',
         priority: 'urgent',
       });
@@ -155,6 +171,7 @@ describe('Referrals Exceptional and BVA Integration', () => {
       childId: new mongoose.Types.ObjectId(),
       parentId: new mongoose.Types.ObjectId(),
       clinicianId,
+      status: 'DIAGNOSIS_READY',
     });
 
     await ClinicalEvaluation.create({
@@ -289,8 +306,14 @@ describe('Referrals Exceptional and BVA Integration', () => {
   });
 
   test('Exceptional: cannot start referral in pending state', async () => {
+    const caseDoc = await ChildCase.create({
+      childId: new mongoose.Types.ObjectId(),
+      parentId: new mongoose.Types.ObjectId(),
+      clinicianId,
+      status: 'THERAPY',
+    });
     const referral = await Referral.create({
-      caseId: new mongoose.Types.ObjectId(),
+      caseId: caseDoc._id,
       clinicianId: new mongoose.Types.ObjectId(),
       therapistType: 'Speech Therapist',
       priority: 'medium',
@@ -306,8 +329,14 @@ describe('Referrals Exceptional and BVA Integration', () => {
   });
 
   test('Flow: can start referral in accepted state', async () => {
+    const caseDoc = await ChildCase.create({
+      childId: new mongoose.Types.ObjectId(),
+      parentId: new mongoose.Types.ObjectId(),
+      clinicianId,
+      status: 'THERAPY',
+    });
     const referral = await Referral.create({
-      caseId: new mongoose.Types.ObjectId(),
+      caseId: caseDoc._id,
       clinicianId: new mongoose.Types.ObjectId(),
       therapistType: 'Speech Therapist',
       priority: 'high',

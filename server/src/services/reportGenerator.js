@@ -49,6 +49,8 @@ function buildIntegratedTherapyReport(ctx) {
     type: 'integrated',
     generatedAt: getCurrentTime().toISOString(),
     insufficientData: !plan && completed.length === 0 && (!assignments || assignments.length === 0),
+    /** Full progress engine snapshot (single source of truth for clinical UI). */
+    progressEngine,
     childInfo,
     case: {
       caseId: String(caseDoc._id),
@@ -79,6 +81,10 @@ function buildIntegratedTherapyReport(ctx) {
       overallScore: progressEngine.overallScore,
       improvementRate: progressEngine.improvementRate,
       consistency: progressEngine.consistency,
+      overallTrend: progressEngine.overallTrend,
+      overallConfidence: progressEngine.overallConfidence,
+      overallExplanation: progressEngine.overallExplanation,
+      domainScores: progressEngine.domainScores,
     },
     therapistNotes: notes,
     recommendations: buildRecommendations(progressEngine),

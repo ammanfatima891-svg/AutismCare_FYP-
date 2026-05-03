@@ -1,23 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { analyticsAPI } from '../../api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CaseAnalyticsPayload } from './types';
-
-const CHART_BAR = '#3B82F6';
-const CHART_LINE = '#1E3A8A';
-const CHART_GRID = '#E5E7EB';
+import { TrendLineChart } from '../reports/ui/ChartSection';
+import {
+  ClinicalAlertsPanel,
+  DomainPerformanceBarChart,
+  GoalClinicalCard,
+  GoalWhyModal,
+  LowConfidenceBanner,
+  trendIcon,
+} from '../progress-clinical';
 
 type Props = {
   caseId: string;
@@ -32,18 +27,13 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function smartAlertRowClass(severity?: string) {
-  const s = String(severity || 'warning').toLowerCase();
-  if (s === 'critical' || s === 'error' || s === 'danger') {
-    return 'rounded-md border border-red-200 bg-red-50/90 px-3 py-2 text-sm text-red-950';
-  }
-  return 'rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950';
-}
-
 export function CaseProgressAnalyticsDashboard({ caseId, childLabel }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<CaseAnalyticsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [whyGoal, setWhyGoal] = useState<NonNullable<CaseAnalyticsPayload['progressEngine']>['goals'][number] | null>(
+    null
+  );
 
   const load = useCallback(async () => {
     if (!caseId) return;
@@ -102,9 +92,19 @@ export function CaseProgressAnalyticsDashboard({ caseId, childLabel }: Props) {
   }
 
   const domains = Array.isArray(pe.domains) ? pe.domains : [];
+  const domainChartData = Array.isArray(pe.domainScores) && pe.domainScores.length
+    ? pe.domainScores.map((d) => ({ name: d.name, score: d.score, confidence: d.confidence }))
+    : domains.length
+      ? domains.map((d: { name?: string; score?: number; confidenceScore?: number }) => ({
+          name: d.name || '—',
+          score: typeof d.score === 'number' ? d.score : 0,
+          confidence: typeof d.confidenceScore === 'number' ? d.confidenceScore : 0,
+        }))
+      : [];
   const weeklyTrend = Array.isArray(pe.weeklyTrend) ? pe.weeklyTrend : [];
   const smartAlerts = Array.isArray(pe.smartAlerts) ? pe.smartAlerts : [];
   const weakAreas = Array.isArray(pe.weakAreas) ? pe.weakAreas : [];
+  const lowOverall = Boolean(pe.confidence && pe.confidence.overall < 0.4);
 
   return (
     <div className="space-y-6">
@@ -115,39 +115,44 @@ export function CaseProgressAnalyticsDashboard({ caseId, childLabel }: Props) {
         </div>
       ) : null}
 
+      <LowConfidenceBanner
+        visible={lowOverall}
+        message="Interpret with caution — overall metric has low statistical confidence."
+      />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="border bg-card shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription>Overall score (engine)</CardDescription>
+            <CardDescription>Overall score (0–5)</CardDescription>
             <CardTitle className="text-3xl font-semibold tabular-nums text-foreground">
-              {typeof pe.overallScore === 'number' && !Number.isNaN(pe.overallScore)
+              {lowOverall ? 'Limited data' : typeof pe.overallScore === 'number' && !Number.isNaN(pe.overallScore)
                 ? pe.overallScore.toFixed(2)
                 : '—'}
             </CardTitle>
+            {typeof pe.overallTrend === 'string' ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                Trend {trendIcon(pe.overallTrend)} {pe.overallTrend}
+              </p>
+            ) : null}
           </CardHeader>
           {pe.confidence ? (
             <CardContent className="text-xs text-muted-foreground">
               Confidence: {(pe.confidence.overall * 100).toFixed(0)}% ({pe.confidence.label})
+              {typeof pe.overallExplanation?.dataQuality === 'string' ? (
+                <span>&nbsp;· data quality {pe.overallExplanation.dataQuality}</span>
+              ) : null}
             </CardContent>
           ) : null}
         </Card>
 
-        {domains.length ? (
+        {domainChartData.length ? (
           <Card className="border bg-card shadow-sm sm:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-foreground">Domain scores</CardTitle>
-              <CardDescription>From progress engine (0–5 scale)</CardDescription>
+              <CardTitle className="text-base text-foreground">Domain performance</CardTitle>
+              <CardDescription>Bars tinted by statistical confidence</CardDescription>
             </CardHeader>
-            <CardContent className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={domains} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART_GRID} strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <Tooltip formatter={(v: number) => [String(v), 'Score']} />
-                  <Bar dataKey="score" fill={CHART_BAR} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <CardContent className="h-[240px]">
+              <DomainPerformanceBarChart data={domainChartData} height={220} />
             </CardContent>
           </Card>
         ) : null}
@@ -156,19 +161,18 @@ export function CaseProgressAnalyticsDashboard({ caseId, childLabel }: Props) {
       {weeklyTrend.length > 0 ? (
         <Card className="border bg-card shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base text-foreground">Trends</CardTitle>
-            <CardDescription>Weekly trend series from backend</CardDescription>
+            <CardTitle className="text-base text-foreground">Composite trajectory</CardTitle>
+            <CardDescription>Same engine smoothing as therapist reports</CardDescription>
           </CardHeader>
-          <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke={CHART_GRID} strokeDasharray="3 3" />
-                <XAxis dataKey="x" tick={{ fontSize: 11, fill: '#64748b' }} />
-                <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: '#64748b' }} />
-                <Tooltip formatter={(v: number) => [String(v), 'Score']} />
-                <Bar dataKey="y" fill={CHART_LINE} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent className="min-h-[260px]">
+            <TrendLineChart
+              data={weeklyTrend.map((w: { x?: string; y?: number; week?: string }) => ({
+                x: String(w.x || w.week || ''),
+                y: typeof w.y === 'number' ? w.y : 0,
+              }))}
+              xLabel="Period"
+              yLabel="Score (0–5)"
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -177,16 +181,10 @@ export function CaseProgressAnalyticsDashboard({ caseId, childLabel }: Props) {
         <Card className="border bg-card shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-foreground">Alerts</CardTitle>
-            <CardDescription>From progress engine</CardDescription>
+            <CardDescription>Grouped severity</CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              {smartAlerts.map((a, i) => (
-                <li key={i} className={smartAlertRowClass(a.severity)}>
-                  {a.message}
-                </li>
-              ))}
-            </ul>
+            <ClinicalAlertsPanel alerts={smartAlerts} />
           </CardContent>
         </Card>
       ) : null}
@@ -210,28 +208,38 @@ export function CaseProgressAnalyticsDashboard({ caseId, childLabel }: Props) {
       {Array.isArray(pe.goals) && pe.goals.length > 0 ? (
         <Card className="border bg-card shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base text-foreground">Goals (engine)</CardTitle>
-            <CardDescription>Backend goal rows only</CardDescription>
+            <CardTitle className="text-base text-foreground">Goals</CardTitle>
+            <CardDescription>Unified engine visuals</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="grid gap-3 sm:grid-cols-2">
             {pe.goals.map((g) => (
-              <div key={g.goalId} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 py-2 last:border-0">
-                <span className="font-medium text-foreground">{g.goalName || g.goalId}</span>
-                <span className="text-muted-foreground">
-                  current {g.current != null ? g.current.toFixed(2) : '—'} · trend {g.trend}
-                  {typeof g.linkedAssignmentsCount === 'number' && g.linkedAssignmentsCount > 0 ? (
-                    <Badge variant="outline" className="ml-2 font-normal">
-                      {g.linkedAssignmentsCount} home link
-                      {g.linkedAssignmentsCount > 1 ? 's' : ''}
-                      {g.assignmentRatingAvg != null ? ` · avg ${g.assignmentRatingAvg}` : ''}
-                    </Badge>
-                  ) : null}
-                </span>
-              </div>
+              <GoalClinicalCard
+                key={g.goalId}
+                goal={{
+                  goalId: g.goalId,
+                  goalName: g.goalName,
+                  current: g.current,
+                  trend: g.trend,
+                  confidenceLabel: g.confidenceLabel,
+                  confidenceScore: typeof g.confidenceScore === 'number' ? g.confidenceScore : undefined,
+                  limitedDataUi: Boolean(
+                    g.limitedDataUi || (typeof g.confidenceScore === 'number' ? g.confidenceScore < 0.4 : false)
+                  ),
+                }}
+                onWhy={() => setWhyGoal(g)}
+              />
             ))}
           </CardContent>
         </Card>
       ) : null}
+
+      <GoalWhyModal
+        open={Boolean(whyGoal)}
+        onOpenChange={(o) => {
+          if (!o) setWhyGoal(null);
+        }}
+        goal={whyGoal}
+      />
     </div>
   );
 }

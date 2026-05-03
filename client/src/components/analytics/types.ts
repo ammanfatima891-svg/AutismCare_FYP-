@@ -89,6 +89,31 @@ export type ClinicalDomainRow = {
   name: string;
   score: number;
   status: string;
+  trend?: string;
+  confidenceScore?: number;
+  confidenceLabel?: string;
+};
+
+export type GoalTimeSeriesPoint = {
+  date: string | null;
+  score: number;
+  smoothedScore?: number;
+  confidence?: number;
+};
+
+export type GoalExplanation = {
+  dataSource?: string;
+  sessionsUsed?: number;
+  structuredDataRatio?: number;
+  smoothingApplied?: boolean;
+  inferredMeasurement?: boolean;
+};
+
+export type GoalClinicalInsight = {
+  severity?: string;
+  code?: string;
+  goalId?: string;
+  message?: string;
 };
 
 export type ProgressEngineGoalRow = {
@@ -102,6 +127,14 @@ export type ProgressEngineGoalRow = {
   goalName?: string;
   measurementType?: string;
   dataPoints?: number;
+  confidenceScore?: number;
+  confidenceLabel?: string;
+  limitedDataUi?: boolean;
+  explanation?: GoalExplanation;
+  reasoningSummary?: string;
+  timeSeries?: GoalTimeSeriesPoint[];
+  goalInsights?: GoalClinicalInsight[];
+  clinicalRecommendation?: string;
 };
 
 export type ProgressEngineWeeklyPoint = {
@@ -111,11 +144,35 @@ export type ProgressEngineWeeklyPoint = {
   y: number;
 };
 
+export type ProgressEngineOverallExplanation = {
+  sessionWeight: number;
+  homeWeight: number;
+  confidenceScore: number;
+  dataQuality: 'low' | 'medium' | 'high';
+};
+
+export type DomainScoreCompact = {
+  name: string;
+  score: number;
+  confidence: number;
+};
+
 export type ProgressEnginePayload = {
   engineVersion?: number;
   overallScore: number;
   rawBlendScore?: number;
   confidence?: { overall: number; label: 'low' | 'medium' | 'high' };
+  overallTrend?: string;
+  /** Last few sessions composite slope (progressEngine v3). */
+  shortTermTrend?: string;
+  /** Overall trajectory (aligned with overallTrend in v3). */
+  longTermTrend?: string;
+  overallConfidence?: number;
+  overallExplanation?: ProgressEngineOverallExplanation;
+  overallClinicalStatus?: 'on_track' | 'needs_attention' | 'high_concern' | string;
+  clinicalReasoning?: string;
+  clinicalRecommendation?: string;
+  domainScores?: DomainScoreCompact[];
   improvementRate: number;
   consistency: number;
   activityCompletionRate?: number | null;
@@ -126,7 +183,7 @@ export type ProgressEnginePayload = {
   })[];
   weeklyTrend: ProgressEngineWeeklyPoint[];
   weakAreas: Array<{ type?: string; goalId?: string; reason?: string } | string>;
-  smartAlerts?: Array<{ severity?: string; code?: string; message?: string }>;
+  smartAlerts?: Array<{ severity?: string; code?: string; message?: string; goalId?: string }>;
   sessionInsights?: Array<{
     sessionId: string;
     sessionDate: string;

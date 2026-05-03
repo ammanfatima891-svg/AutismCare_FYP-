@@ -16,8 +16,10 @@ import { ReportsCaseTab } from './case-tabs/ReportsCaseTab';
 import { ScheduleCaseTab } from '../schedule/ScheduleCaseTab';
 import { CaseLabRequestsPanel } from '../case/CaseLabRequestsPanel';
 import type { CaseLabRequestRow } from '../case/CaseLabRequestsPanel';
+import { CaseTimelineView } from '../case/CaseTimelineView';
 
 const CASE_FILE_TABS = [
+  'timeline',
   'overview',
   'plans',
   'sessions',
@@ -126,6 +128,9 @@ export function TherapistCaseFile() {
 
             <Tabs value={activeTab} onValueChange={onTabChange} className="w-full gap-4">
               <TabsList className="flex h-auto min-h-10 w-full max-w-full flex-wrap justify-start gap-1 bg-muted p-1">
+                <TabsTrigger value="timeline" className="text-xs sm:text-sm">
+                  Timeline
+                </TabsTrigger>
                 <TabsTrigger value="overview" className="text-xs sm:text-sm">
                   Overview
                 </TabsTrigger>
@@ -154,6 +159,10 @@ export function TherapistCaseFile() {
                   Lab
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="timeline" className="mt-4">
+                <CaseTimelineView caseId={caseId} compact />
+              </TabsContent>
 
               <TabsContent value="overview" className="mt-4">
                 <OverviewTab data={data} />

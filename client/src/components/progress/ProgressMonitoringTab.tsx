@@ -2,18 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { progressEngineAPI } from '../../api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Loader2, AlertCircle, TrendingUp, BarChart3 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { TrendLineChart } from '../reports/ui/ChartSection';
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  BarChart,
-  Bar,
-} from 'recharts';
+  ClinicalAlertsPanel,
+  DomainPerformanceBarChart,
+  GoalClinicalCard,
+  GoalProgressLineChart,
+  GoalWhyModal,
+  LowConfidenceBanner,
+  trendIcon,
+} from '../progress-clinical';
 
 interface ProgressMonitoringTabProps {
   caseId: string;
@@ -34,6 +33,7 @@ export function ProgressMonitoringTab({ caseId }: ProgressMonitoringTabProps) {
 
   const [selectedDomain, setSelectedDomain] = useState<string>(DOMAIN_OPTIONS[0]);
   const [domainLoading, setDomainLoading] = useState(false);
+  const [whyGoal, setWhyGoal] = useState<any>(null);
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -73,64 +73,55 @@ export function ProgressMonitoringTab({ caseId }: ProgressMonitoringTabProps) {
     return goals || weekly || sessions;
   }, [engine]);
 
-  const overallProgressPercent = useMemo(() => {
-    const s = engine?.overallScore;
-    if (s == null || Number.isNaN(Number(s))) return 0;
-    return (Number(s) / 5) * 100;
-  }, [engine?.overallScore]);
+  const lowOverall = Boolean(engine?.confidence && Number(engine.confidence.overall) < 0.4);
+
+  const domainChartData = useMemo(() => {
+    const ds = Array.isArray(engine?.domainScores) ? engine.domainScores : engine?.domains;
+    const arr = Array.isArray(ds) ? ds : [];
+    if (!arr.length) return [];
+    return arr.map((d: any) => ({
+      name: String(d?.name || '—'),
+      score: typeof d?.score === 'number' ? d.score : 0,
+      confidence: typeof d?.confidence === 'number' ? d.confidence : Number(d?.confidenceScore) || 0,
+    }));
+  }, [engine]);
 
   const domains = useMemo(() => {
-    const ds = Array.isArray(engine?.domains) ? engine.domains : [];
     const goals = Array.isArray(engine?.goals) ? engine.goals : [];
-    if (!ds.length) {
-      return DOMAIN_OPTIONS.map((d) => ({
-        domain: d,
-        progressPercent: 0,
-        totalGoals: goals.filter((g: any) => String(g?.domain || '') === d).length,
-        achievedGoals: goals.filter(
-          (g: any) => String(g?.domain || '') === d && (g?.mastery === true || String(g?.masteryStatus || '') === 'mastered')
-        ).length,
-      }));
-    }
-    return ds.map((d: any) => {
-      const domain = String(d?.name || '');
-      const totalGoals = goals.filter((g: any) => String(g?.domain || '') === domain).length;
-      const achievedGoals = goals.filter(
-        (g: any) => String(g?.domain || '') === domain && (g?.mastery === true || String(g?.masteryStatus || '') === 'mastered')
-      ).length;
-      const scoreFive = d?.score != null ? Number(d.score) : 0;
-      return {
-        domain,
-        progressPercent: (scoreFive / 5) * 100,
-        totalGoals,
-        achievedGoals,
-      };
-    });
+    return DOMAIN_OPTIONS.map((d) => ({
+      domain: d,
+      totalGoals: goals.filter((g: any) => String(g?.domain || '') === d).length,
+      achievedGoals: goals.filter(
+        (g: any) =>
+          String(g?.domain || '') === d && (g?.mastery === true || String(g?.masteryStatus || '') === 'mastered')
+      ).length,
+    }));
   }, [engine]);
 
   const trendData = useMemo(() => {
     const w = Array.isArray(engine?.weeklyTrend) ? engine.weeklyTrend : [];
-    return w
-      .filter((row: any) => row && row.week)
-      .map((row: any) => ({
-        date: String(row.week),
-        value: row.y != null ? Number(row.y) * 20 : null, // 0–5 → 0–100
-      }));
+    return w.map((row: any) => ({
+      x: String(row.x || row.week || ''),
+      y: row.y != null ? Number(row.y) : 0,
+    }));
   }, [engine]);
 
   const domainData = useMemo(() => {
     const target = String(selectedDomain || '').toLowerCase();
     const match = domains.find((d: any) => String(d.domain || '').toLowerCase() === target) || null;
+    const goalsInDomain = (Array.isArray(engine?.goals) ? engine.goals : []).filter(
+      (g: any) => String(g?.domain || '').toLowerCase() === target
+    );
     return match
       ? {
           domain: match.domain,
-          progressPercent: match.progressPercent,
           totalGoals: match.totalGoals,
           achievedGoals: match.achievedGoals,
           trendData,
+          goalsInDomain,
         }
       : null;
-  }, [selectedDomain, domains, trendData]);
+  }, [selectedDomain, domains, trendData, engine?.goals]);
 
   const sessionInsights = useMemo(() => {
     return {
@@ -170,77 +161,96 @@ export function ProgressMonitoringTab({ caseId }: ProgressMonitoringTabProps) {
         </div>
       ) : (
         <>
+          <LowConfidenceBanner
+            visible={lowOverall}
+            message="Interpret with caution: overall estimate has low statistical confidence."
+          />
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="lg:col-span-2 border shadow-sm bg-card">
               <CardHeader className="pb-2">
-                <CardDescription>Overall Progress</CardDescription>
-                <CardTitle className="text-4xl text-blue-700">
-                  {Number(overallProgressPercent || 0).toFixed(1)}%
+                <CardDescription>Overall score (0–5)</CardDescription>
+                <CardTitle className="text-4xl tabular-nums text-blue-700">
+                  {lowOverall
+                    ? 'Limited data'
+                    : engine?.overallScore != null
+                      ? Number(engine.overallScore).toFixed(2)
+                      : '—'}
                 </CardTitle>
+                {engine?.overallTrend ? (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Trend {trendIcon(engine.overallTrend)} {String(engine.overallTrend)}
+                  </p>
+                ) : null}
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                Goals tracked: {Array.isArray(engine?.goals) ? engine.goals.length : 0}
+              <CardContent className="space-y-1 text-sm text-muted-foreground">
+                <p>Goals tracked: {Array.isArray(engine?.goals) ? engine.goals.length : 0}</p>
+                {engine?.confidence ? (
+                  <p>
+                    Confidence:{' '}
+                    <span className="font-medium capitalize text-foreground">{engine.confidence.label}</span> (
+                    {(Number(engine.confidence.overall) * 100).toFixed(0)}%)
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
 
-            {(domains || []).map((d: any) => (
-              <Card key={d.domain} className="border shadow-sm bg-card">
-                <CardHeader className="pb-2">
-                  <CardDescription>{d.domain}</CardDescription>
-                  <CardTitle className="text-2xl text-foreground">
-                    {Number(d.progressPercent || 0).toFixed(1)}%
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs text-muted-foreground">
-                  {d.achievedGoals || 0}/{d.totalGoals || 0} goals achieved
-                </CardContent>
-              </Card>
-            ))}
+            {(domains || []).map((d: any) => {
+              const row = domainChartData.find((x) => String(x.name).toLowerCase() === String(d.domain).toLowerCase());
+              const scoreFive = row != null && typeof row.score === 'number' ? row.score : null;
+              return (
+                <Card key={d.domain} className="border shadow-sm bg-card">
+                  <CardHeader className="pb-2">
+                    <CardDescription>{d.domain}</CardDescription>
+                    <CardTitle className="text-2xl tabular-nums text-foreground">
+                      {scoreFive == null || Number.isNaN(scoreFive) ? '—' : scoreFive.toFixed(2)}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground">
+                    Engine 0–5 · mastered {d.achievedGoals}/{d.totalGoals}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <Card className="border shadow-sm bg-card">
               <CardHeader className="border-b border bg-blue-50/40">
-                <CardTitle className="text-base text-blue-900 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Domain Progress Comparison
-                </CardTitle>
-                <CardDescription>Goal completion % by therapy domain</CardDescription>
+                <CardTitle className="text-base text-blue-900">Domain performance</CardTitle>
+                <CardDescription>Horizontal bars (0–5), color by statistical confidence</CardDescription>
               </CardHeader>
               <CardContent className="pt-6 h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={domains || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="domain" tick={{ fontSize: 12 }} />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Bar dataKey="progressPercent" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <DomainPerformanceBarChart data={domainChartData} height={280} />
               </CardContent>
             </Card>
 
             <Card className="border shadow-sm bg-card">
               <CardHeader className="border-b border bg-blue-50/40">
-                <CardTitle className="text-base text-blue-900 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Response Trend Over Time
-                </CardTitle>
-                <CardDescription>Average child response trend from sessions</CardDescription>
+                <CardTitle className="text-base text-blue-900">Composite trajectory</CardTitle>
+                <CardDescription>Smoothed engine series (same as reports)</CardDescription>
               </CardHeader>
-              <CardContent className="pt-6 h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="value" stroke="#16a34a" strokeWidth={2} dot />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent className="pt-6 min-h-[320px]">
+                {trendData.length ? (
+                  <TrendLineChart data={trendData} xLabel="Period" yLabel="Score (0–5)" />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No trajectory yet.</p>
+                )}
               </CardContent>
             </Card>
           </div>
+
+          {Array.isArray(engine?.smartAlerts) && engine.smartAlerts.length ? (
+            <Card className="border shadow-sm bg-card">
+              <CardHeader>
+                <CardTitle className="text-base">Clinical alerts</CardTitle>
+                <CardDescription>From progress engine (grouped)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ClinicalAlertsPanel alerts={engine.smartAlerts} />
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="border shadow-sm bg-card">
             <CardHeader className="border-b border bg-blue-50/40">
@@ -268,27 +278,67 @@ export function ProgressMonitoringTab({ caseId }: ProgressMonitoringTabProps) {
                   <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="space-y-6">
                   <div className="rounded-lg border p-4 bg-background">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Progress</p>
-                    <p className="text-2xl font-semibold text-foreground">
-                      {Number(domainData?.progressPercent || 0).toFixed(1)}%
-                    </p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Domain snapshot</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {domainData?.achievedGoals || 0}/{domainData?.totalGoals || 0} goals achieved
+                      {domainData?.achievedGoals || 0}/{domainData?.totalGoals || 0} goals mastered in this domain
                     </p>
                   </div>
-                  <div className="lg:col-span-2 rounded-lg border p-3 bg-card h-[220px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={domainData?.trendData || []}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis domain={[0, 100]} />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={2} dot />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div>
+                    <p className="text-sm font-medium text-foreground mb-2">Case-wide composite trajectory</p>
+                    <div className="h-[220px]">
+                      {(domainData?.trendData || []).length ? (
+                        <TrendLineChart
+                          data={domainData!.trendData}
+                          xLabel="Period"
+                          yLabel="Score (0–5)"
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No trend series.</p>
+                      )}
+                    </div>
                   </div>
+                  {(domainData as any)?.goalsInDomain?.length ? (
+                    <div className="space-y-6">
+                      <p className="text-sm font-medium text-foreground">Goals in this domain</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {(domainData as any).goalsInDomain.map((g: any) => (
+                          <GoalClinicalCard
+                            key={g.goalId}
+                            goal={{
+                              goalName: g.goalName,
+                              current: g.current,
+                              trend: g.trend,
+                              confidenceLabel: g.confidenceLabel,
+                              confidenceScore: g.confidenceScore,
+                              limitedDataUi: Boolean(g.limitedDataUi || g.confidenceScore < 0.4),
+                            }}
+                            onWhy={() => setWhyGoal(g)}
+                          />
+                        ))}
+                      </div>
+                      {(domainData as any).goalsInDomain.map((g: any) =>
+                        Array.isArray(g.timeSeries) && g.timeSeries.length ? (
+                          <div key={`${g.goalId}-chart`} className="rounded-lg border bg-card p-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">{g.goalName}</p>
+                            <GoalProgressLineChart
+                              height={200}
+                              data={g.timeSeries.map((t: any) => ({
+                                date: t.date,
+                                score: Number(t.score),
+                                smoothedScore: t.smoothedScore != null ? Number(t.smoothedScore) : undefined,
+                                confidence: t.confidence != null ? Number(t.confidence) : undefined,
+                              }))}
+                              explanationSnippet={String(g.reasoningSummary || '').slice(0, 100)}
+                            />
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No goals tagged in this domain yet.</p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -328,12 +378,20 @@ export function ProgressMonitoringTab({ caseId }: ProgressMonitoringTabProps) {
                         <p className="text-sm font-medium text-foreground">
                           {formatDate(item.sessionDate)} · {item.duration || 0} mins
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Response: {item.childResponse || 'n/a'}
-                          {item.responseScore != null ? ` (${Number(item.responseScore).toFixed(1)})` : ''}
-                        </p>
                         <p className="text-xs text-muted-foreground">
-                          Goals targeted: {Array.isArray(item.goalsTargeted) ? item.goalsTargeted.join(', ') || '—' : '—'}
+                          Goals in session log:{' '}
+                          {Array.isArray(item.goalsImpacted) && item.goalsImpacted.length
+                            ? item.goalsImpacted
+                                .map((gi: unknown) =>
+                                  typeof gi === 'object' && gi && 'goalName' in gi
+                                    ? String((gi as { goalName?: string }).goalName || '')
+                                    : ''
+                                )
+                                .filter(Boolean)
+                                .join(', ') || '—'
+                            : Array.isArray(item.goalsTargeted)
+                              ? item.goalsTargeted.join(', ') || '—'
+                              : '—'}
                         </p>
                       </div>
                     ))}
@@ -346,6 +404,13 @@ export function ProgressMonitoringTab({ caseId }: ProgressMonitoringTabProps) {
               </div>
             </CardContent>
           </Card>
+          <GoalWhyModal
+            open={Boolean(whyGoal)}
+            onOpenChange={(open) => {
+              if (!open) setWhyGoal(null);
+            }}
+            goal={whyGoal}
+          />
         </>
       )}
     </div>

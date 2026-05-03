@@ -187,55 +187,23 @@ export function QuestionnaireSelection({ onStartScreening }: QuestionnaireSelect
             )}
           </div>
 
-          <Button
-            onClick={handleStart}
-            disabled={!selectedChild || !selectedQuestionnaire || !selectedIsEligible}
-            className="w-full h-11 rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
-          >
-            Start Screening
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+          <div className="border-t border-border pt-6 mt-2">
+            <Button
+              onClick={handleStart}
+              disabled={!selectedChild || !selectedQuestionnaire || !selectedIsEligible}
+              className="w-full h-12 rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
+            >
+              Start Screening
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            {!selectedIsEligible && selectedChild && selectedQuestionnaire ? (
+              <p className="mt-3 text-center text-sm text-destructive">
+                This questionnaire is not available for the selected child’s age window. Choose another tool or child.
+              </p>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
-
-      {/* Single “what you’re starting” card — matches selected child + tool only */}
-      {selectedChild && selectedQuestionnaire && (
-        <Card
-          className={`border transition-shadow ${selectedIsEligible ? 'border-border' : 'border-destructive/40 bg-destructive/5'}`}
-        >
-          <CardHeader className="space-y-1 pb-2 px-5 pt-5">
-            <CardTitle className="text-base text-foreground">About this questionnaire</CardTitle>
-            <CardDescription>
-              {selectedIsEligible
-                ? 'Details for your selected child and screening type.'
-                : 'This tool is not in the recommended age range for the selected child.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-5 pb-5 pt-0">
-            {selectedIsEligible && selectedQuestionnaire === 'MCHAT-R' && (
-              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground leading-relaxed">
-                <li>20 yes/no questions</li>
-                <li>Takes about 5–10 minutes</li>
-                <li>Designed for toddlers about 16–30 months old</li>
-                <li>Screens for autism spectrum concerns (not a diagnosis)</li>
-              </ul>
-            )}
-            {selectedIsEligible && selectedQuestionnaire === 'ASQ-3' && (
-              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground leading-relaxed">
-                <li>30 questions across five developmental areas</li>
-                <li>Takes about 10–15 minutes</li>
-                <li>Uses age-based intervals (e.g. 2, 6, 12 months…)</li>
-                <li>Assesses communication, gross motor, fine motor, problem-solving, and personal-social skills</li>
-              </ul>
-            )}
-            {!selectedIsEligible && (
-              <p className="text-sm text-destructive">
-                Pick a questionnaire from the list above that appears for this child, or choose a different child.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

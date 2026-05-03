@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../../context/AuthContext';
 import { Home, ClipboardList, Calendar, TrendingUp, Inbox, LibraryBig, House, FileText } from 'lucide-react';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { TherapistHome } from './TherapistHome';
@@ -37,7 +38,7 @@ interface User {
 }
 
 interface TherapistDashboardProps {
-  user?: User; // optional, so we can render dummy for now
+  user?: User;
   onLogout?: () => void;
 }
 
@@ -53,13 +54,23 @@ const navigation = [
   { id: 'reports', label: 'Reports', icon: FileText },
 ];
 
+type AuthSessionUser = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  token?: string;
+  role?: string;
+};
+
 export function TherapistDashboard({ user, onLogout }: TherapistDashboardProps) {
-  // Safe dummy user if none provided
+  const auth = useContext(AuthContext);
+  const session = auth?.user as AuthSessionUser | null | undefined;
+
   const safeUser: User = user ?? {
-    _id: '1',
-    firstName: 'Rabia',
-    lastName: 'Babar',
-    email: 'rabiababar@example.com',
+    _id: '',
+    firstName: session?.firstName || '',
+    lastName: session?.lastName || '',
+    email: session?.email || '',
     primaryRole: 'therapist',
     roles: ['therapist'],
   };

@@ -183,9 +183,15 @@ export function ChildCaseLabModule({ childId }: { childId?: string }) {
             </CardTitle>
             <CardDescription>Clinician to lab workflow for this child case</CardDescription>
           </div>
-          <Button size="sm" onClick={openRequestModal} disabled={!childId}>
+          <Button
+            size="sm"
+            type="button"
+            onClick={openRequestModal}
+            disabled={!childId}
+            title={!childId ? 'Child record is required to request a lab test for this case.' : undefined}
+          >
             <Plus className="mr-1 h-4 w-4" />
-            Request Lab Test
+            Request
           </Button>
         </div>
       </CardHeader>

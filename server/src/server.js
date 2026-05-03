@@ -116,6 +116,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes.js');
 const reportRoutes = require('./routes/reportRoutes.js');
 const { scheduleRouter, sessionSlotRouter } = require('./routes/scheduleRoutes.js');
 const facialScreeningRoutes = require('./routes/facialScreening.routes.js');
+const clinicalIntelligenceRoutes = require('./routes/clinicalIntelligence.routes.js');
 
 /* ─────────────────────────────────────────────
    5. Healthcheck (CRITICAL for Railway)
@@ -160,6 +161,7 @@ app.use("/api/activities", activityRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/assignments", homeAssignmentRoutes);
 app.use('/api/messaging', messagingLimiter, messageRoutes);
+app.use('/api', clinicalIntelligenceRoutes);
 
 /* ─────────────────────────────────────────────
    7. Server + DB startup (FIXED FLOW)

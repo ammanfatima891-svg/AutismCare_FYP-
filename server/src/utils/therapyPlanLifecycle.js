@@ -52,26 +52,30 @@ async function activateTherapyPlanWhenTherapyStarts(caseId, therapistId) {
 
   if (!plan) return null;
 
-  const eff = effectivePlanStatus(plan);
-  if (eff === 'active') return plan;
-
-  if (eff === 'approved' || (!plan.planStatus && plan.approval?.status === 'approved')) {
-    const cid = plan.caseId;
-    await TherapyPlan.updateMany(
-      { caseId: cid, planStatus: 'active' },
-      { $set: { planStatus: 'archived' } }
-    );
-    plan.planStatus = 'active';
-    if (!plan.approvedAt) plan.approvedAt = plan.approval?.approvedAt || null;
-    if (!plan.approvedBy && plan.approval?.approvedBy) plan.approvedBy = plan.approval.approvedBy;
-    syncLegacyFieldsFromPlanStatus(plan);
-    plan.approval = plan.approval || {};
-    plan.approval.status = 'approved';
-    await plan.save();
+  const planStatusStr = String(plan.planStatus || '').trim();
+  if (planStatusStr === 'active' || effectivePlanStatus(plan) === 'active') {
     return plan;
   }
 
-  return null;
+  // Submitted plans keep planStatus `final` after clinician approval; effectivePlanStatus is still
+  // `final`, so we must not require eff === `approved` here — any clinician-approved doc should
+  // become session-eligible once therapy starts.
+  if (String(plan.approval?.status || '') !== 'approved') return null;
+  if (planStatusStr === 'archived') return null;
+
+  const cid = plan.caseId;
+  await TherapyPlan.updateMany(
+    { caseId: cid, planStatus: 'active' },
+    { $set: { planStatus: 'archived' } }
+  );
+  plan.planStatus = 'active';
+  if (!plan.approvedAt) plan.approvedAt = plan.approval?.approvedAt || null;
+  if (!plan.approvedBy && plan.approval?.approvedBy) plan.approvedBy = plan.approval.approvedBy;
+  syncLegacyFieldsFromPlanStatus(plan);
+  plan.approval = plan.approval || {};
+  plan.approval.status = 'approved';
+  await plan.save();
+  return plan;
 }
 
 /**

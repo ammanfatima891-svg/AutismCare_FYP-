@@ -2,6 +2,8 @@ const { User, APPROVAL_STATUS } = require('../models/User');
 const mongoose = require('mongoose');
 const { recordAuditEvent } = require('../utils/auditLog');
 const LabApproval = require('../models/LabApproval');
+const { Appointment } = require('../models/Appointment');
+const { APPOINTMENT_STATUS } = require('../constants/workflowEnums');
 
 // Get all pending professionals
 exports.getPendingProfessionals = async (req, res) => {
@@ -120,5 +122,45 @@ exports.updateProfessionalStatus = async (req, res) => {
   } catch (err) {
     console.error("Update professional status error:", err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * GET /api/admin/dashboard-metrics
+ * Lightweight counts for admin home cards (no mock UI data).
+ */
+exports.getDashboardMetrics = async (req, res) => {
+  try {
+    const [pendingClinicianTherapist, pendingLabApprovals, apptTotal, apptPending, apptCompleted, activeProfessionals] =
+      await Promise.all([
+        User.countDocuments({
+          role: { $in: ['clinician', 'therapist'] },
+          approvalStatus: APPROVAL_STATUS.PENDING,
+        }),
+        LabApproval.countDocuments({ status: APPROVAL_STATUS.PENDING }),
+        Appointment.countDocuments(),
+        Appointment.countDocuments({ status: APPOINTMENT_STATUS.PENDING }),
+        Appointment.countDocuments({ status: APPOINTMENT_STATUS.COMPLETED }),
+        User.countDocuments({
+          role: { $in: ['clinician', 'therapist', 'lab'] },
+          approvalStatus: APPROVAL_STATUS.ACTIVE,
+        }),
+      ]);
+
+    const pendingApprovals = pendingClinicianTherapist + pendingLabApprovals;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        pendingApprovals,
+        appointmentsTotal: apptTotal,
+        appointmentsPending: apptPending,
+        appointmentsCompleted: apptCompleted,
+        activeProfessionals,
+      },
+    });
+  } catch (err) {
+    console.error('getDashboardMetrics:', err);
+    return res.status(500).json({ success: false, message: 'Failed to load dashboard metrics' });
   }
 };

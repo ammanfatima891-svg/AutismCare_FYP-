@@ -14,13 +14,14 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
 import { Loader2, Copy, Pencil, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { activityAPI } from '../../api';
+import { activityAPI, therapistAPI } from '../../api';
 import type { ActivityTemplate } from './activityTypes';
 import { FILTER_DOMAIN_OPTIONS } from './activityTypes';
 import { ActivityTemplateFormDialog } from './ActivityTemplateFormDialog';
@@ -101,6 +102,14 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
   const [assignDue, setAssignDue] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** When the library is opened from the dashboard (no case route), therapist picks a case to assign. */
+  const [assignCaseIdOverride, setAssignCaseIdOverride] = useState<string | null>(null);
+  const [casePickOpen, setCasePickOpen] = useState(false);
+  const [casePickLoading, setCasePickLoading] = useState(false);
+  const [casePickOptions, setCasePickOptions] = useState<Array<{ caseId: string; childName: string }>>([]);
+  const [casePickForActivity, setCasePickForActivity] = useState<ActivityTemplate | null>(null);
+
+  const effectiveCaseId = caseId || assignCaseIdOverride || '';
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search), 350);
@@ -163,6 +172,31 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
     });
   };
 
+  /** Platform templates are read-only in place; clone first, then open the new copy for editing. */
+  const handleEditOrClonePlatform = async (a: ActivityTemplate) => {
+    if (!isPlatformTemplate(a)) {
+      openEdit(a);
+      return;
+    }
+    try {
+      const res = await activityAPI.cloneTemplate(a._id);
+      const created = (res.data as { data?: ActivityTemplate } | undefined)?.data;
+      if (created && created._id) {
+        toast.success('Created your copy — you can edit it now');
+        await load();
+        startTransition(() => {
+          setEditing(created);
+          setFormOpen(true);
+        });
+      } else {
+        toast.error('Clone did not return a template');
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Could not create an editable copy');
+    }
+  };
+
   const handleClone = async (a: ActivityTemplate) => {
     try {
       await activityAPI.cloneTemplate(a._id);
@@ -174,12 +208,9 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
     }
   };
 
-  const openAssign = (a: ActivityTemplate) => {
-    if (!caseId) {
-      toast.message('Open a child therapy case file to assign activities.');
-      return;
-    }
+  const beginAssignFlow = (a: ActivityTemplate, cid: string) => {
     setAssignActivity(a);
+    if (!caseId) setAssignCaseIdOverride(cid);
     setAssignTarget('home');
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -187,8 +218,50 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
     setAssignOpen(true);
   };
 
+  const openAssign = async (a: ActivityTemplate) => {
+    if (caseId) {
+      beginAssignFlow(a, caseId);
+      return;
+    }
+    if (assignCaseIdOverride) {
+      beginAssignFlow(a, assignCaseIdOverride);
+      return;
+    }
+    setCasePickForActivity(a);
+    setCasePickOpen(true);
+    setCasePickLoading(true);
+    setCasePickOptions([]);
+    try {
+      const res = await therapistAPI.getDashboardSummary();
+      const rows = (res.data?.data?.assignedCases || []) as Array<{ caseId?: string; childName?: string }>;
+      const opts = rows
+        .filter((r) => r?.caseId)
+        .map((r) => ({ caseId: String(r.caseId), childName: String(r.childName || 'Child') }));
+      setCasePickOptions(opts);
+      if (opts.length === 0) {
+        toast.error('No assigned cases yet. Accept a referral in Assigned Cases, then try again.');
+        setCasePickOpen(false);
+        setCasePickForActivity(null);
+        return;
+      }
+      if (opts.length === 1) {
+        setAssignCaseIdOverride(opts[0].caseId);
+        setCasePickOpen(false);
+        beginAssignFlow(a, opts[0].caseId);
+        setCasePickForActivity(null);
+      }
+    } catch {
+      toast.error('Could not load your cases to assign this activity.');
+      setCasePickOpen(false);
+      setCasePickForActivity(null);
+    } finally {
+      setCasePickLoading(false);
+    }
+  };
+
   const submitAssign = async () => {
-    if (!caseId || !assignActivity) return;
+    const cid = effectiveCaseId;
+    if (!cid || !assignActivity) return;
     if (assignTarget === 'home' && !assignDue) {
       toast.error('Due date is required for home assignments');
       return;
@@ -196,12 +269,13 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
     try {
       setAssignSaving(true);
       await activityAPI.assign(assignActivity._id, {
-        caseId,
+        caseId: cid,
         assignTo: assignTarget,
         ...(assignTarget === 'home' ? { dueDate: new Date(assignDue).toISOString() } : {}),
       });
       toast.success(assignTarget === 'home' ? 'Home assignment created' : 'Activity added to therapy plan');
       setAssignOpen(false);
+      if (!caseId) setAssignCaseIdOverride(null);
       if (onAssignSuccess) await onAssignSuccess();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -275,6 +349,27 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
             New Activity
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-border/80 bg-muted/15 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+        <p className="font-semibold text-foreground">Edit, Clone, and Assign</p>
+        <ul className="mt-2 list-disc space-y-1.5 pl-4 marker:text-muted-foreground">
+          <li>
+            <span className="font-medium text-foreground">Edit</span> — change your own template. For{' '}
+            <span className="font-medium text-foreground">Platform</span> activities, Edit first creates your editable copy,
+            then opens it.
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Clone</span> — duplicate any activity as a new template in your
+            library (handy to customize a platform activity without losing the original).
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Assign</span> — send to a{' '}
+            <span className="font-medium text-foreground">home assignment</span> (parent dashboard) or add to the case{' '}
+            <span className="font-medium text-foreground">therapy plan</span>. From this page, if you are not inside a case
+            file, you will pick which assigned case to use (or one is chosen automatically if you only have one).
+          </li>
+        </ul>
       </div>
 
       {loadError && !loading ? (
@@ -398,13 +493,13 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-10 min-w-0 w-full border bg-card px-2 font-bold text-foreground shadow-sm transition-all hover:border hover:bg-background active:scale-[0.98] disabled:opacity-50 sm:px-3"
-                    disabled={isPlatformTemplate(a)}
-                    title={isPlatformTemplate(a) ? 'Platform templates cannot be edited — clone to customize' : undefined}
-                    onClick={() => {
-                      if (isPlatformTemplate(a)) return;
-                      openEdit(a);
-                    }}
+                    className="h-10 min-w-0 w-full border bg-card px-2 font-bold text-foreground shadow-sm transition-all hover:border hover:bg-background active:scale-[0.98] sm:px-3"
+                    title={
+                      isPlatformTemplate(a)
+                        ? 'Creates your copy, then opens the editor (platform templates are read-only)'
+                        : 'Open this template in the editor'
+                    }
+                    onClick={() => void handleEditOrClonePlatform(a)}
                   >
                     <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden />
                     Edit
@@ -423,10 +518,13 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
                     type="button"
                     size="sm"
                     variant="accent"
-                    className="h-10 min-w-0 w-full px-2 font-bold shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 sm:px-3"
-                    onClick={() => openAssign(a)}
-                    disabled={!caseId}
-                    title={!caseId ? 'Open a case file to assign' : 'Assign to plan or home'}
+                    className="h-10 min-w-0 w-full px-2 font-bold shadow-sm transition-all active:scale-[0.98] sm:px-3"
+                    onClick={() => void openAssign(a)}
+                    title={
+                      caseId
+                        ? 'Assign to home or therapy plan for this case'
+                        : 'Assign — pick a case if you have more than one'
+                    }
                   >
                     Assign
                   </Button>
@@ -447,7 +545,75 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
         />
       ) : null}
 
-      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+      <Dialog
+        open={casePickOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCasePickOpen(false);
+            setCasePickForActivity(null);
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[min(85dvh,32rem)] flex-col gap-0 overflow-hidden border bg-card p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 border-b px-5 py-4">
+            <DialogTitle>Choose a case</DialogTitle>
+            <DialogDescription>
+              {casePickForActivity
+                ? `Assign “${casePickForActivity.name}” to one of your assigned cases.`
+                : 'Select which case should receive this assignment.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+            {casePickLoading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {casePickOptions.map((opt) => (
+                  <li key={opt.caseId}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto w-full justify-start py-3 text-left"
+                      onClick={() => {
+                        const act = casePickForActivity;
+                        if (!act) return;
+                        setAssignCaseIdOverride(opt.caseId);
+                        setCasePickOpen(false);
+                        setCasePickForActivity(null);
+                        beginAssignFlow(act, opt.caseId);
+                      }}
+                    >
+                      <span className="font-medium text-foreground">{opt.childName}</span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter className="shrink-0 border-t px-5 py-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setCasePickOpen(false);
+                setCasePickForActivity(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={assignOpen}
+        onOpenChange={(open) => {
+          setAssignOpen(open);
+          if (!open && !caseId) setAssignCaseIdOverride(null);
+        }}
+      >
         <DialogContent className="border bg-card sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-foreground">Assign activity</DialogTitle>
@@ -482,7 +648,16 @@ export function ActivityLibraryScreen({ caseId, onAssignSuccess }: Props) {
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" className="border" onClick={() => setAssignOpen(false)} disabled={assignSaving}>
+            <Button
+              type="button"
+              variant="outline"
+              className="border"
+              onClick={() => {
+                setAssignOpen(false);
+                if (!caseId) setAssignCaseIdOverride(null);
+              }}
+              disabled={assignSaving}
+            >
               Cancel
             </Button>
             <Button

@@ -48,7 +48,7 @@ function formatLastSessionDate(value: string | Date | null | undefined): string 
 }
 
 function statusDisplayLabel(normalized: string): string {
-  if (normalized === 'in-progress') return 'Active';
+  if (normalized === 'in-progress') return 'Therapy active';
   if (normalized === 'accepted') return 'Accepted';
   if (normalized === 'pending') return 'Pending';
   if (normalized === 'sent') return 'Sent';
@@ -56,7 +56,9 @@ function statusDisplayLabel(normalized: string): string {
 }
 
 function statusBadgeClassForCard(normalized: string): string {
-  if (normalized === 'in-progress') return 'rounded-full border-0 bg-primary px-3 py-2 text-xs font-medium text-white';
+  if (normalized === 'in-progress') {
+    return 'rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100';
+  }
   if (normalized === 'accepted') return 'rounded-full border bg-card px-3 py-2 text-xs font-medium text-foreground';
   return 'rounded-full border bg-muted px-3 py-2 text-xs font-medium text-foreground';
 }
@@ -244,7 +246,10 @@ export function TherapistAssignedCases() {
         <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {filteredItems.map((item) => {
             const normalizedStatus = normalizeStatus(item.status);
+            const caseLifecycle = String(item.case?.status ?? '').toUpperCase();
             const caseIdForRoute = String(item.caseId ?? item.case?.caseId ?? '');
+            const showStartTherapy =
+              normalizedStatus === 'accepted' && caseLifecycle === 'THERAPY';
             const child = item.case?.child;
             const childName = child
               ? `${child.firstName || ''} ${child.lastName || ''}`.trim() || 'Child'
@@ -333,7 +338,7 @@ export function TherapistAssignedCases() {
                       ) : null}
                     </>
                   ) : null}
-                  {normalizedStatus === 'accepted' ? (
+                  {showStartTherapy ? (
                     <>
                       <Button
                         type="button"
@@ -356,6 +361,16 @@ export function TherapistAssignedCases() {
                         View Case File
                       </Button>
                     </>
+                  ) : null}
+                  {normalizedStatus === 'accepted' && !showStartTherapy && caseIdForRoute ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(assignedChipBtn, 'w-full border bg-card text-foreground hover:bg-background')}
+                      onClick={() => navigate(`/therapist/case/${caseIdForRoute}`)}
+                    >
+                      View Case File
+                    </Button>
                   ) : null}
                   {normalizedStatus === 'in-progress' ? (
                     <Button

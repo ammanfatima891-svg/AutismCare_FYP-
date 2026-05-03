@@ -22,6 +22,7 @@ import { Loader2 } from 'lucide-react';
 import { activityAPI } from '../../api';
 import type { ActivityTemplate } from './activityTypes';
 import { DIFFICULTY_OPTIONS, FORM_DOMAIN_OPTIONS } from './activityTypes';
+import { cn } from '../ui/utils';
 
 type Props = {
   /** When mounted, dialog is shown; parent unmounts when closed. */
@@ -128,7 +129,9 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
       modal
     >
       <DialogContent
-        className="max-h-[90vh] overflow-y-auto border bg-card sm:max-w-lg"
+        className={cn(
+          'flex max-h-[min(92dvh,44rem)] w-full flex-col gap-0 overflow-hidden border bg-card p-0 sm:max-w-lg',
+        )}
         /** Keep dropdowns usable; dialog still closes via overlay/Escape/Cancel */
         onPointerDownOutside={(e) => {
           const el = e.target as HTMLElement | null;
@@ -139,13 +142,16 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
           if (el?.closest?.('[data-slot="select-content"]')) e.preventDefault();
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 space-y-0 border-b px-6 py-4 text-left">
           <DialogTitle className="text-blue-900">{editing ? 'Edit activity' : 'New activity'}</DialogTitle>
         </DialogHeader>
         {error ? (
-          <div className="rounded-md border bg-muted px-3 py-2 text-sm text-destructive">{error}</div>
+          <div className="shrink-0 border-b bg-muted/30 px-6 py-2">
+            <div className="rounded-md border bg-muted px-3 py-2 text-sm text-destructive">{error}</div>
+          </div>
         ) : null}
-        <div className="grid gap-4 py-2">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+        <div className="grid gap-4">
           <div className="space-y-1">
             <Label>Activity name</Label>
             <Input
@@ -272,7 +278,8 @@ export function ActivityTemplateFormDialog({ editing, onClose, onSaved }: Props)
             ) : null}
           </div>
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        </div>
+        <DialogFooter className="shrink-0 gap-2 border-t bg-background px-6 py-4 sm:gap-0">
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
